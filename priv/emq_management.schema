@@ -1,0 +1,82 @@
+%%-*- mode: erlang -*-
+%% emq_management config mapping
+
+{mapping, "management.listener.http", "emq_dashboard.listeners", [
+  {default, 8080},
+  {datatype, [integer, ip]}
+]}.
+
+{mapping, "management.listener.http.acceptors", "emq_dashboard.listeners", [
+  {default, 4},
+  {datatype, integer}
+]}.
+
+{mapping, "management.listener.http.max_clients", "emq_dashboard.listeners", [
+  {default, 512},
+  {datatype, integer}
+]}.
+
+{mapping, "management.listener.https", "emq_dashboard.listeners", [
+  {datatype, [integer, ip]}
+]}.
+
+{mapping, "management.listener.https.acceptors", "emq_dashboard.listeners", [
+  {default, 8},
+  {datatype, integer}
+]}.
+
+{mapping, "management.listener.https.max_clients", "emq_dashboard.listeners", [
+  {default, 64},
+  {datatype, integer}
+]}.
+
+{mapping, "management.listener.https.handshake_timeout", "emq_dashboard.listeners", [
+  {default, 15},
+  {datatype, integer}
+]}.
+
+{mapping, "management.listener.https.keyfile", "emq_dashboard.listeners", [
+  {datatype, string}
+]}.
+
+{mapping, "management.listener.https.certfile", "emq_dashboard.listeners", [
+  {datatype, string}
+]}.
+
+{mapping, "management.listener.https.cacertfile", "emq_dashboard.listeners", [
+  {datatype, string}
+]}.
+
+{mapping, "management.listener.https.verify", "emq_dashboard.listeners", [
+  {datatype, string}
+]}.
+
+{mapping, "management.listener.https.fail_if_no_peer_cert", "emq_dashboard.listeners", [
+  {datatype, {enum, [true, false]}}
+]}.
+
+{translation, "emq_management.listeners", fun(Conf) ->
+  Filter = fun(Opts) -> [{K, V} || {K, V} <- Opts, V =/= undefined] end,
+  Opts = fun(Prefix) ->
+             Filter([{acceptors,   cuttlefish:conf_get(Prefix ++ ".acceptors", Conf)},
+                     {max_clients, cuttlefish:conf_get(Prefix ++ ".max_clients", Conf)}])
+         end,
+  SslOpts = fun(Prefix) ->
+                Filter([{handshake_timeout, cuttlefish:conf_get(Prefix ++ ".handshake_timeout", Conf) * 1000},
+                        {keyfile,    cuttlefish:conf_get(Prefix ++ ".keyfile", Conf, undefined)},
+                        {certfile,   cuttlefish:conf_get(Prefix ++ ".certfile", Conf, undefined)},
+                        {cacertfile, cuttlefish:conf_get(Prefix ++ ".cacertfile", Conf, undefined)},
+                        {verify,     cuttlefish:conf_get(Prefix ++ ".verify", Conf, undefined)},
+                        {fail_if_no_peer_cert, cuttlefish:conf_get(Prefix ++ ".fail_if_no_peer_cert", Conf, undefined)}])
+              end,
+  lists:append([
+      case cuttlefish:conf_get("management.listener.http", Conf, undefined) of
+          undefined -> [];
+          HttpPort  -> [{http, HttpPort, Opts("management.listener.http")}]
+      end,
+      case cuttlefish:conf_get("management.listener.https", Conf, undefined) of
+          undefined -> [];
+          HttpsPort -> [{https, HttpsPort, [{sslopts, SslOpts("management.listener.https")} | Opts("dashboard.listener.https")]}]
+      end])
+end}.
+
