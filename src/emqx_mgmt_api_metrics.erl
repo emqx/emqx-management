@@ -14,33 +14,32 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emq_mgmt_api_nodes).
+-module(emqx_mgmt_api_metrics).
 
 -author("Feng Lee <feng@emqtt.io>").
 
--rest_api(#{name   => list_nodes,
+-rest_api(#{name   => list_metrics,
             method => 'GET',
-            path   => "/nodes/",
+            path   => "/metrics/",
             func   => list,
-            descr  => "A list of nodes in the cluster"}).
+            descr  => "A list of metrics of all nodes in the cluster"}).
 
--rest_api(#{name   => lookup_node,
+-rest_api(#{name   => list_node_metrics,
             method => 'GET',
-            path   => "/nodes/:node",
-            func   => lookup,
-            descr  => "Lookup a node in the cluster"}).
+            path   => "/nodes/:node/metrics/",
+            func   => list,
+            descr  => "A list of metrics of a node"}).
 
--export([list/2, lookup/2]).
+-export([list/2]).
 
-list(_Bindings, _Params) ->
-    {ok, [{Node, format(Info)} || {Node, Info} <- emq_mgmt:list_nodes()]}.
+%% List metrics of all nodes
+list(Bindings, _Params) when map_size(Bindings) == 0 ->
+    {ok, emqx_mgmt:get_metrics()};
 
-lookup(#{node := Node}, _Params) ->
-    {ok, emq_mgmt:lookup_node(Node)}.
-
-format({error, Reason}) -> [{error, Reason}];
-
-format(Info = #{memory_total := Total, memory_used := Used}) ->
-    Info#{memory_total := emq_mgmt_util:kmg(Total),
-          memory_used  := emq_mgmt_util:kmg(Used)}.
+%% List metrics of a node
+list(#{node := Node}, _Params) ->
+    case emqx_mgmt:get_metrics(Node) of
+        {error, Reason} -> {error, Reason};
+        Metrics -> {ok, Metrics}
+    end.
 

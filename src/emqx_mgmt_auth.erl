@@ -14,7 +14,7 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emq_mgmt_auth).
+-module(emqx_mgmt_auth).
 
 %% Mnesia Bootstrap
 -export([mnesia/1]).
@@ -51,7 +51,7 @@ mnesia(copy) ->
 -spec(add_app(appid()) -> {ok, appsecret()} | {error, term()}).
 add_app(AppId) when is_binary(AppId) ->
     Secret = emqttd_guid:to_base62(emqttd_guid:gen()),
-    App = #mqtt_app{appid = AppId, appsecret = Secret},
+    App = #mqtt_app{id = AppId, secret = Secret},
     AddFun = fun() ->
                  case mnesia:wread({mqtt_app, AppId}) of
                      [] -> mnesia:write(App);
@@ -66,7 +66,7 @@ add_app(AppId) when is_binary(AppId) ->
 -spec(get_appsecret(appid()) -> {appsecret() | undefined}).
 get_appsecret(AppId) when is_binary(AppId) ->
     case mnesia:dirty_read(mqtt_app, AppId) of
-        [#mqtt_app{appsecret = Secret}] -> Secret;
+        [#mqtt_app{secret = Secret}] -> Secret;
         [] -> undefined
     end.
 

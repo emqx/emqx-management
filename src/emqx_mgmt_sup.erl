@@ -14,29 +14,17 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emq_mgmt_api_brokers).
+-module(emqx_mgmt_sup).
 
--author("Feng Lee <feng@emqtt.io>").
+-behaviour(supervisor).
 
--rest_api(#{name   => list_brokers_info,
-            method => 'GET',
-            path   => "/brokers/",
-            func   => list,
-            descr  => "A list of brokers in the cluster"}).
+-export([start_link/0]).
 
--rest_api(#{name   => list_broker_info,
-            method => 'GET',
-            path   => "/brokers/:node",
-            func   => list,
-            descr  => "Show broker info of a node"}).
+-export([init/1]).
 
-list(#{node := Node}, _Params) ->
-    {ok, format(emq_mgmt:broker_info(list_to_atom(Node)))}.
+start_link() ->
+	supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-list(_Bindings, _Params) ->
-    {ok, [{Node, format(Info)} || {Node, Info} <- emq_mgmt:brokers_info()]}.
-
-format({error, Reason}) -> [{error, Reason}];
-
-format(Info) -> Info.
+init([]) ->
+	{ok, {{one_for_one, 1, 5}, []}}.
 

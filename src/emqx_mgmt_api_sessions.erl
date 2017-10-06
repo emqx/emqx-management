@@ -14,7 +14,7 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emq_mgmt_api_sessions).
+-module(emqx_mgmt_api_sessions).
 
 -include_lib("emqttd/include/emqttd.hrl").
 
@@ -36,10 +36,12 @@
             func   => lookup,
             descr  => "Lookup a session in the cluster"}).
 
+-export([list/2, lookup/2]).
+
 list(#{node := Node}, Params) when Node =:= node() ->
-    {ok, emq_mgmt_api:paginate(emq_mgmt:query_handle(sessions),
-                               emq_mgmt:count(sessions),
-                               Params, fun format/1)};
+    {ok, emqx_mgmt_api:paginate(emqx_mgmt:query_handle(sessions),
+                                emqx_mgmt:count(sessions),
+                                Params, fun format/1)};
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
@@ -48,17 +50,17 @@ list(Bindings = #{node := Node}, Params) ->
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    {ok, #{items => format(emq_mgmt:lookup_session(Node, ClientId))}};
+    {ok, #{items => format(emqx_mgmt:lookup_session(Node, ClientId))}};
 
 lookup(#{clientid := ClientId}, _Params) ->
-    {ok, #{items => format(emq_mgmt:lookup_session(ClientId))}}.
+    {ok, #{items => format(emqx_mgmt:lookup_session(ClientId))}}.
 
-format({ClientId, _Pid, Persistent, Properties}) ->
-    format(emq_mgmt:item(session, Item));
+format(Item = {_ClientId, _Pid, _Persistent, _Properties}) ->
+    format(emqx_mgmt:item(session, Item));
 
 format(Items) when is_list(Items) ->
     [format(Item) || Item <- Items];
 
-format(Item = #{created_at = CreatedAt}) ->
-    Item#{created_at = iolist_to_binary(emq_mgmt_util:strftime(CreatedAt))}.
+format(Item = #{created_at := CreatedAt}) ->
+    Item#{created_at => iolist_to_binary(emqx_mgmt_util:strftime(CreatedAt))}.
 

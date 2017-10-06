@@ -14,11 +14,15 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emq_mgmt_api_configs).
+-module(emqx_mgmt_api_configs).
 
 -author("Feng Lee <feng@emqtt.io>").
 
+-include("emqx_mgmt.hrl").
+
 -include_lib("emqttd/include/emqttd.hrl").
+
+-import(proplists, [get_value/2, get_value/3]).
 
 -rest_api(#{name   => get_all_configs,
             method => 'GET',
@@ -56,28 +60,30 @@
             func   => update_plugin_configs,
             descr  => "Update configurations of a plugin on the node"}).
 
+-export([get_configs/2, update_config/2, get_plugin_configs/2, update_plugin_configs/2]).
+
 get_configs(#{node := Node}, _Params) ->
-    {ok, emq_mgmt:get_all_configs(Node)};
+    {ok, format(emqx_mgmt:get_all_configs(Node))};
 
 get_configs(_Binding, _Params) ->
-    {ok, emq_mgmt:get_all_configs()}.
+    {ok, [{Node, format(Configs)} || {Node, Configs} <- emqx_mgmt:get_all_configs()]}.
 
 update_config(#{node := Node, app := App}, Params) ->
     Key   = get_value(<<"key">>, Params),
     Value = get_value(<<"value">>, Params),
-    emq_mgmt:update_config(Node, App, Key, Value);
+    emqx_mgmt:update_config(Node, App, Key, Value);
 
 update_config(#{app := App}, Params) ->
     Key   = get_value(<<"key">>, Params),
     Value = get_value(<<"value">>, Params),
-    emq_mgmt:update_config(App, Key, Value).
+    emqx_mgmt:update_config(App, Key, Value).
 
 get_plugin_configs(#{node := Node, plugin := Plugin}, _Params) ->
     {ok, [ format_plugin_config(Config) 
-           || Config <- emq_mgmt:get_plugin_configs(Node, Plugin) ]}.
+           || Config <- emqx_mgmt:get_plugin_configs(Node, Plugin) ]}.
 
 update_plugin_configs(#{node := Node, plugin := Plugin}, Params) ->
-    case emq_mgmt:update_plugin_configs(Node, Plugin, Params) of
+    case emqx_mgmt:update_plugin_configs(Node, Plugin, Params) of
         ok  ->
             ensure_reload_plugin(Plugin);
         _ ->
@@ -87,10 +93,29 @@ update_plugin_configs(#{node := Node, plugin := Plugin}, Params) ->
 ensure_reload_plugin(Plugin) ->
     case lists:keyfind(Plugin, 2, emqttd_plugins:list()) of
         {_, _, _, _, true} ->
-            emqttd_plugins:unload(PluginName),
+            emqttd_plugins:unload(Plugin),
             timer:sleep(500),
-            emqttd_plugins:load(PluginName);
+            emqttd_plugins:load(Plugin);
          _ ->
             ok
     end.
+
+format(Configs) when is_list(Configs) ->
+    format(Configs, []);
+format({Key, Value, Datatpye, App}) ->
+    [{<<"key">>, list_to_binary(Key)},
+     {<<"value">>, list_to_binary(Value)},
+     {<<"datatpye">>, list_to_binary(Datatpye)},
+     {<<"app">>, App}].
+
+format([], Acc) ->
+    Acc;
+format([{Key, Value, Datatpye, App}| Configs], Acc) ->
+    format(Configs, [format({Key, Value, Datatpye, App}) | Acc]).
+
+format_plugin_config({Key, Value, Desc, Required}) ->
+    [{<<"key">>, list_to_binary(Key)},
+     {<<"value">>, list_to_binary(Value)},
+     {<<"desc">>, list_to_binary(Desc)},
+     {<<"required">>, Required}].
 

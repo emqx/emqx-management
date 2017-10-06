@@ -14,7 +14,7 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emq_mgmt_api_plugins).
+-module(emqx_mgmt_api_plugins).
 
 -author("Feng Lee <feng@emqtt.io>").
 
@@ -42,17 +42,17 @@
             func   => unload,
             descr  => "Unload a plugin"}).
 
+-export([list/2, load/2, unload/2]).
+
 list(#{node := Node}, _Params) ->
-    {ok, emq_mgmt:plugins(atom(Node))}.
+    {ok, emqx_mgmt:list_plugins(Node)};
 
 list(_Bindings, _Params) ->
-    {ok, emq_mgmt:plugins()}.
+    {ok, emq_mgmt:list_plugins()}.
 
 load(#{node := Node, plugin := Plugin}, _Params) ->
-    emq_mgmt:load_plugin(atom(Node), atom(Plugin)).
+    emqx_mgmt:load_plugin(Node, Plugin).
 
 unload(#{node := Node, plugin := Plugin}, _Params) ->
-    emq_mgmt:unload_plugin(atom(Node), atom(Plugin)).
+    emqx_mgmt:unload_plugin(Node, Plugin).
     
-atom(S) -> list_to_existing_atom(S).
-

@@ -14,9 +14,11 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emq_mgmt_api_alarms).
+-module(emqx_mgmt_api_alarms).
 
 -author("Feng Lee <feng@emqtt.io>").
+
+-include_lib("emqttd/include/emqttd.hrl").
 
 -rest_api(#{name   => list_all_alarms,
             method => 'GET',
@@ -32,11 +34,11 @@
 
 -export([list/2]).
 
-list(#{node := Node}, Params) ->
-    {ok, format(emq_mgmt:get_alarms(Node))};
+list(#{node := Node}, _Params) ->
+    {ok, format(emqx_mgmt:get_alarms(Node))};
     
-list(_Binding, Params) ->
-    {ok, [{Node, format(Alarms)} || {Node, Alarms} <- emq_mgmt:get_alarms()]}.
+list(_Binding, _Params) ->
+    {ok, [{Node, format(Alarms)} || {Node, Alarms} <- emqx_mgmt:get_alarms()]}.
 
 format(Alarms) when is_list(Alarms) ->
     [format(Alarm) || Alarm <- Alarms];
@@ -50,5 +52,5 @@ format(#mqtt_alarm{id        = Id,
       severity  => Severity,
       title     => iolist_to_binary(Title),
       summary   => iolist_to_binary(Summary),
-      timestamp => iolist_to_binary(emq_mgmt_util:strftime(Ts))}.
+      timestamp => iolist_to_binary(emqx_mgmt_util:strftime(Ts))}.
 

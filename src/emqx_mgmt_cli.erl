@@ -14,7 +14,7 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emq_mgmt_cli).
+-module(emqx_mgmt_cli).
 
 -include_lib("emqttd/include/emqttd_cli.hrl").
 
@@ -24,9 +24,9 @@ load() ->
     emqttd_ctl:register_cmd(mgmt, {?MODULE, cmd}, []).
 
 cmd(["add_app", AppId]) ->
-    case emq_mgmt_auth:add_app(list_to_binary(AppId)) of
+    case emqx_mgmt_auth:add_app(list_to_binary(AppId)) of
         {ok, Secret} ->
-            ?PRINT_MSG("AppSecret: ~s~n");
+            ?PRINT("AppSecret: ~s~n", [Secret]);
         {error, already_existed} ->
             ?PRINT_MSG("Error: already existed~n");
         {error, Reason} ->
@@ -34,7 +34,7 @@ cmd(["add_app", AppId]) ->
     end;
 
 cmd(["del_app", AppId]) ->
-    case emq_mgmt_auth:del_app(list_to_binary(AppId)) of
+    case emqx_mgmt_auth:del_app(list_to_binary(AppId)) of
         ok -> ?PRINT_MSG("ok~n");
         {error, not_found} ->
             ?PRINT_MSG("Error: app not found~n");
@@ -45,7 +45,7 @@ cmd(["del_app", AppId]) ->
 cmd(["list_apps"]) ->
     list:foreach(fun({AppId, AppSecret}) ->
           ?PRINT("~s: ~s~n", [AppId, AppSecret])
-      end, emq_mgmt_auth:list_apps());
+      end, emqx_mgmt_auth:list_apps());
 
 cmd(_) ->
     ?USAGE([{"mgmt add_app <AppId>", "Add Application of REST API"},

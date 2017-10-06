@@ -14,33 +14,33 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emq_mgmt_api_listeners).
+-module(emqx_mgmt_api_nodes).
 
 -author("Feng Lee <feng@emqtt.io>").
 
--rest_api(#{name   => list_listeners,
+-rest_api(#{name   => list_nodes,
             method => 'GET',
-            path   => "/listeners/",
+            path   => "/nodes/",
             func   => list,
-            descr  => "A list of listeners in the cluster"}).
+            descr  => "A list of nodes in the cluster"}).
 
--rest_api(#{name   => list_node_listeners,
+-rest_api(#{name   => lookup_node,
             method => 'GET',
-            path   => "/nodes/:node/listeners",
-            func   => list,
-            descr  => "A list of listeners on the node"}).
+            path   => "/nodes/:node",
+            func   => lookup,
+            descr  => "Lookup a node in the cluster"}).
 
-%% List listeners on a node.
-list(#{node := Node}, _Params) ->
-    {ok, format(emq_mgmt:listeners(list_to_atom(Node)))};
+-export([list/2, lookup/2]).
 
-%% List listeners in the cluster.
-list(_Binding, _Params) ->
-    {ok, [{Node, format(Listener)} || {Node, Listener} <- emq_mgmt:listeners()]}.
+list(_Bindings, _Params) ->
+    {ok, [{Node, format(Info)} || {Node, Info} <- emqx_mgmt:list_nodes()]}.
 
-format(Listeners) ->
-    [ Info#{listen_on = list_to_binary(esockd:to_string(ListenOn))}
-     || Info = #{listen_on := ListenOn} <- Listeners];
+lookup(#{node := Node}, _Params) ->
+    {ok, emqx_mgmt:lookup_node(Node)}.
 
-format({error, Reason}) -> [{error, Reason}].
+format({error, Reason}) -> [{error, Reason}];
+
+format(Info = #{memory_total := Total, memory_used := Used}) ->
+    Info#{memory_total := emqx_mgmt_util:kmg(Total),
+          memory_used  := emqx_mgmt_util:kmg(Used)}.
 

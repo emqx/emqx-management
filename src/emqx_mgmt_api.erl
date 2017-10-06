@@ -14,9 +14,11 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emq_mgmt_api).
+-module(emqx_mgmt_api).
 
 -author("Feng Lee <feng@emqtt.io>").
+
+-include_lib("stdlib/include/qlc.hrl").
 
 -export([paginate/4]).
 
@@ -47,7 +49,7 @@ page_no(Params) ->
 
 page_size(Params) ->
     case proplists:get_value("size", Params) of
-        undefined -> emq_mgmt:max_row_limit();
+        undefined -> emqx_mgmt:max_row_limit();
         Size      -> list_to_integer(Size)
     end.
 

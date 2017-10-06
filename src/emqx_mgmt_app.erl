@@ -14,19 +14,19 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emq_mgmt_app).
+-module(emqx_mgmt_app).
 
 -behaviour(application).
 
 -export([start/2, stop/1]).
 
 start(_Type, _Args) ->
-    {ok, Sup} = emq_mgmt_sup:start_link(),
-    emq_mgmt_http:start_listeners(),
-    emq_mgmt_cli:load(),
+    {ok, Sup} = emqx_mgmt_sup:start_link(),
+    emqx_mgmt_http:start_listeners(),
+    emqx_mgmt_cli:load(),
     {ok, Sup}.
 
 stop(_State) ->
-    emq_mgmt_http:stop_listeners(),
-    emq_mgmt_cli:unload().
+    emqx_mgmt_http:stop_listeners(),
+    emqx_mgmt_cli:unload().
 

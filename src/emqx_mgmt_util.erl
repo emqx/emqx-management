@@ -14,7 +14,7 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emq_mgmt_util).
+-module(emqx_mgmt_util).
 
 -author("Feng Lee <feng@emqtt.io>").
 

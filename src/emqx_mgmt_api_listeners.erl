@@ -14,30 +14,35 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emq_mgmt_api_metrics).
+-module(emqx_mgmt_api_listeners).
 
 -author("Feng Lee <feng@emqtt.io>").
 
--rest_api(#{name   => list_metrics,
+-rest_api(#{name   => list_listeners,
             method => 'GET',
-            path   => "/metrics/",
+            path   => "/listeners/",
             func   => list,
-            descr  => "A list of metrics of all nodes in the cluster"}).
+            descr  => "A list of listeners in the cluster"}).
 
--rest_api(#{name   => list_node_metrics,
+-rest_api(#{name   => list_node_listeners,
             method => 'GET',
-            path   => "/nodes/:node/metrics/",
+            path   => "/nodes/:node/listeners",
             func   => list,
-            descr  => "A list of metrics of a node"}).
+            descr  => "A list of listeners on the node"}).
 
-%% List metrics of all nodes
-list(Bindings, _Params) when map_size(Bindings) == 0 ->
-    {ok, emq_mgmt:metrics()};
+-export([list/2]).
 
-%% List metrics of a node
+%% List listeners on a node.
 list(#{node := Node}, _Params) ->
-    case emq_mgmt:metrics(list_to_existing_atom(Node)) of
-        {error, Reason} -> {error, Reason};
-        Metrics -> {ok, Metrics}
-    end.
+    {ok, format(emqx_mgmt:list_listeners(list_to_atom(Node)))};
+
+%% List listeners in the cluster.
+list(_Binding, _Params) ->
+    {ok, [{Node, format(Listeners)} || {Node, Listeners} <- emqx_mgmt:listeners()]}.
+
+format(Listeners) when is_list(Listeners) ->
+    [ Info#{listen_on => list_to_binary(esockd:to_string(ListenOn))}
+     || Info = #{listen_on := ListenOn} <- Listeners ];
+
+format({error, Reason}) -> [{error, Reason}].
 

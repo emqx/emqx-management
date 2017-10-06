@@ -14,7 +14,7 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emq_mgmt_api_routes).
+-module(emqx_mgmt_api_routes).
 
 -author("Feng Lee <feng@emqtt.io>").
 
@@ -28,15 +28,18 @@
             method => 'GET',
             url    => "/routes/:topic",
             func   => lookup,
-            descr  => "Lookup routes to a topic"}}).
+            descr  => "Lookup routes to a topic"}).
 
 -export([list/2, lookup/2]).
 
 list(Bindings, Params) when map_size(Bindings) == 0 ->
-    {ok, emq_mgmt_api:paginate(emq_mgmt:query_handle(routes),
-                               emq_mgmt:count(routes), Params,
-                               fun(R) -> emq_mgmt:item(route, R) end)}.
+    {ok, emqx_mgmt_api:paginate(
+           emqx_mgmt:query_handle(routes),
+           emqx_mgmt:count(routes),
+           Params, fun format/1)}.
 
 lookup(#{topic := Topic}, _Params) ->
-    {ok, #{items => emq_mgmt:lookup_routes(Topic)}}.
+    {ok, #{items => emqx_mgmt:lookup_routes(Topic)}}.
+
+format(R) -> emqx_mgmt:item(route, R).
 

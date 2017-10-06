@@ -14,7 +14,7 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emq_mgmt_api_clients).
+-module(emqx_mgmt_api_clients).
 
 -include_lib("emqttd/include/emqttd.hrl").
 
@@ -48,31 +48,35 @@
             func   => clean_acl_cache,
             descr  => "Clean acl cache of a client"}).
 
--import(emq_mgmt_util, [ntoa/1, strftime/1]).
+-import(emqx_mgmt_util, [ntoa/1, strftime/1]).
+
+-export([list/2, lookup/2, kickout/2, clean_acl_cache/2]).
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    {ok, emq_mgmt_api:paginate(emq_mgmt:query_handle(clients),
-                               emq_mgmt:count(clients),
-                               Params, fun format/1)};
+    {ok, emqx_mgmt_api:paginate(emqx_mgmt:query_handle(clients),
+                                emqx_mgmt:count(clients),
+                                Params, fun format/1)};
 
-list(Bindings = #{node := Node}, Params) ->
-    case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
+list(Bindings = #{"node" := Node}, Params) ->
+    case rpc:call(list_to_existing_atom(Node),
+                  ?MODULE, list, [Bindings, Params]) of
         {badrpc, Reason} -> {error, Reason};
         Res -> Res
     end.
 
-lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    {ok, #{items => format(emq_mgmt:lookup_client(Node, ClientId))}};
+lookup(#{"node" := Node, "clientid" := ClientId}, _Params) ->
+    Items = emqx_mgmt:lookup_client(list_to_existing_atom(Node), list_to_binary(ClientId)),
+    {ok, #{items => [format(Item) || Item <- Items]}};
 
 lookup(#{clientid := ClientId}, _Params) ->
-    {ok, #{items => format(emq_mgmt:lookup_client(ClientId))}}.
+    {ok, #{items => format(emqx_mgmt:lookup_client(ClientId))}}.
 
 kickout(#{clientid := ClientId}, _Params) ->
-    emq_mgmt:kickout_client(ClientId).
+    emqx_mgmt:kickout_client(ClientId).
 
 clean_acl_cache(#{clientid := ClientId}, Params) ->
     Topic = proplists:get_value(<<"topic">>, Params),
-    emq_mgmt:clean_acl_cache(ClientId, Topic);
+    emqx_mgmt:clean_acl_cache(ClientId, Topic).
 
 format(Clients) when is_list(Clients) ->
     [format(Client) || Client <- Clients];

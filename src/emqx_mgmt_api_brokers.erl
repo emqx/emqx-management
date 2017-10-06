@@ -14,30 +14,31 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emq_mgmt_api_stats).
+-module(emqx_mgmt_api_brokers).
 
 -author("Feng Lee <feng@emqtt.io>").
 
--rest_api(#{name   => list_stats,
+-rest_api(#{name   => list_brokers,
             method => 'GET',
-            path   => "/stats/",
+            path   => "/brokers/",
             func   => list,
-            descr  => "A list of stats of all nodes in the cluster"}).
+            descr  => "A list of brokers in the cluster"}).
 
--rest_api(#{name   => list_node_stats,
+-rest_api(#{name   => lookup_broker,
             method => 'GET',
-            path   => "/nodes/:node/stats/",
-            func   => list,
-            descr  => "A list of stats of a node"}).
+            path   => "/brokers/:node",
+            func   => lookup,
+            descr  => "Lookup broker info of a node"}).
 
-%% List stats of all nodes
-list(Bindings, _Params) when map_size(Bindings) == 0 ->
-    {ok, emq_mgmt:stats()};
+-export([list/2, lookup/2]).
 
-%% List stats of a node
-list(#{node := Node}, _Params) ->
-    case emq_mgmt:stats(list_to_existing_atom(Node)) of
-        {error, Reason} -> {error, Reason};
-        Stats -> {ok, Stats}
-    end.
+list(_Bindings, _Params) ->
+    {ok, [{Node, format(Info)} || {Node, Info} <- emq_mgmt:list_brokers()]}.
+
+lookup(#{node := Node}, _Params) ->
+    {ok, format(emq_mgmt:lookup_broker(Node))}.
+
+format({error, Reason}) -> [{error, Reason}];
+
+format(Info) -> Info.
 

@@ -14,7 +14,7 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emq_mgmt).
+-module(emqx_mgmt).
 
 -author("Feng Lee <feng@emqtt.io>").
 
@@ -24,9 +24,11 @@
 
 -include_lib("emqttd/include/emqttd_protocol.hrl").
 
-%% Nodes and brokers.
--export([list_nodes/0, lookup_node/1, list_brokers/0, lookup_broker/0,
-         node_info/1, broker_info/1])
+-import(proplists, [get_value/2, get_value/3]).
+
+%% Nodes and Brokers API
+-export([list_nodes/0, lookup_node/1, list_brokers/0, lookup_broker/1,
+         node_info/1, broker_info/1]).
 
 %% Metrics and Stats
 -export([get_metrics/0, get_metrics/1, get_stats/0, get_stats/1]).
@@ -38,19 +40,19 @@
 -export([list_sessions/1, lookup_session/1, lookup_session/2]).
 
 %% Subscriptions
--export([list_subscriptions/1, lookup_subscriptions/1, lookup_subscriptions/2])
+-export([list_subscriptions/1, lookup_subscriptions/1, lookup_subscriptions/2]).
 
 %% Routes
 -export([list_routes/0, lookup_routes/1]).
 
 %% PubSub
--export([subscribe/2, publish/1, unsubscribe/3]).
+-export([subscribe/3, publish/1, unsubscribe/2]).
 
 %% Plugins
--export([plugins/0, plugins/1, load_plugin/2, unload_plugin/2]).
+-export([list_plugins/0, list_plugins/1, load_plugin/2, unload_plugin/2]).
 
 %% Listeners
--export([listeners/0, listeners/1]).
+-export([list_listeners/0, list_listeners/1]).
 
 %% Alarms
 -export([get_alarms/0, get_alarms/1]).
@@ -65,6 +67,8 @@
 -export([count/1, tables/1, query_handle/1, item/2, max_row_limit/0]).
 
 -define(MAX_ROW_LIMIT, 10000).
+
+-define(APP, emqx_management).
 
 %%--------------------------------------------------------------------
 %% Node Info
@@ -107,7 +111,9 @@ lookup_broker(Node) ->
     broker_info(Node).
 
 broker_info(Node) when Node =:= node() ->
-    maps:from_list(emqttd_broker:info());
+    Info = maps:from_list([{K, iolist_to_binary(V)} || {K, V} <- emqttd_broker:info()]),
+    Info#{name => Node, otp_release => iolist_to_binary(otp_rel()), node_status => 'Running'};
+
 broker_info(Node) ->
     rpc_call(Node, broker_info, [Node]).
 
@@ -120,7 +126,7 @@ get_metrics() ->
 
 get_metrics(Node) when Node =:= node() ->
     emqttd_metrics:all();
-get_metrics(Node)  ->
+get_metrics(Node) ->
     rpc_call(Node, get_metrics, [Node]).
 
 get_stats() ->
@@ -193,8 +199,8 @@ clean_acl_cache(Node, ClientId, Topic) ->
 
 list_sessions(Node) when Node =:= node() ->
     case check_row_limit([mqtt_local_session]) of
-        false -> throw(max_row_limit)
-        ok    -> [item(session, Item) || Item <- ets:tab2list(mqtt_local_session)];
+        false -> throw(max_row_limit);
+        ok    -> [item(session, Item) || Item <- ets:tab2list(mqtt_local_session)]
     end;
 
 list_sessions(Node) ->
@@ -218,8 +224,8 @@ lookup_session(Node, ClientId) ->
 
 list_subscriptions(Node) when Node =:= node() ->
     case check_row_limit([mqtt_subproperty]) of
-        false -> throw(max_row_limit)
-        ok    -> [item(subscription, Sub) || Sub <- ets:tab2list(mqtt_subproperty)];
+        false -> throw(max_row_limit);
+        ok    -> [item(subscription, Sub) || Sub <- ets:tab2list(mqtt_subproperty)]
     end;
 
 list_subscriptions(Node) ->
@@ -237,7 +243,7 @@ lookup_subscriptions(Node, Key) when Node =:= node() ->
         false ->
             lists:append([ets:lookup(mqtt_subproperty, {T, S}) || {T, S} <- Keys])
     end,
-    [item(subscription, Sub) || Sub <- Subscriptions].
+    [item(subscription, Sub) || Sub <- Subscriptions];
 
 lookup_subscriptions(Node, Key) ->
     rpc_call(Node, lookup_subscriptions, [Node, Key]).
@@ -265,7 +271,7 @@ subscribe(ClientId, Topic, Qos) ->
         undefined -> {error, session_not_found};
         #mqtt_session{sess_pid = SessPid} ->
             emqttd_session:subscribe(SessPid, [{Topic, [{qos, Qos}]}])
-    end;
+    end.
 
 %%TODO: ???
 publish(Msg) -> emqttd:publish(Msg).
@@ -275,20 +281,19 @@ unsubscribe(ClientId, Topic) ->
         undefined -> {error, session_not_found};
         #mqtt_session{sess_pid = SessPid} ->
             emqttd_session:unsubscribe(SessPid, [{Topic, []}])
-    end;
- 
+    end.
 
 %%--------------------------------------------------------------------
 %% Plugins
 %%--------------------------------------------------------------------
 
-plugins() ->
-    [{Node, plugins(Node)} || Node <- ekka_mnesia:running_nodes()].
+list_plugins() ->
+    [{Node, list_plugins(Node)} || Node <- ekka_mnesia:running_nodes()].
 
-plugins(Node) when Node =:= node() ->
+list_plugins(Node) when Node =:= node() ->
     emqttd_plugins:list(Node);
-plugins(Node) ->
-    rpc_call(Node, plugins, [Node]).
+list_plugins(Node) ->
+    rpc_call(Node, list_plugins, [Node]).
 
 load_plugin(Node, Plugin) when Node =:= node() ->
     emqttd_plugins:load(Plugin);
@@ -304,10 +309,10 @@ unload_plugin(Node, Plugin) ->
 %% Listeners
 %%--------------------------------------------------------------------
 
-listeners() ->
-    [{Node, listeners(Node)} || Node <- ekka_mnesia:running_nodes()].
+list_listeners() ->
+    [{Node, list_listeners(Node)} || Node <- ekka_mnesia:running_nodes()].
 
-listeners(Node) when Node =:= node() ->
+list_listeners(Node) when Node =:= node() ->
     lists:map(fun({{Protocol, ListenOn}, Pid}) ->
                 #{protocol        => Protocol,
                   listen_on       => ListenOn,
@@ -316,8 +321,9 @@ listeners(Node) when Node =:= node() ->
                   current_clients => esockd:get_current_clients(Pid),
                   shutdown_count  => esockd:get_shutdown_count(Pid)}
               end, esockd:listeners());
-listeners(Node) ->
-    rpc_call(Node, listeners, [Node]).
+
+list_listeners(Node) ->
+    rpc_call(Node, list_listeners, [Node]).
 
 %%--------------------------------------------------------------------
 %% Get Alarms
@@ -410,10 +416,10 @@ item(session, {ClientId, _Pid, Persistent, Properties}) ->
     maps:from_list(
       [{client_id, ClientId}, {clean_sess, not Persistent},
        {created_at, get_value(created_at, Properties)}
-       | emqttd_stats:get_session_stats(ClientId)]).
+       | emqttd_stats:get_session_stats(ClientId)]);
 
 item(subscription, {{Topic, ClientId}, Options}) ->
-    #{topic => Topic, clientid => ClientId, options => Options}.
+    #{topic => Topic, clientid => ClientId, options => Options};
 
 item(route, #mqtt_route{topic = Topic, node = Node}) ->
     #{topic => Topic, node => Node};
@@ -445,7 +451,7 @@ check_row_limit([Tab|Tables], Limit) ->
     end.
 
 max_row_limit() ->
-    application:get_env(emq_management, max_row_limit, ?MAX_ROW_LIMIT).
+    application:get_env(?APP, max_row_limit, ?MAX_ROW_LIMIT).
 
 table_size(Tab) -> ets:info(Tab, size).
 
