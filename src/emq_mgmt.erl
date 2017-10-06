@@ -16,63 +16,271 @@
 
 -module(emq_mgmt).
 
+-author("Feng Lee <feng@emqtt.io>").
+
 -include_lib("stdlib/include/qlc.hrl").
 
 -include_lib("emqttd/include/emqttd.hrl").
 
 -include_lib("emqttd/include/emqttd_protocol.hrl").
 
--include_lib("emqttd/include/emqttd_internal.hrl").
+%% Nodes and brokers.
+-export([list_nodes/0, lookup_node/1, list_brokers/0, lookup_broker/0,
+         node_info/1, broker_info/1])
 
--define(EMPTY_KEY(Key), ((Key == undefined) orelse (Key == <<>>))).
+%% Metrics and Stats
+-export([get_metrics/0, get_metrics/1, get_stats/0, get_stats/1]).
 
--import(proplists, [get_value/2]).
+%% Clients, Sessions
+-export([list_clients/1, lookup_client/1, lookup_client/2,
+         kickout_client/1, clean_acl_cache/2]).
 
--export([brokers/0, broker/1, metrics/0, metrics/1, stats/1, stats/0,
-         plugins/0, plugins/1, listeners/0, listener/1, nodes_info/0, node_info/1]).
+-export([list_sessions/1, lookup_session/1, lookup_session/2]).
 
--export([plugin_list/1, plugin_unload/2, plugin_load/2]).
+%% Subscriptions
+-export([list_subscriptions/1, lookup_subscriptions/1, lookup_subscriptions/2])
 
--export([client_list/4, session_list/4, route_list/3, subscription_list/4, alarm_list/0]).
+%% Routes
+-export([list_routes/0, lookup_routes/1]).
 
--export([client/1, session/1, route/1, subscription/1]).
+%% PubSub
+-export([subscribe/2, publish/1, unsubscribe/3]).
 
--export([query_table/4, lookup_table/3]).
+%% Plugins
+-export([plugins/0, plugins/1, load_plugin/2, unload_plugin/2]).
 
--export([publish/1, subscribe/1, unsubscribe/1]).
+%% Listeners
+-export([listeners/0, listeners/1]).
 
--export([kick_client/1, clean_acl_cache/2]).
+%% Alarms
+-export([get_alarms/0, get_alarms/1]).
 
--export([modify_config/2, modify_config/3, modify_config/4, get_configs/0, get_config/1,
-         get_plugin_config/1, get_plugin_config/2, modify_plugin_config/2, modify_plugin_config/3]).
+%% Configs
+-export([update_configs/2, update_config/3, update_config/4,
+         get_all_configs/0, get_all_configs/1,
+         get_plugin_configs/1, get_plugin_configs/2,
+         update_plugin_configs/2, update_plugin_configs/3]).
 
--define(KB, 1024).
--define(MB, (1024*1024)).
--define(GB, (1024*1024*1024)).
+%% Common Table API
+-export([count/1, tables/1, query_handle/1, item/2, max_row_limit/0]).
 
-brokers() ->
-    [{Node, broker(Node)} || Node <- ekka_mnesia:running_nodes()].
+-define(MAX_ROW_LIMIT, 10000).
 
-broker(Node) when Node =:= node() ->
-    emqttd_broker:info();
-broker(Node) ->
-    rpc_call(Node, broker, [Node]).
+%%--------------------------------------------------------------------
+%% Node Info
+%%--------------------------------------------------------------------
 
-metrics() ->
-    [{Node, metrics(Node)} || Node <- ekka_mnesia:running_nodes()].
+list_nodes() ->
+    Running = mnesia:system_info(running_db_nodes),
+    Stopped = mnesia:system_info(db_nodes) -- Running,
+    DownNodes = lists:map(fun stopped_node_info/1, Stopped),
+    [{Node, node_info(Node)} || Node <- Running] ++ DownNodes.
 
-metrics(Node) when Node =:= node() ->
+lookup_node(Node) -> node_info(Node).
+
+node_info(Node) when Node =:= node() ->
+    Memory  = emqttd_vm:get_memory(),
+    Info = maps:from_list([{K, list_to_binary(V)} || {K, V} <- emqttd_vm:loads()]),
+    Info#{name              => node(),
+          otp_release       => iolist_to_binary(otp_rel()),
+          memory_total      => get_value(allocated, Memory),
+          memory_used       => get_value(used, Memory),
+          process_available => erlang:system_info(process_limit),
+          process_used      => erlang:system_info(process_count),
+          max_fds           => get_value(max_fds, erlang:system_info(check_io)),
+          clients           => ets:info(mqtt_client, size),
+          node_status       => 'Running'};
+node_info(Node) ->
+    rpc_call(Node, node_info, [Node]).
+
+stopped_node_info(Node) ->
+    #{name => Node, node_status => 'Stopped'}.
+
+%%--------------------------------------------------------------------
+%% Brokers
+%%--------------------------------------------------------------------
+
+list_brokers() ->
+    [{Node, broker_info(Node)} || Node <- ekka_mnesia:running_nodes()].
+
+lookup_broker(Node) ->
+    broker_info(Node).
+
+broker_info(Node) when Node =:= node() ->
+    maps:from_list(emqttd_broker:info());
+broker_info(Node) ->
+    rpc_call(Node, broker_info, [Node]).
+
+%%--------------------------------------------------------------------
+%% Metrics and Stats
+%%--------------------------------------------------------------------
+
+get_metrics() ->
+    [{Node, get_metrics(Node)} || Node <- ekka_mnesia:running_nodes()].
+
+get_metrics(Node) when Node =:= node() ->
     emqttd_metrics:all();
-metrics(Node)  ->
-    rpc_call(Node, metrics, [Node]).
+get_metrics(Node)  ->
+    rpc_call(Node, get_metrics, [Node]).
 
-stats() ->
-    [{Node, stats(Node)} || Node <- ekka_mnesia:running_nodes()].
+get_stats() ->
+    [{Node, get_stats(Node)} || Node <- ekka_mnesia:running_nodes()].
 
-stats(Node) when Node =:= node() ->
+get_stats(Node) when Node =:= node() ->
     emqttd_stats:getstats();
-stats(Node) ->
-    rpc_call(Node, stats, [Node]).
+get_stats(Node) ->
+    rpc_call(Node, get_stats, [Node]).
+
+%%--------------------------------------------------------------------
+%% Clients
+%%--------------------------------------------------------------------
+
+list_clients(Node) when Node =:= node() ->
+    case check_row_limit([mqtt_client]) of
+        ok -> ets:tab2list(mqtt_client);
+        false -> throw(max_row_limit)
+    end;
+
+list_clients(Node) ->
+    case rpc_call(Node, list_clients, [Node]) of
+        max_row_limit -> throw(max_row_limit);
+        Res -> Res
+    end.
+
+lookup_client(ClientId) ->
+    lists:append([lookup_client(Node, ClientId) || Node <- ekka_mnesia:running_nodes()]).
+
+lookup_client(Node, ClientId) when Node =:= node() ->
+    ets:lookup(mqtt_client, ClientId);
+
+lookup_client(Node, ClientId) ->
+    rpc_call(Node, lookup_client, [Node, ClientId]).
+
+kickout_client(ClientId) ->
+    Results = [kickout_client(Node, ClientId) || Node <- ekka_mnesia:running_nodes()],
+    case lists:any(fun(Item) -> Item =:= ok end, Results) of
+        true  -> ok;
+        false -> lists:last(Results)
+    end.
+
+kickout_client(Node, ClientId) when Node =:= node() ->
+    case emqttd_cm:lookup(ClientId) of
+        undefined -> {error, not_found};
+        #mqtt_client{client_pid = Pid} -> emqttd_client:kick(Pid)
+    end;
+
+kickout_client(Node, ClientId) ->
+    rpc_call(Node, kickout_client, [Node, ClientId]).
+
+clean_acl_cache(ClientId, Topic) ->
+    Results = [clean_acl_cache(Node, ClientId, Topic) || Node <- ekka_mnesia:running_nodes()],
+    case lists:any(fun(Item) -> Item =:= ok end, Results) of
+        true  -> ok;
+        false -> lists:last(Results)
+    end.
+
+clean_acl_cache(Node, ClientId, Topic) when Node =:= node() ->
+    case emqttd_cm:lookup(ClientId) of
+        undefined -> {error, not_found};
+        #mqtt_client{client_pid = Pid}-> emqttd_client:clean_acl_cache(Pid, Topic)
+    end;
+clean_acl_cache(Node, ClientId, Topic) ->
+    rpc_call(Node, clean_acl_cache, [Node, ClientId, Topic]).
+
+%%--------------------------------------------------------------------
+%% Sessions
+%%--------------------------------------------------------------------
+
+list_sessions(Node) when Node =:= node() ->
+    case check_row_limit([mqtt_local_session]) of
+        false -> throw(max_row_limit)
+        ok    -> [item(session, Item) || Item <- ets:tab2list(mqtt_local_session)];
+    end;
+
+list_sessions(Node) ->
+    case rpc_call(Node, list_sessions, [Node]) of
+        max_row_limit -> throw(max_row_limit);
+        Res -> Res
+    end.
+
+lookup_session(ClientId) ->
+    lists:append([lookup_session(Node, ClientId) || Node <- ekka_mnesia:running_nodes()]).
+
+lookup_session(Node, ClientId) when Node =:= node() ->
+    [item(session, Item) || Item <- ets:lookup(mqtt_local_session, ClientId)];
+
+lookup_session(Node, ClientId) ->
+    rpc_call(Node, lookup_session, [Node, ClientId]).
+
+%%--------------------------------------------------------------------
+%% Subscriptions
+%%--------------------------------------------------------------------
+
+list_subscriptions(Node) when Node =:= node() ->
+    case check_row_limit([mqtt_subproperty]) of
+        false -> throw(max_row_limit)
+        ok    -> [item(subscription, Sub) || Sub <- ets:tab2list(mqtt_subproperty)];
+    end;
+
+list_subscriptions(Node) ->
+    rpc_call(Node, list_subscriptions, [Node]).
+
+lookup_subscriptions(Key) ->
+    lists:append([lookup_subscriptions(Node, Key) || Node <- ekka_mnesia:running_nodes()]).
+ 
+lookup_subscriptions(Node, Key) when Node =:= node() ->
+    Keys = ets:lookup(mqtt_subscription, Key),
+    Subscriptions =
+    case length(Keys) == 0 of
+        true ->
+            ets:match_object(mqtt_subproperty, {{Key, '_'}, '_'});
+        false ->
+            lists:append([ets:lookup(mqtt_subproperty, {T, S}) || {T, S} <- Keys])
+    end,
+    [item(subscription, Sub) || Sub <- Subscriptions].
+
+lookup_subscriptions(Node, Key) ->
+    rpc_call(Node, lookup_subscriptions, [Node, Key]).
+
+%%--------------------------------------------------------------------
+%% Routes
+%%--------------------------------------------------------------------
+
+list_routes() ->
+    case check_row_limit(tables(routes)) of
+        false -> throw(max_row_limit);
+        ok ->
+            [item(route, R) || R <- lists:append([ets:tab2list(Tab) || Tab <- tables(routes)])]
+    end.
+
+lookup_routes(Topic) ->
+    [item(route, R) || R <- lists:append([ets:lookup(Tab, Topic) || Tab <- tables(routes)])].
+
+%%--------------------------------------------------------------------
+%% PubSub
+%%--------------------------------------------------------------------
+
+subscribe(ClientId, Topic, Qos) ->
+    case emqttd_sm:lookup_session(ClientId) of
+        undefined -> {error, session_not_found};
+        #mqtt_session{sess_pid = SessPid} ->
+            emqttd_session:subscribe(SessPid, [{Topic, [{qos, Qos}]}])
+    end;
+
+%%TODO: ???
+publish(Msg) -> emqttd:publish(Msg).
+
+unsubscribe(ClientId, Topic) ->
+    case emqttd_sm:lookup_session(ClientId) of
+        undefined -> {error, session_not_found};
+        #mqtt_session{sess_pid = SessPid} ->
+            emqttd_session:unsubscribe(SessPid, [{Topic, []}])
+    end;
+ 
+
+%%--------------------------------------------------------------------
+%% Plugins
+%%--------------------------------------------------------------------
 
 plugins() ->
     [{Node, plugins(Node)} || Node <- ekka_mnesia:running_nodes()].
@@ -82,232 +290,135 @@ plugins(Node) when Node =:= node() ->
 plugins(Node) ->
     rpc_call(Node, plugins, [Node]).
 
+load_plugin(Node, Plugin) when Node =:= node() ->
+    emqttd_plugins:load(Plugin);
+load_plugin(Node, Plugin) ->
+    rpc_call(Node, load_plugin, [Node, Plugin]).
+
+unload_plugin(Node, Plugin) when Node =:= node() ->
+    emqttd_plugins:unload(Plugin);
+unload_plugin(Node, Plugin) ->
+    rpc_call(Node, unload_plugin, [Node, Plugin]).
+
+%%--------------------------------------------------------------------
+%% Listeners
+%%--------------------------------------------------------------------
+
 listeners() ->
-    [{Node, listener(Node)} || Node <- ekka_mnesia:running_nodes()].
+    [{Node, listeners(Node)} || Node <- ekka_mnesia:running_nodes()].
 
-listener(Node) when Node =:= node() ->
+listeners(Node) when Node =:= node() ->
     lists:map(fun({{Protocol, ListenOn}, Pid}) ->
-                Info = [{acceptors,      esockd:get_acceptors(Pid)},
-                        {max_clients,    esockd:get_max_clients(Pid)},
-                        {current_clients,esockd:get_current_clients(Pid)},
-                        {shutdown_count, esockd:get_shutdown_count(Pid)}],
-                {Protocol, ListenOn, Info}
-            end, esockd:listeners());
-
-listener(Node) ->
-    rpc_call(Node, listener, [Node]).
-
-nodes_info() ->
-    Running = mnesia:system_info(running_db_nodes),
-    Stopped = mnesia:system_info(db_nodes) -- Running,
-    DownNodes = lists:map(fun stop_node/1, Stopped),
-    [node_info(Node) || Node <- Running] ++ DownNodes.
-
-node_info(Node) when Node =:= node() ->
-    CpuInfo = [{K, list_to_binary(V)} || {K, V} <- emqttd_vm:loads()],
-    Memory  = emqttd_vm:get_memory(),
-    OtpRel  = "R" ++ erlang:system_info(otp_release) ++ "/" ++ erlang:system_info(version),
-    [{name, node()},
-     {otp_release, list_to_binary(OtpRel)},
-     {memory_total, kmg(get_value(allocated, Memory))},
-     {memory_used,  kmg(get_value(used, Memory))},
-     {process_available, erlang:system_info(process_limit)},
-     {process_used, erlang:system_info(process_count)},
-     {max_fds, get_value(max_fds, erlang:system_info(check_io))},
-     {clients, ets:info(mqtt_client, size)},
-     {node_status, 'Running'} | CpuInfo];
-
-node_info(Node) ->
-    rpc_call(Node, node_info, [Node]).
-
-stop_node(Node) ->
-    [{name, Node}, {node_status, 'Stopped'}].
-%%--------------------------------------------------------
-%% plugins
-%%--------------------------------------------------------
-plugin_list(Node) when Node =:= node() ->
-    emqttd_plugins:list();
-plugin_list(Node) ->
-    rpc_call(Node, plugin_list, [Node]).
-
-plugin_load(Node, PluginName) when Node =:= node() ->
-    emqttd_plugins:load(PluginName);
-plugin_load(Node, PluginName) ->
-    rpc_call(Node, plugin_load, [Node, PluginName]).
-
-plugin_unload(Node, PluginName) when Node =:= node() ->
-    emqttd_plugins:unload(PluginName);
-plugin_unload(Node, PluginName) ->
-    rpc_call(Node, plugin_unload, [Node, PluginName]).
-
-%%--------------------------------------------------------
-%% client
-%%--------------------------------------------------------
-client_list(Node, Key, PageNo, PageSize) when Node =:= node() ->
-    client_list(Key, PageNo, PageSize);
-client_list(Node, Key, PageNo, PageSize) ->
-    rpc_call(Node, client_list, [Node, Key, PageNo, PageSize]).
-
-client(ClientId) ->
-    lists:flatten([client_list(Node, ClientId, 1, 20) || Node <- ekka_mnesia:running_nodes()]).
-
-%%--------------------------------------------------------
-%% session
-%%--------------------------------------------------------
-session_list(Node, Key, PageNo, PageSize) when Node =:= node() ->
-    session_list(Key, PageNo, PageSize);
-session_list(Node, Key, PageNo, PageSize) ->
-    rpc_call(Node, session_list, [Node, Key, PageNo, PageSize]).
-
-session(ClientId) ->
-    lists:flatten([session_list(Node, ClientId, 1, 20) || Node <- ekka_mnesia:running_nodes()]).
-
-%%--------------------------------------------------------
-%% subscription
-%%--------------------------------------------------------
-subscription_list(Node, Key, PageNo, PageSize) when Node =:= node() ->
-    subscription_list(Key, PageNo, PageSize);
-subscription_list(Node, Key, PageNo, PageSize) ->
-    rpc_call(Node, subscription_list, [Node, Key, PageNo, PageSize]).
-
-subscription(Key) ->
-    lists:flatten([subscription_list(Node, Key, 1, 20) || Node <- ekka_mnesia:running_nodes()]).
-
-%%--------------------------------------------------------
-%% Routes
-%%--------------------------------------------------------
-route(Key) -> route_list(Key, 1, 20).
-
-%%--------------------------------------------------------
-%% alarm
-%%--------------------------------------------------------
-alarm_list() ->
-    emqttd_alarm:get_alarms().
-
-query_table(Qh, PageNo, PageSize, TotalNum) ->
-    Cursor = qlc:cursor(Qh),
-    case PageNo > 1 of
-        true  -> qlc:next_answers(Cursor, (PageNo - 1) * PageSize);
-        false -> ok
-    end,
-    Rows = qlc:next_answers(Cursor, PageSize),
-    qlc:delete_cursor(Cursor),
-    [{totalNum, TotalNum},
-     {totalPage, total_page(TotalNum, PageSize)},
-     {result, Rows}].
-
-total_page(TotalNum, PageSize) ->
-    case TotalNum rem PageSize of
-        0 -> TotalNum div PageSize;
-        _ -> (TotalNum div PageSize) + 1
-    end.
-
-%%TODO: refactor later...
-lookup_table(LookupFun, _PageNo, _PageSize) ->
-    Rows = LookupFun(),
-    Rows.
+                #{protocol        => Protocol,
+                  listen_on       => ListenOn,
+                  acceptors       => esockd:get_acceptors(Pid),
+                  max_clients     => esockd:get_max_clients(Pid),
+                  current_clients => esockd:get_current_clients(Pid),
+                  shutdown_count  => esockd:get_shutdown_count(Pid)}
+              end, esockd:listeners());
+listeners(Node) ->
+    rpc_call(Node, listeners, [Node]).
 
 %%--------------------------------------------------------------------
-%% mqtt 
+%% Get Alarms
 %%--------------------------------------------------------------------
-publish({ClientId, Topic, Payload, Qos, Retain}) ->
-    case validate(topic, Topic) of
-        true ->
-            Msg = emqttd_message:make(ClientId, Qos, Topic, Payload),
-            emqttd:publish(Msg#mqtt_message{retain  = Retain}),
-            ok;
-        false ->
-            {error, format_error(Topic, "validate topic: ${0} fail")}
-    end.
 
-subscribe({ClientId, Topic, Qos}) ->
-    case validate(topic, Topic) of
-        true ->
-            case emqttd_sm:lookup_session(ClientId) of
-                undefined ->
-                    {error, format_error(ClientId, "Clientid: ${0} not found")};
-                #mqtt_session{sess_pid = SessPid} ->  
-                    emqttd_session:subscribe(SessPid, [{Topic, [{qos, Qos}]}]),
-                    ok
-            end;
-        false ->
-            {error, format_error(Topic, "validate topic: ${0} fail")}
-    end.
-
-unsubscribe({ClientId, Topic}) ->
-    case validate(topic, Topic) of
-        true ->
-            case emqttd_sm:lookup_session(ClientId) of
-                undefined ->
-                    {error, format_error(ClientId, "Clientid: ${0} not found")};
-                #mqtt_session{sess_pid = SessPid} ->   
-                    emqttd_session:unsubscribe(SessPid, [{Topic, []}]),
-                    ok
-            end;
-        false ->
-            {error, format_error(Topic, "validate topic: ${0} fail")}
-    end.
-
-%%--------------------------------------------------------------------
-%% manager API
-%%--------------------------------------------------------------------
-kick_client(ClientId) ->
-    Result = [kick_client(Node, ClientId) || Node <- ekka_mnesia:running_nodes()],
-    lists:any(fun(Item) -> Item =:= ok end, Result).
-
-kick_client(Node, ClientId) when Node =:= node() ->
-    case emqttd_cm:lookup(ClientId) of
-        undefined -> error;
-        #mqtt_client{client_pid = Pid}-> emqttd_client:kick(Pid)
-    end;
-kick_client(Node, ClientId) ->
-    rpc_call(Node, kick_client, [Node, ClientId]).
-
-
-clean_acl_cache(ClientId, Topic) ->
-    Result = [clean_acl_cache(Node, ClientId, Topic) || Node <- ekka_mnesia:running_nodes()],
-    lists:any(fun(Item) -> Item =:= ok end, Result).
-
-clean_acl_cache(Node, ClientId, Topic) when Node =:= node() ->
-    case emqttd_cm:lookup(ClientId) of
-        undefined -> error;
-        #mqtt_client{client_pid = Pid}-> emqttd_client:clean_acl_cache(Pid, Topic)
-    end;
-clean_acl_cache(Node, ClientId, Topic) ->
-    rpc_call(Node, clean_acl_cache, [Node, ClientId, Topic]).
+get_alarms() ->
+    [{Node, get_alarms(Node)} || Node <- ekka_mnesia:running_nodes()].
+   
+get_alarms(Node) when Node =:= node() ->
+    emqttd_alarm:get_alarms();
+get_alarms(Node) ->
+    rpc_call(Node, get_alarms, [Node]).
 
 %%--------------------------------------------------------------------
 %% Config ENV
 %%--------------------------------------------------------------------
-modify_config(App, Terms) ->
+
+update_configs(App, Terms) ->
     emqttd_config:write(App, Terms).
 
-modify_config(App, Key, Value) ->
-    Result = [modify_config(Node, App, Key, Value) || Node <- ekka_mnesia:running_nodes()],
-    lists:any(fun(Item) -> Item =:= ok end, Result).
+update_config(App, Key, Value) ->
+    Results = [update_config(Node, App, Key, Value) || Node <- ekka_mnesia:running_nodes()],
+    case lists:any(fun(Item) -> Item =:= ok end, Results) of
+        true  -> ok;
+        false -> lists:last(Results)
+    end.
 
-modify_config(Node, App, Key, Value) when Node =:= node() ->
+update_config(Node, App, Key, Value) when Node =:= node() ->
     emqttd_config:set(App, Key, Value);
-modify_config(Node, App, Key, Value) ->
-    rpc_call(Node, modify_config, [Node, App, Key, Value]).
 
-get_configs() ->
-    [{Node, get_config(Node)} || Node <- ekka_mnesia:running_nodes()].
+update_config(Node, App, Key, Value) ->
+    rpc_call(Node, update_config, [Node, App, Key, Value]).
 
-get_config(Node) when Node =:= node()->
+get_all_configs() ->
+    [{Node, get_all_configs(Node)} || Node <- ekka_mnesia:running_nodes()].
+
+get_all_configs(Node) when Node =:= node()->
     emqttd_cli_config:all_cfgs();
-get_config(Node) ->
+
+get_all_configs(Node) ->
     rpc_call(Node, get_config, [Node]).
 
-get_plugin_config(PluginName) ->
+get_plugin_configs(PluginName) ->
     emqttd_config:read(PluginName).
-get_plugin_config(Node, PluginName) ->
-    rpc_call(Node, get_plugin_config, [PluginName]).
 
-modify_plugin_config(PluginName, Terms) ->
+get_plugin_configs(Node, PluginName) ->
+    rpc_call(Node, get_plugin_configs, [PluginName]).
+
+update_plugin_configs(PluginName, Terms) ->
     emqttd_config:write(PluginName, Terms).
-modify_plugin_config(Node, PluginName, Terms) ->
-    rpc_call(Node, modify_plugin_config, [PluginName, Terms]).
+
+update_plugin_configs(Node, PluginName, Terms) ->
+    rpc_call(Node, update_plugin_configs, [PluginName, Terms]).
+
+%%--------------------------------------------------------------------
+%% Common Table API
+%%--------------------------------------------------------------------
+
+count(clients) ->
+    table_size(mqtt_client);
+
+count(sessions) ->
+    table_size(mqtt_local_session);
+
+count(subscriptions) ->
+    table_size(mqtt_subproperty);
+
+count(routes) ->
+    lists:sum([table_size(Tab) || Tab <- tables(routes)]).
+
+query_handle(clients) ->
+    qlc:q([Client || Client <- ets:table(mqtt_client)]);
+
+query_handle(sessions) ->
+    qlc:q([Session || Session <- ets:table(mqtt_local_session)]);
+
+query_handle(subscriptions) ->
+    qlc:q([E || E <- ets:table(mqtt_subproperty)]);
+
+query_handle(routes) ->
+    qlc:append([qlc:q([E || E <- ets:table(Tab)]) || Tab <- tables(routes)]).
+
+tables(clients) -> [mqtt_client];
+
+tables(sessions) -> [mqtt_local_session];
+
+tables(routes) -> [mqtt_route, mqtt_local_route].
+
+item(session, {ClientId, _Pid, Persistent, Properties}) ->
+    maps:from_list(
+      [{client_id, ClientId}, {clean_sess, not Persistent},
+       {created_at, get_value(created_at, Properties)}
+       | emqttd_stats:get_session_stats(ClientId)]).
+
+item(subscription, {{Topic, ClientId}, Options}) ->
+    #{topic => Topic, clientid => ClientId, options => Options}.
+
+item(route, #mqtt_route{topic = Topic, node = Node}) ->
+    #{topic => Topic, node => Node};
+item(route, {Topic, Node}) ->
+    #{topic => Topic, node => Node}.
 
 %%--------------------------------------------------------------------
 %% Internel Functions.
@@ -319,86 +430,22 @@ rpc_call(Node, Fun, Args) ->
         Res -> Res
     end.
 
-kmg(Byte) when Byte > ?GB ->
-    float(Byte / ?GB, "G");
-kmg(Byte) when Byte > ?MB ->
-    float(Byte / ?MB, "M");
-kmg(Byte) when Byte > ?KB ->
-    float(Byte / ?MB, "K");
-kmg(Byte) ->
-    Byte.
-float(F, S) ->
-    iolist_to_binary(io_lib:format("~.2f~s", [F, S])).
+otp_rel() ->
+    lists:concat(["R", erlang:system_info(otp_release), "/", erlang:system_info(version)]).
 
-validate(qos, Qos) ->
-    (Qos >= ?QOS_0) and (Qos =< ?QOS_2);
+check_row_limit(Tables) ->
+    check_row_limit(Tables, max_row_limit()).
 
-validate(topic, Topic) ->
-    emqttd_topic:validate({name, Topic}).
+check_row_limit([], _Limit) ->
+    ok;
+check_row_limit([Tab|Tables], Limit) ->
+    case table_size(Tab) > Limit of
+        true  -> false;
+        false -> check_row_limit(Tables, Limit)
+    end.
 
-client_list(ClientId, PageNo, PageSize) when ?EMPTY_KEY(ClientId) ->
-    TotalNum = ets:info(mqtt_client, size),
-    Qh = qlc:q([R || R <- ets:table(mqtt_client)]),
-    query_table(Qh, PageNo, PageSize, TotalNum);
+max_row_limit() ->
+    application:get_env(emq_management, max_row_limit, ?MAX_ROW_LIMIT).
 
-client_list(ClientId, PageNo, PageSize) ->
-    Fun = fun() -> ets:lookup(mqtt_client, ClientId) end,
-    lookup_table(Fun, PageNo, PageSize).
+table_size(Tab) -> ets:info(Tab, size).
 
-session_list(ClientId, PageNo, PageSize) when ?EMPTY_KEY(ClientId) ->
-    TotalNum = lists:sum([ets:info(Tab, size) || Tab <- [mqtt_local_session]]),
-    Qh = qlc:append([qlc:q([E || E <- ets:table(Tab)]) || Tab <- [mqtt_local_session]]),
-    query_table(Qh, PageNo, PageSize, TotalNum);
-
-session_list(ClientId, PageNo, PageSize) ->
-    MP = {ClientId, '_', '_', '_'},
-    Fun = fun() -> lists:append([ets:match_object(Tab, MP) || Tab <- [mqtt_local_session]]) end,
-    lookup_table(Fun, PageNo, PageSize).
-
-subscription_list(Key, PageNo, PageSize) when ?EMPTY_KEY(Key) ->
-    TotalNum = ets:info(mqtt_subproperty, size),
-    Qh = qlc:q([E || E <- ets:table(mqtt_subproperty)]),
-    query_table(Qh, PageNo, PageSize, TotalNum);
-
-subscription_list(Key, PageNo, PageSize) ->
-    Keys = ets:lookup(mqtt_subscription, Key),
-    Fun = case length(Keys) == 0 of
-        true ->
-            MP = {{Key, '_'}, '_'},
-            fun() -> ets:match_object(mqtt_subproperty, MP) end;
-        false ->
-            fun() ->
-                lists:map(fun({S, T}) ->[R] = ets:lookup(mqtt_subproperty, {T, S}), R end, Keys)
-            end
-    end,
-    lookup_table(Fun, PageNo, PageSize).
-
-route_list(Topic, PageNo, PageSize) when ?EMPTY_KEY(Topic) ->
-    TotalNum = lists:sum([ets:info(Tab, size) || Tab <- tables()]),
-    Qh = qlc:append([qlc:q([E || E <- ets:table(Tab)]) || Tab <- tables()]),
-    query_table(Qh, PageNo, PageSize, TotalNum);
-
-route_list(Topic, PageNo, PageSize) ->
-    Fun = fun() -> lists:append([ets:lookup(Tab, Topic) || Tab <- tables()]) end,
-    lookup_table(Fun, PageNo, PageSize).
-
-tables() ->
-    [mqtt_route, mqtt_local_route].
-
-format_error(Val, Msg) ->
-    re:replace(Msg, <<"\\$\\{[^}]+\\}">>, Val, [global, {return, binary}]).
-
-hash(Password) ->
-    SaltBin = salt(),
-    <<SaltBin/binary, (md5_hash(SaltBin, Password))/binary>>.
-
-md5_hash(SaltBin, Password) ->
-    erlang:md5(<<SaltBin/binary, Password/binary>>).
-
-salt() ->
-    seed(),
-    Salt = rand:uniform(16#ffffffff),
-    <<Salt:32>>.
-
-seed() ->
-    rand:seed(exsplus, erlang:timestamp()).

@@ -23,11 +23,11 @@
 -export([add_app/1, get_appsecret/1, del_app/1, list_apps/0]).
 
 %% APP Auth/ACL API
--export([check_app/2]).
+-export([is_authorized/2]).
 
--record(mqtt_app, {appid, appsecret}).
+-record(mqtt_app, {id, secret}).
 
--type(appid() :: atom()).
+-type(appid() :: binary()).
 
 -type(appsecret() :: binary()).
 
@@ -49,7 +49,7 @@ mnesia(copy) ->
 %%--------------------------------------------------------------------
 
 -spec(add_app(appid()) -> {ok, appsecret()} | {error, term()}).
-add_app(AppId) ->
+add_app(AppId) when is_binary(AppId) ->
     Secret = emqttd_guid:to_base62(emqttd_guid:gen()),
     App = #mqtt_app{appid = AppId, appsecret = Secret},
     AddFun = fun() ->
@@ -64,14 +64,14 @@ add_app(AppId) ->
     end.
 
 -spec(get_appsecret(appid()) -> {appsecret() | undefined}).
-get_appsecret(AppId) ->
+get_appsecret(AppId) when is_binary(AppId) ->
     case mnesia:dirty_read(mqtt_app, AppId) of
         [#mqtt_app{appsecret = Secret}] -> Secret;
         [] -> undefined
     end.
 
 -spec(del_app(appid()) -> ok | {error, term()}).
-del_app(AppId) ->
+del_app(AppId) when is_binary(AppId) ->
     case mnesia:transaction(fun mnesia:delete/1, [{mqtt_app, AppId}]) of
         {atomic, Ok} -> Ok;
         {aborted, Reason} -> {error, Reason}
@@ -79,13 +79,13 @@ del_app(AppId) ->
 
 -spec(list_apps() -> [{appid(), appsecret()}]).
 list_apps() ->
-    [ {AppId, AppSecret} || #mqtt_app{appid = AppId, appsecret = AppSecret} <- ets:tab2list(mqtt_app) ].
+    [ {AppId, AppSecret} || #mqtt_app{id = AppId, secret = AppSecret} <- ets:tab2list(mqtt_app) ].
 
 %%--------------------------------------------------------------------
 %% Authenticate App
 %%--------------------------------------------------------------------
 
--spec(check_app(appid(), appsecret()) -> boolean()).
-check_app(AppId, AppSecret) ->
+-spec(is_authorized(appid(), appsecret()) -> boolean()).
+is_authorized(AppId, AppSecret) ->
     case get_appsecret(AppId) of AppSecret -> true; _ -> false end.
 

@@ -14,19 +14,30 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emq_mgmt_app).
+-module(emq_mgmt_api_stats).
 
--behaviour(application).
+-author("Feng Lee <feng@emqtt.io>").
 
--export([start/2, stop/1]).
+-rest_api(#{name   => list_stats,
+            method => 'GET',
+            path   => "/stats/",
+            func   => list,
+            descr  => "A list of stats of all nodes in the cluster"}).
 
-start(_Type, _Args) ->
-    {ok, Sup} = emq_mgmt_sup:start_link(),
-    emq_mgmt_http:start_listeners(),
-    emq_mgmt_cli:load(),
-    {ok, Sup}.
+-rest_api(#{name   => list_node_stats,
+            method => 'GET',
+            path   => "/nodes/:node/stats/",
+            func   => list,
+            descr  => "A list of stats of a node"}).
 
-stop(_State) ->
-    emq_mgmt_http:stop_listeners(),
-    emq_mgmt_cli:unload().
+%% List stats of all nodes
+list(Bindings, _Params) when map_size(Bindings) == 0 ->
+    {ok, emq_mgmt:stats()};
+
+%% List stats of a node
+list(#{node := Node}, _Params) ->
+    case emq_mgmt:stats(list_to_existing_atom(Node)) of
+        {error, Reason} -> {error, Reason};
+        Stats -> {ok, Stats}
+    end.
 

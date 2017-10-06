@@ -1,57 +1,62 @@
 %%-*- mode: erlang -*-
 %% emq_management config mapping
 
-{mapping, "management.listener.http", "emq_dashboard.listeners", [
+{mapping, "management.max_row_limit", "emq_management.max_row_limit", [
+  {default, 10000},
+  {datatype, integer}
+]}.
+
+{mapping, "management.listener.http", "emq_management.listeners", [
   {default, 8080},
   {datatype, [integer, ip]}
 ]}.
 
-{mapping, "management.listener.http.acceptors", "emq_dashboard.listeners", [
+{mapping, "management.listener.http.acceptors", "emq_management.listeners", [
   {default, 4},
   {datatype, integer}
 ]}.
 
-{mapping, "management.listener.http.max_clients", "emq_dashboard.listeners", [
+{mapping, "management.listener.http.max_clients", "emq_management.listeners", [
   {default, 512},
   {datatype, integer}
 ]}.
 
-{mapping, "management.listener.https", "emq_dashboard.listeners", [
+{mapping, "management.listener.https", "emq_management.listeners", [
   {datatype, [integer, ip]}
 ]}.
 
-{mapping, "management.listener.https.acceptors", "emq_dashboard.listeners", [
+{mapping, "management.listener.https.acceptors", "emq_management.listeners", [
   {default, 8},
   {datatype, integer}
 ]}.
 
-{mapping, "management.listener.https.max_clients", "emq_dashboard.listeners", [
+{mapping, "management.listener.https.max_clients", "emq_management.listeners", [
   {default, 64},
   {datatype, integer}
 ]}.
 
-{mapping, "management.listener.https.handshake_timeout", "emq_dashboard.listeners", [
+{mapping, "management.listener.https.handshake_timeout", "emq_management.listeners", [
   {default, 15},
   {datatype, integer}
 ]}.
 
-{mapping, "management.listener.https.keyfile", "emq_dashboard.listeners", [
+{mapping, "management.listener.https.keyfile", "emq_management.listeners", [
   {datatype, string}
 ]}.
 
-{mapping, "management.listener.https.certfile", "emq_dashboard.listeners", [
+{mapping, "management.listener.https.certfile", "emq_management.listeners", [
   {datatype, string}
 ]}.
 
-{mapping, "management.listener.https.cacertfile", "emq_dashboard.listeners", [
+{mapping, "management.listener.https.cacertfile", "emq_management.listeners", [
   {datatype, string}
 ]}.
 
-{mapping, "management.listener.https.verify", "emq_dashboard.listeners", [
+{mapping, "management.listener.https.verify", "emq_management.listeners", [
   {datatype, string}
 ]}.
 
-{mapping, "management.listener.https.fail_if_no_peer_cert", "emq_dashboard.listeners", [
+{mapping, "management.listener.https.fail_if_no_peer_cert", "emq_management.listeners", [
   {datatype, {enum, [true, false]}}
 ]}.
 
@@ -76,7 +81,7 @@
       end,
       case cuttlefish:conf_get("management.listener.https", Conf, undefined) of
           undefined -> [];
-          HttpsPort -> [{https, HttpsPort, [{sslopts, SslOpts("management.listener.https")} | Opts("dashboard.listener.https")]}]
+          HttpsPort -> [{https, HttpsPort, [{sslopts, SslOpts("management.listener.https")} | Opts("management.listener.https")]}]
       end])
 end}.
 
