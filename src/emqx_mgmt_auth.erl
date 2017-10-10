@@ -50,7 +50,7 @@ mnesia(copy) ->
 
 -spec(add_app(appid()) -> {ok, appsecret()} | {error, term()}).
 add_app(AppId) when is_binary(AppId) ->
-    Secret = emqttd_guid:to_base62(emqttd_guid:gen()),
+    Secret = emqx_guid:to_base62(emqx_guid:gen()),
     App = #mqtt_app{id = AppId, secret = Secret},
     AddFun = fun() ->
                  case mnesia:wread({mqtt_app, AppId}) of

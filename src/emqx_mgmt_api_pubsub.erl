@@ -18,9 +18,9 @@
 
 -author("Feng Lee <feng@emqtt.io>").
 
--include_lib("emqttd/include/emqttd.hrl").
+-include_lib("emqx/include/emqx.hrl").
 
--include_lib("emqttd/include/emqttd_protocol.hrl").
+-include_lib("emqx/include/emqx_mqtt.hrl").
 
 -import(proplists, [get_value/2, get_value/3]).
 
@@ -56,7 +56,7 @@ publish(_Bindings, Params) ->
     Payload  = get_value(<<"payload">>, Params, <<>>),
     Qos      = get_value(<<"qos">>, Params, 0),
     Retain   = get_value(<<"retain">>, Params, false),
-    Msg = emqttd_message:make(ClientId, Qos, Topic, Payload),
+    Msg = emqx_message:make(ClientId, Qos, Topic, Payload),
     emqx_mgmt:publish(Msg#mqtt_message{retain = Retain}).
 
 unsubscribe(_Bindings, Params) ->
@@ -70,4 +70,5 @@ unsubscribe(_Bindings, Params) ->
 %%    (Qos >= ?QOS_0) and (Qos =< ?QOS_2);
 
 %%validate(topic, Topic) ->
-%%    emqttd_topic:validate({name, Topic}).
+%%    emqx_topic:validate({name, Topic}).
+

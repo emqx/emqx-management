@@ -18,9 +18,11 @@
 
 -author("Feng Lee <feng@emqtt.io>").
 
--include_lib("emqttd/include/emqttd.hrl").
+-include_lib("emqx/include/emqx.hrl").
 
--include_lib("emqttd/include/emqttd_internal.hrl").
+-include_lib("emqx/include/emqx_rest.hrl").
+
+-include_lib("emqx/include/emqx_internal.hrl").
 
 -export([start_listeners/0, stop_listeners/0, handle_request/2]).
 
@@ -58,11 +60,11 @@ handle_request(Req, Dispatch) ->
     case Req:get(path) of
         "/status" when Method =:= 'HEAD'; Method =:= 'GET' ->
             {InternalStatus, _ProvidedStatus} = init:get_status(),
-            AppStatus = case lists:keysearch(emqttd, 1, application:which_applications()) of
+            AppStatus = case lists:keysearch(emqx, 1, application:which_applications()) of
                 false         -> not_running;
                 {value, _Val} -> running
             end,
-            Status = io_lib:format("Node ~s is ~s~nemqttd is ~s",
+            Status = io_lib:format("Node ~s is ~s~nemqx is ~s",
                                     [node(), InternalStatus, AppStatus]),
             Req:ok({"text/plain", Status});
         "/" when Method =:= 'HEAD'; Method =:= 'GET' ->
@@ -104,11 +106,10 @@ rest_dispatcher(APIs) ->
     end.
 
 rest_apis() ->
+    {ok, Modules} = application:get_key(emqx_management, modules),
     lists:usort(
-      lists:append(
-        [API#{module => Module, tokens => string:tokens(Path, "/")} ||
-         {ok, Module} <- [application:get_key(emqx_management, modules)],
-         {rest_api, [API = #{path := Path}]} <- Module:module_info(attributes)])).
+        [API#{module => Module, tokens => string:tokens(Path, "/")}
+         || Module <- Modules, {rest_api, [API = #{path := Path}]} <- Module:module_info(attributes)]).
 
 match_api(_Method, _Url, []) ->
     false;

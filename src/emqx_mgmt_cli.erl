@@ -16,12 +16,12 @@
 
 -module(emqx_mgmt_cli).
 
--include_lib("emqttd/include/emqttd_cli.hrl").
+-include_lib("emqx/include/emqx_cli.hrl").
 
 -export([load/0, cmd/1, unload/0]).
 
 load() ->
-    emqttd_ctl:register_cmd(mgmt, {?MODULE, cmd}, []).
+    emqx_ctl:register_cmd(mgmt, {?MODULE, cmd}, []).
 
 cmd(["add_app", AppId]) ->
     case emqx_mgmt_auth:add_app(list_to_binary(AppId)) of
@@ -53,5 +53,5 @@ cmd(_) ->
             {"mgmt list_apps",       "List Applications"}]).
 
 unload() ->
-    emqttd_ctl:unregister_cmd(cmd).
+    emqx_ctl:unregister_cmd(cmd).
 

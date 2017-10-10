@@ -20,7 +20,7 @@
 
 -include("emqx_mgmt.hrl").
 
--include_lib("emqttd/include/emqttd.hrl").
+-include_lib("emqx/include/emqx.hrl").
 
 -import(proplists, [get_value/2, get_value/3]).
 
@@ -91,11 +91,11 @@ update_plugin_configs(#{node := Node, plugin := Plugin}, Params) ->
     end.
 
 ensure_reload_plugin(Plugin) ->
-    case lists:keyfind(Plugin, 2, emqttd_plugins:list()) of
+    case lists:keyfind(Plugin, 2, emqx_plugins:list()) of
         {_, _, _, _, true} ->
-            emqttd_plugins:unload(Plugin),
+            emqx_plugins:unload(Plugin),
             timer:sleep(500),
-            emqttd_plugins:load(Plugin);
+            emqx_plugins:load(Plugin);
          _ ->
             ok
     end.

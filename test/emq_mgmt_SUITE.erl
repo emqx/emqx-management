@@ -18,7 +18,7 @@
 
 -compile(export_all).
 
--include_lib("emqttd/include/emqttd.hrl").
+-include_lib("emqx/include/emqx.hrl").
 
 -include_lib("eunit/include/eunit.hrl").
 
@@ -46,11 +46,11 @@ end_per_suite(_Config) ->
     application:stop(mnesia).
 
 t_add_app(_Config) ->
-    emqttd_rest_auth:add_app(id, <<"secret">>),
-    ?assert(emqttd_rest_auth:check_app(id, <<"secret">>)),
-    ?assertEqual(<<"secret">>, emqttd_rest_auth:get_appsecret(id)),
-    ?assertEqual([{id, <<"secret">>}], emqttd_rest_auth:list_apps()),
-    emqttd_rest_auth:del_app(id),
+    emqx_mgmt_auth:add_app(id, <<"secret">>),
+    ?assert(emqx_mgmt_auth:check_app(id, <<"secret">>)),
+    ?assertEqual(<<"secret">>, emqx_mgmt_auth:get_appsecret(id)),
+    ?assertEqual([{id, <<"secret">>}], emqx_mgmt_auth:list_apps()),
+    emqx_mgmt_auth:del_app(id),
     ok.
 
 t_del_app(_Config) ->
@@ -61,5 +61,4 @@ t_check_app(_Config) ->
 
 t_check_app_acl(_Config) ->
     ok.
-
 

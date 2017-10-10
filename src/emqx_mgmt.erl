@@ -20,9 +20,9 @@
 
 -include_lib("stdlib/include/qlc.hrl").
 
--include_lib("emqttd/include/emqttd.hrl").
+-include_lib("emqx/include/emqx.hrl").
 
--include_lib("emqttd/include/emqttd_protocol.hrl").
+-include_lib("emqx/include/emqx_mqtt.hrl").
 
 -import(proplists, [get_value/2, get_value/3]).
 
@@ -83,8 +83,8 @@ list_nodes() ->
 lookup_node(Node) -> node_info(Node).
 
 node_info(Node) when Node =:= node() ->
-    Memory  = emqttd_vm:get_memory(),
-    Info = maps:from_list([{K, list_to_binary(V)} || {K, V} <- emqttd_vm:loads()]),
+    Memory  = emqx_vm:get_memory(),
+    Info = maps:from_list([{K, list_to_binary(V)} || {K, V} <- emqx_vm:loads()]),
     Info#{name              => node(),
           otp_release       => iolist_to_binary(otp_rel()),
           memory_total      => get_value(allocated, Memory),
@@ -111,7 +111,7 @@ lookup_broker(Node) ->
     broker_info(Node).
 
 broker_info(Node) when Node =:= node() ->
-    Info = maps:from_list([{K, iolist_to_binary(V)} || {K, V} <- emqttd_broker:info()]),
+    Info = maps:from_list([{K, iolist_to_binary(V)} || {K, V} <- emqx_broker:info()]),
     Info#{name => Node, otp_release => iolist_to_binary(otp_rel()), node_status => 'Running'};
 
 broker_info(Node) ->
@@ -125,7 +125,7 @@ get_metrics() ->
     [{Node, get_metrics(Node)} || Node <- ekka_mnesia:running_nodes()].
 
 get_metrics(Node) when Node =:= node() ->
-    emqttd_metrics:all();
+    emqx_metrics:all();
 get_metrics(Node) ->
     rpc_call(Node, get_metrics, [Node]).
 
@@ -133,7 +133,7 @@ get_stats() ->
     [{Node, get_stats(Node)} || Node <- ekka_mnesia:running_nodes()].
 
 get_stats(Node) when Node =:= node() ->
-    emqttd_stats:getstats();
+    emqx_stats:getstats();
 get_stats(Node) ->
     rpc_call(Node, get_stats, [Node]).
 
@@ -170,9 +170,9 @@ kickout_client(ClientId) ->
     end.
 
 kickout_client(Node, ClientId) when Node =:= node() ->
-    case emqttd_cm:lookup(ClientId) of
+    case emqx_cm:lookup(ClientId) of
         undefined -> {error, not_found};
-        #mqtt_client{client_pid = Pid} -> emqttd_client:kick(Pid)
+        #mqtt_client{client_pid = Pid} -> emqx_client:kick(Pid)
     end;
 
 kickout_client(Node, ClientId) ->
@@ -186,9 +186,9 @@ clean_acl_cache(ClientId, Topic) ->
     end.
 
 clean_acl_cache(Node, ClientId, Topic) when Node =:= node() ->
-    case emqttd_cm:lookup(ClientId) of
+    case emqx_cm:lookup(ClientId) of
         undefined -> {error, not_found};
-        #mqtt_client{client_pid = Pid}-> emqttd_client:clean_acl_cache(Pid, Topic)
+        #mqtt_client{client_pid = Pid}-> emqx_client:clean_acl_cache(Pid, Topic)
     end;
 clean_acl_cache(Node, ClientId, Topic) ->
     rpc_call(Node, clean_acl_cache, [Node, ClientId, Topic]).
@@ -267,20 +267,20 @@ lookup_routes(Topic) ->
 %%--------------------------------------------------------------------
 
 subscribe(ClientId, Topic, Qos) ->
-    case emqttd_sm:lookup_session(ClientId) of
+    case emqx_sm:lookup_session(ClientId) of
         undefined -> {error, session_not_found};
         #mqtt_session{sess_pid = SessPid} ->
-            emqttd_session:subscribe(SessPid, [{Topic, [{qos, Qos}]}])
+            emqx_session:subscribe(SessPid, [{Topic, [{qos, Qos}]}])
     end.
 
 %%TODO: ???
-publish(Msg) -> emqttd:publish(Msg).
+publish(Msg) -> emqx:publish(Msg).
 
 unsubscribe(ClientId, Topic) ->
-    case emqttd_sm:lookup_session(ClientId) of
+    case emqx_sm:lookup_session(ClientId) of
         undefined -> {error, session_not_found};
         #mqtt_session{sess_pid = SessPid} ->
-            emqttd_session:unsubscribe(SessPid, [{Topic, []}])
+            emqx_session:unsubscribe(SessPid, [{Topic, []}])
     end.
 
 %%--------------------------------------------------------------------
@@ -291,17 +291,17 @@ list_plugins() ->
     [{Node, list_plugins(Node)} || Node <- ekka_mnesia:running_nodes()].
 
 list_plugins(Node) when Node =:= node() ->
-    emqttd_plugins:list(Node);
+    emqx_plugins:list(Node);
 list_plugins(Node) ->
     rpc_call(Node, list_plugins, [Node]).
 
 load_plugin(Node, Plugin) when Node =:= node() ->
-    emqttd_plugins:load(Plugin);
+    emqx_plugins:load(Plugin);
 load_plugin(Node, Plugin) ->
     rpc_call(Node, load_plugin, [Node, Plugin]).
 
 unload_plugin(Node, Plugin) when Node =:= node() ->
-    emqttd_plugins:unload(Plugin);
+    emqx_plugins:unload(Plugin);
 unload_plugin(Node, Plugin) ->
     rpc_call(Node, unload_plugin, [Node, Plugin]).
 
@@ -333,7 +333,7 @@ get_alarms() ->
     [{Node, get_alarms(Node)} || Node <- ekka_mnesia:running_nodes()].
    
 get_alarms(Node) when Node =:= node() ->
-    emqttd_alarm:get_alarms();
+    emqx_alarm:get_alarms();
 get_alarms(Node) ->
     rpc_call(Node, get_alarms, [Node]).
 
@@ -342,7 +342,7 @@ get_alarms(Node) ->
 %%--------------------------------------------------------------------
 
 update_configs(App, Terms) ->
-    emqttd_config:write(App, Terms).
+    emqx_config:write(App, Terms).
 
 update_config(App, Key, Value) ->
     Results = [update_config(Node, App, Key, Value) || Node <- ekka_mnesia:running_nodes()],
@@ -352,7 +352,7 @@ update_config(App, Key, Value) ->
     end.
 
 update_config(Node, App, Key, Value) when Node =:= node() ->
-    emqttd_config:set(App, Key, Value);
+    emqx_config:set(App, Key, Value);
 
 update_config(Node, App, Key, Value) ->
     rpc_call(Node, update_config, [Node, App, Key, Value]).
@@ -361,19 +361,19 @@ get_all_configs() ->
     [{Node, get_all_configs(Node)} || Node <- ekka_mnesia:running_nodes()].
 
 get_all_configs(Node) when Node =:= node()->
-    emqttd_cli_config:all_cfgs();
+    emqx_cli_config:all_cfgs();
 
 get_all_configs(Node) ->
     rpc_call(Node, get_config, [Node]).
 
 get_plugin_configs(PluginName) ->
-    emqttd_config:read(PluginName).
+    emqx_config:read(PluginName).
 
 get_plugin_configs(Node, PluginName) ->
     rpc_call(Node, get_plugin_configs, [PluginName]).
 
 update_plugin_configs(PluginName, Terms) ->
-    emqttd_config:write(PluginName, Terms).
+    emqx_config:write(PluginName, Terms).
 
 update_plugin_configs(Node, PluginName, Terms) ->
     rpc_call(Node, update_plugin_configs, [PluginName, Terms]).
@@ -416,7 +416,7 @@ item(session, {ClientId, _Pid, Persistent, Properties}) ->
     maps:from_list(
       [{client_id, ClientId}, {clean_sess, not Persistent},
        {created_at, get_value(created_at, Properties)}
-       | emqttd_stats:get_session_stats(ClientId)]);
+       | emqx_stats:get_session_stats(ClientId)]);
 
 item(subscription, {{Topic, ClientId}, Options}) ->
     #{topic => Topic, clientid => ClientId, options => Options};

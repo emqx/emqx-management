@@ -16,7 +16,7 @@
 
 -module(emqx_mgmt_api_sessions).
 
--include_lib("emqttd/include/emqttd.hrl").
+-include_lib("emqx/include/emqx.hrl").
 
 -rest_api(#{name   => list_node_sessions,
             method => 'GET',

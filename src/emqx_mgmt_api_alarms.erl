@@ -18,7 +18,7 @@
 
 -author("Feng Lee <feng@emqtt.io>").
 
--include_lib("emqttd/include/emqttd.hrl").
+-include_lib("emqx/include/emqx.hrl").
 
 -rest_api(#{name   => list_all_alarms,
             method => 'GET',
