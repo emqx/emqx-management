@@ -20,6 +20,10 @@
 
 -export([start/2, stop/1]).
 
+%%--------------------------------------------------------------------
+%% Start/Stop Callbacks
+%%--------------------------------------------------------------------
+
 start(_Type, _Args) ->
     {ok, Sup} = emqx_mgmt_sup:start_link(),
     emqx_mgmt_http:start_listeners(),

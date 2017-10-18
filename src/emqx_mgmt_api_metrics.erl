@@ -18,7 +18,7 @@
 
 -author("Feng Lee <feng@emqtt.io>").
 
--rest_api(#{name   => list_metrics,
+-rest_api(#{name   => list_all_metrics,
             method => 'GET',
             path   => "/metrics/",
             func   => list,
@@ -26,20 +26,18 @@
 
 -rest_api(#{name   => list_node_metrics,
             method => 'GET',
-            path   => "/nodes/:node/metrics/",
+            path   => "/nodes/:atom:node/metrics/",
             func   => list,
             descr  => "A list of metrics of a node"}).
 
 -export([list/2]).
 
-%% List metrics of all nodes
 list(Bindings, _Params) when map_size(Bindings) == 0 ->
     {ok, emqx_mgmt:get_metrics()};
 
-%% List metrics of a node
 list(#{node := Node}, _Params) ->
     case emqx_mgmt:get_metrics(Node) of
         {error, Reason} -> {error, Reason};
-        Metrics -> {ok, Metrics}
+        Metrics         -> {ok, Metrics}
     end.
 

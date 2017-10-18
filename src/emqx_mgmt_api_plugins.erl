@@ -26,19 +26,19 @@
 
 -rest_api(#{name   => list_node_plugins,
             method => 'GET',
-            path   => "/nodes/:node/plugins/",
+            path   => "/nodes/:atom:node/plugins/",
             func   => list,
             descr  => "List all plugins on a node"}).
 
 -rest_api(#{name   => load_plugin,
             method => 'POST',
-            path   => "/nodes/:node/plugins/:plugin/load",
+            path   => "/nodes/:atom:node/plugins/:atom:plugin/load",
             func   => load,
             descr  => "Load a plugin"}).
 
 -rest_api(#{name   => unload_plugin,
             method => 'post',
-            path   => "/nodes/:node/plugins/:plugin/unload",
+            path   => "/nodes/:atom:node/plugins/:atom:plugin/unload",
             func   => unload,
             descr  => "Unload a plugin"}).
 
@@ -55,4 +55,4 @@ load(#{node := Node, plugin := Plugin}, _Params) ->
 
 unload(#{node := Node, plugin := Plugin}, _Params) ->
     emqx_mgmt:unload_plugin(Node, Plugin).
-    
+

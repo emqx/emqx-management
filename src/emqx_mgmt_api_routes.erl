@@ -33,10 +33,8 @@
 -export([list/2, lookup/2]).
 
 list(Bindings, Params) when map_size(Bindings) == 0 ->
-    {ok, emqx_mgmt_api:paginate(
-           emqx_mgmt:query_handle(routes),
-           emqx_mgmt:count(routes),
-           Params, fun format/1)}.
+    Qh = emqx_mgmt:query_handle(routes),
+    {ok, emqx_mgmt_api:paginate(Qh, emqx_mgmt:count(routes), Params, fun format/1)}.
 
 lookup(#{topic := Topic}, _Params) ->
     {ok, #{items => emqx_mgmt:lookup_routes(Topic)}}.

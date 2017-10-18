@@ -20,52 +20,50 @@
 
 -rest_api(#{name   => list_node_clients,
             method => 'GET',
-            path   => "nodes/:node/clients/",
+            path   => "nodes/:atom:node/clients/",
             func   => list,
             descr  => "A list of clients on a node"}).
 
 -rest_api(#{name   => lookup_node_client,
             method => 'GET',
-            path   => "nodes/:node/clients/:clientid",
+            path   => "nodes/:atom:node/clients/:bin:clientid",
             func   => lookup,
             descr  => "Lookup a client on node"}).
 
 -rest_api(#{name   => lookup_client,
             method => 'GET',
-            path   => "/clients/:clientid",
+            path   => "/clients/:bin:clientid",
             func   => lookup,
             descr  => "Lookup a client in the cluster"}).
 
 -rest_api(#{name   => kickout_client,
             method => 'DELETE',
-            path   => "/clients/:clientid",
+            path   => "/clients/:bin:clientid",
             func   => kickout,
             descr  => "Kick out a client"}).
 
 -rest_api(#{name   => clean_acl_cache,
             method => 'PUT',
-            path   => "/clients/:clientid/clean_acl_cache",
+            path   => "/clients/:bin:clientid/clean_acl_cache",
             func   => clean_acl_cache,
-            descr  => "Clean acl cache of a client"}).
+            descr  => "Clean ACL cache of a client"}).
 
 -import(emqx_mgmt_util, [ntoa/1, strftime/1]).
 
 -export([list/2, lookup/2, kickout/2, clean_acl_cache/2]).
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    {ok, emqx_mgmt_api:paginate(emqx_mgmt:query_handle(clients),
-                                emqx_mgmt:count(clients),
-                                Params, fun format/1)};
+    QH = emqx_mgmt:query_handle(clients),
+    {ok, emqx_mgmt_api:paginate(QH, emqx_mgmt:count(clients), Params, fun format/1)};
 
-list(Bindings = #{"node" := Node}, Params) ->
-    case rpc:call(list_to_existing_atom(Node),
-                  ?MODULE, list, [Bindings, Params]) of
+list(Bindings = #{node := Node}, Params) ->
+    case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
         {badrpc, Reason} -> {error, Reason};
         Res -> Res
     end.
 
-lookup(#{"node" := Node, "clientid" := ClientId}, _Params) ->
-    Items = emqx_mgmt:lookup_client(list_to_existing_atom(Node), list_to_binary(ClientId)),
+lookup(#{node := Node, clientid := ClientId}, _Params) ->
+    Items = emqx_mgmt:lookup_client(Node, ClientId),
     {ok, #{items => [format(Item) || Item <- Items]}};
 
 lookup(#{clientid := ClientId}, _Params) ->

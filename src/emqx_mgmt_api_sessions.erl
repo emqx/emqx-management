@@ -20,19 +20,19 @@
 
 -rest_api(#{name   => list_node_sessions,
             method => 'GET',
-            path   => "nodes/:node/sessions/",
+            path   => "nodes/:atom:node/sessions/",
             func   => list,
             descr  => "A list of sessions on a node"}).
 
 -rest_api(#{name   => lookup_node_session,
             method => 'GET',
-            path   => "nodes/:node/sessions/:clientid",
+            path   => "nodes/:atom:node/sessions/:bin:clientid",
             func   => lookup,
             descr  => "Lookup a session on the node"}).
 
 -rest_api(#{name   => lookup_session,
             method => 'GET',
-            path   => "nodes/:node/sessions/:clientid",
+            path   => "nodes/:atom:node/sessions/:bin:clientid",
             func   => lookup,
             descr  => "Lookup a session in the cluster"}).
 

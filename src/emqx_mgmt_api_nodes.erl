@@ -26,7 +26,7 @@
 
 -rest_api(#{name   => lookup_node,
             method => 'GET',
-            path   => "/nodes/:node",
+            path   => "/nodes/:atom:node",
             func   => lookup,
             descr  => "Lookup a node in the cluster"}).
 

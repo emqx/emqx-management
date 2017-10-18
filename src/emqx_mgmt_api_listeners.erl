@@ -26,7 +26,7 @@
 
 -rest_api(#{name   => list_node_listeners,
             method => 'GET',
-            path   => "/nodes/:node/listeners",
+            path   => "/nodes/:atom:node/listeners",
             func   => list,
             descr  => "A list of listeners on the node"}).
 
@@ -34,7 +34,7 @@
 
 %% List listeners on a node.
 list(#{node := Node}, _Params) ->
-    {ok, format(emqx_mgmt:list_listeners(list_to_atom(Node)))};
+    {ok, format(emqx_mgmt:list_listeners(Node))};
 
 %% List listeners in the cluster.
 list(_Binding, _Params) ->

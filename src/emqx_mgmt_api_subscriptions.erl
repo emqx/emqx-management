@@ -22,29 +22,27 @@
 
 -rest_api(#{name   => list_node_subscriptions,
             method => 'GET',
-            path   => "/nodes/:node/subscriptions/",
+            path   => "/nodes/:atom:node/subscriptions/",
             func   => list,
             descr  => "A list of subscriptions on a node"}).
 
 -rest_api(#{name   => lookup_client_subscriptions,
             method => 'GET',
-            path   => "/subscriptions/:clientid",
+            path   => "/subscriptions/:bin:clientid",
             func   => lookup,
             descr  => "A list of subscriptions of a client"}).
 
 -rest_api(#{name   => lookup_client_subscriptions_with_node,
             method => 'GET',
-            path   => "/nodes/:node/subscriptions/:clientid",
+            path   => "/nodes/:atom:node/subscriptions/:bin:clientid",
             func   => lookup,
             descr  => "A list of subscriptions of a client on the node"}).
 
 -export([list/2, lookup/2]).
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    {ok, emqx_mgmt_api:paginate(
-           emqx_mgmt:query_handle(subscriptions),
-           emqx_mgmt:count(subscriptions),
-           Params, fun format/1)}.
+    Qh = emqx_mgmt:query_handle(subscriptions),
+    {ok, emqx_mgmt_api:paginate(Qh, emqx_mgmt:count(subscriptions), Params, fun format/1)}.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
     {ok, #{items => format(emqx_mgmt:lookup_subscriptions(Node, ClientId))}};

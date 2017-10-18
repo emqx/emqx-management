@@ -26,19 +26,18 @@
 
 -rest_api(#{name   => lookup_broker,
             method => 'GET',
-            path   => "/brokers/:node",
+            path   => "/brokers/:atom:node",
             func   => lookup,
-            descr  => "Lookup broker info of a node"}).
+            descr  => "Get broker info of a node"}).
 
 -export([list/2, lookup/2]).
 
 list(_Bindings, _Params) ->
-    {ok, [{Node, format(Info)} || {Node, Info} <- emq_mgmt:list_brokers()]}.
+    {ok, emq_mgmt:list_brokers()}.
 
 lookup(#{node := Node}, _Params) ->
-    {ok, format(emq_mgmt:lookup_broker(Node))}.
-
-format({error, Reason}) -> [{error, Reason}];
-
-format(Info) -> Info.
+    case emq_mgmt:lookup_broker(Node) of
+        {error, Reason} -> {error, Reason};
+        Info -> {ok, Info}
+    end.
 

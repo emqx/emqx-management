@@ -26,7 +26,7 @@
 
 -rest_api(#{name   => list_node_stats,
             method => 'GET',
-            path   => "/nodes/:node/stats/",
+            path   => "/nodes/:atom:node/stats/",
             func   => list,
             descr  => "A list of stats of a node"}).
 
