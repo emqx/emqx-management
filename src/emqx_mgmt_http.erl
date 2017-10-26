@@ -34,7 +34,7 @@ stop_listeners() ->
     lists:foreach(fun stop_listener/1, listeners()).
 
 start_listener({Proto, Port, Options}) when Proto == http orelse Proto == https ->
-    Handlers = [{"/status", {emqx_mgmt_api_status, handle_request, []}},
+    Handlers = [{"/status", {?MODULE, handle_request, []}},
                 {"/api/v2", emqx_rest_handler:init(#{apps => [?APP]}),
                  [{authorization, fun authorize_appid/1}]}],
     emqx_rest:start_http(listener_name(Proto), Port, Options, Handlers).
