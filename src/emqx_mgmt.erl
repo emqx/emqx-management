@@ -112,7 +112,7 @@ lookup_broker(Node) ->
 
 broker_info(Node) when Node =:= node() ->
     Info = maps:from_list([{K, iolist_to_binary(V)} || {K, V} <- emqx_broker:info()]),
-    Info#{name => Node, otp_release => iolist_to_binary(otp_rel()), node_status => 'Running'};
+    Info#{otp_release => iolist_to_binary(otp_rel()), node_status => 'Running'};
 
 broker_info(Node) ->
     rpc_call(Node, broker_info, [Node]).

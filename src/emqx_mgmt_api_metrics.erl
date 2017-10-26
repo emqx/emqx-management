@@ -33,11 +33,12 @@
 -export([list/2]).
 
 list(Bindings, _Params) when map_size(Bindings) == 0 ->
-    {ok, emqx_mgmt:get_metrics()};
+    {ok, [[{node, Node}, {metrics, Metrics}]
+          || {Node, Metrics} <- emqx_mgmt:get_metrics()]};
 
 list(#{node := Node}, _Params) ->
     case emqx_mgmt:get_metrics(Node) of
-        {error, Reason} -> {error, Reason};
+        {error, Reason} -> {error, #{message => Reason}};
         Metrics         -> {ok, Metrics}
     end.
 

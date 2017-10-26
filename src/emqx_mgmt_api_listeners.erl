@@ -38,7 +38,8 @@ list(#{node := Node}, _Params) ->
 
 %% List listeners in the cluster.
 list(_Binding, _Params) ->
-    {ok, [{Node, format(Listeners)} || {Node, Listeners} <- emqx_mgmt:listeners()]}.
+    {ok, [#{node => Node, listeners => format(Listeners)}
+          || {Node, Listeners} <- emqx_mgmt:listeners()]}.
 
 format(Listeners) when is_list(Listeners) ->
     [ Info#{listen_on => list_to_binary(esockd:to_string(ListenOn))}

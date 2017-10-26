@@ -26,7 +26,7 @@
 
 -rest_api(#{name   => lookup_routes,
             method => 'GET',
-            url    => "/routes/:topic",
+            url    => "/routes/:bin:topic",
             func   => lookup,
             descr  => "Lookup routes to a topic"}).
 
@@ -37,7 +37,7 @@ list(Bindings, Params) when map_size(Bindings) == 0 ->
     {ok, emqx_mgmt_api:paginate(Qh, emqx_mgmt:count(routes), Params, fun format/1)}.
 
 lookup(#{topic := Topic}, _Params) ->
-    {ok, #{items => emqx_mgmt:lookup_routes(Topic)}}.
+    {ok, emqx_mgmt:lookup_routes(Topic)}.
 
 format(R) -> emqx_mgmt:item(route, R).
 

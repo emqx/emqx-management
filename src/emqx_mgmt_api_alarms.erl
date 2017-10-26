@@ -35,7 +35,8 @@
 -export([list/2]).
 
 list(Bindings, _Params) when map_size(Bindings) == 0 ->
-    {ok, [{Node, format(Alarms)} || {Node, Alarms} <- emqx_mgmt:get_alarms()]};
+    {ok, [#{node => Node, alarms => format(Alarms)}
+          || {Node, Alarms} <- emqx_mgmt:get_alarms()]};
 
 list(#{node := Node}, _Params) ->
     {ok, format(emqx_mgmt:get_alarms(Node))}.

@@ -24,22 +24,23 @@
             func   => list,
             descr  => "A list of stats of all nodes in the cluster"}).
 
--rest_api(#{name   => list_node_stats,
+-rest_api(#{name   => lookup_node_stats,
             method => 'GET',
             path   => "/nodes/:atom:node/stats/",
-            func   => list,
+            func   => lookup,
             descr  => "A list of stats of a node"}).
 
--export([list/2]).
+-export([list/2, lookup/2]).
 
 %% List stats of all nodes
 list(Bindings, _Params) when map_size(Bindings) == 0 ->
-    {ok, emqx_mgmt:get_stats()};
+    {ok, [#{node => Node, stats => Stats}
+          || {Node, Stats} <- emqx_mgmt:get_stats()]}.
 
 %% List stats of a node
-list(#{node := Node}, _Params) ->
+lookup(#{node := Node}, _Params) ->
     case emqx_mgmt:get_stats(Node) of
-        {error, Reason} -> {error, Reason};
+        {error, Reason} -> {error, #{message => Reason}};
         Stats -> {ok, Stats}
     end.
 

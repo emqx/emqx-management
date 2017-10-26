@@ -45,10 +45,10 @@ list(#{node := Node}, Params) when Node =:= node() ->
     {ok, emqx_mgmt_api:paginate(Qh, emqx_mgmt:count(subscriptions), Params, fun format/1)}.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    {ok, #{items => format(emqx_mgmt:lookup_subscriptions(Node, ClientId))}};
+    {ok, format(emqx_mgmt:lookup_subscriptions(Node, ClientId))};
 
 lookup(#{clientid := ClientId}, _Params) ->
-    {ok, #{items => format(emqx_mgmt:lookup_subscriptions(ClientId))}}.
+    {ok, format(emqx_mgmt:lookup_subscriptions(ClientId))}.
 
 format(Items) when is_list(Items) ->
     [format(Item) || Item <- Items];

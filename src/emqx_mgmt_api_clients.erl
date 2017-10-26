@@ -43,8 +43,8 @@
             descr  => "Kick out a client"}).
 
 -rest_api(#{name   => clean_acl_cache,
-            method => 'PUT',
-            path   => "/clients/:bin:clientid/clean_acl_cache",
+            method => 'DELETE',
+            path   => "/clients/:bin:clientid/acl/:bin:topic",
             func   => clean_acl_cache,
             descr  => "Clean ACL cache of a client"}).
 
@@ -58,22 +58,24 @@ list(#{node := Node}, Params) when Node =:= node() ->
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
-        {badrpc, Reason} -> {error, Reason};
+        {badrpc, Reason} -> {error, #{message => Reason}};
         Res -> Res
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
     Items = emqx_mgmt:lookup_client(Node, ClientId),
-    {ok, #{items => [format(Item) || Item <- Items]}};
+    {ok, [format(Item) || Item <- Items]};
 
 lookup(#{clientid := ClientId}, _Params) ->
-    {ok, #{items => format(emqx_mgmt:lookup_client(ClientId))}}.
+    {ok, format(emqx_mgmt:lookup_client(ClientId))}.
 
 kickout(#{clientid := ClientId}, _Params) ->
-    emqx_mgmt:kickout_client(ClientId).
+    case emqx_mgmt:kickout_client(ClientId) of
+        ok -> ok;
+        {error, Reason} -> {error, #{message => Reason}}
+    end.
 
-clean_acl_cache(#{clientid := ClientId}, Params) ->
-    Topic = proplists:get_value(<<"topic">>, Params),
+clean_acl_cache(#{clientid := ClientId, topic := Topic}, _Params) ->
     emqx_mgmt:clean_acl_cache(ClientId, Topic).
 
 format(Clients) when is_list(Clients) ->

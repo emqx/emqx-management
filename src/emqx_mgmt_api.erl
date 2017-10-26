@@ -23,32 +23,23 @@
 -export([paginate/4]).
 
 paginate(Qh, Count, Params, RowFun) ->
-    Page = page_no(Params),
-    Size = page_size(Params),
+    Page = page(Params),
+    Limit = limit(Params),
     Cursor = qlc:cursor(Qh),
     case Page > 1 of
-        true  -> qlc:next_answers(Cursor, (Page - 1) * Size);
+        true  -> qlc:next_answers(Cursor, (Page - 1) * Limit);
         false -> ok
     end,
-    Rows = qlc:next_answers(Cursor, Size),
+    Rows = qlc:next_answers(Cursor, Limit),
     qlc:delete_cursor(Cursor),
-    #{page        => Page,
-      page_size   => Size,
-      total_pages => total_pages(Count, Size),
-      total_count => Count,
-      items       => [RowFun(Row) || Row <- Rows]}.
+    #{meta  => #{page => Page, limit => Limit, count => Count},
+      items => [RowFun(Row) || Row <- Rows]}.
 
-total_pages(TotalCount, PageSize) ->
-    case TotalCount rem PageSize of
-        0 -> TotalCount div PageSize;
-        _ -> (TotalCount div PageSize) + 1
-    end.
-
-page_no(Params) ->
+page(Params) ->
     list_to_integer(proplists:get_value("page", Params, "1")).
 
-page_size(Params) ->
-    case proplists:get_value("size", Params) of
+limit(Params) ->
+    case proplists:get_value("limit", Params) of
         undefined -> emqx_mgmt:max_row_limit();
         Size      -> list_to_integer(Size)
     end.

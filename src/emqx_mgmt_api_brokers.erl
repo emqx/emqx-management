@@ -24,20 +24,20 @@
             func   => list,
             descr  => "A list of brokers in the cluster"}).
 
--rest_api(#{name   => lookup_broker,
+-rest_api(#{name   => get_broker,
             method => 'GET',
             path   => "/brokers/:atom:node",
-            func   => lookup,
+            func   => get,
             descr  => "Get broker info of a node"}).
 
--export([list/2, lookup/2]).
+-export([list/2, get/2]).
 
 list(_Bindings, _Params) ->
-    {ok, emq_mgmt:list_brokers()}.
+    {ok, [ Info#{node => Node} || {Node, Info} <- emq_mgmt:list_brokers() ]}.
 
-lookup(#{node := Node}, _Params) ->
+get(#{node := Node}, _Params) ->
     case emq_mgmt:lookup_broker(Node) of
-        {error, Reason} -> {error, Reason};
+        {error, Reason} -> {error, #{message => Reason}};
         Info -> {ok, Info}
     end.
 

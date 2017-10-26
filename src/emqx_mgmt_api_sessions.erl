@@ -45,15 +45,15 @@ list(#{node := Node}, Params) when Node =:= node() ->
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
-        {badrpc, Reason} -> {error, Reason};
+        {badrpc, Reason} -> {error, #{message => Reason}};
         Res -> Res
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    {ok, #{items => format(emqx_mgmt:lookup_session(Node, ClientId))}};
+    {ok, format(emqx_mgmt:lookup_session(Node, ClientId))};
 
 lookup(#{clientid := ClientId}, _Params) ->
-    {ok, #{items => format(emqx_mgmt:lookup_session(ClientId))}}.
+    {ok, format(emqx_mgmt:lookup_session(ClientId))}.
 
 format(Item = {_ClientId, _Pid, _Persistent, _Properties}) ->
     format(emqx_mgmt:item(session, Item));

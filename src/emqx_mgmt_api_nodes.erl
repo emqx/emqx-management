@@ -24,23 +24,24 @@
             func   => list,
             descr  => "A list of nodes in the cluster"}).
 
--rest_api(#{name   => lookup_node,
+-rest_api(#{name   => get_node,
             method => 'GET',
             path   => "/nodes/:atom:node",
-            func   => lookup,
+            func   => get,
             descr  => "Lookup a node in the cluster"}).
 
--export([list/2, lookup/2]).
+-export([list/2, get/2]).
 
 list(_Bindings, _Params) ->
-    {ok, [{Node, format(Info)} || {Node, Info} <- emqx_mgmt:list_nodes()]}.
+    {ok, [format(Node, Info) || {Node, Info} <- emqx_mgmt:list_nodes()]}.
 
-lookup(#{node := Node}, _Params) ->
+get(#{node := Node}, _Params) ->
     {ok, emqx_mgmt:lookup_node(Node)}.
 
-format({error, Reason}) -> [{error, Reason}];
+format(Node, {error, Reason}) -> [{node, Node}, {error, Reason}];
 
-format(Info = #{memory_total := Total, memory_used := Used}) ->
-    Info#{memory_total := emqx_mgmt_util:kmg(Total),
+format(Node, Info = #{memory_total := Total, memory_used := Used}) ->
+    Info#{node         := Node,
+          memory_total := emqx_mgmt_util:kmg(Total),
           memory_used  := emqx_mgmt_util:kmg(Used)}.
 
