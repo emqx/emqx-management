@@ -48,7 +48,7 @@ list(#{node := Node}, _Params) ->
     {ok, emqx_mgmt:list_plugins(Node)};
 
 list(_Bindings, _Params) ->
-    {ok, emq_mgmt:list_plugins()}.
+    {ok, emqx_mgmt:list_plugins()}.
 
 load(#{node := Node, plugin := Plugin}, _Params) ->
     emqx_mgmt:load_plugin(Node, Plugin).
