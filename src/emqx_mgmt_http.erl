@@ -27,7 +27,6 @@
 %%--------------------------------------------------------------------
 
 start_listeners() ->
-    io:format("Listeners: ~p~n", [listeners()]),
     lists:foreach(fun start_listener/1, listeners()).
     
 stop_listeners() ->
@@ -35,12 +34,12 @@ stop_listeners() ->
 
 start_listener({Proto, Port, Options}) when Proto == http orelse Proto == https ->
     Handlers = [{"/status", {?MODULE, handle_request, []}},
-                {"/api/v2", emqx_rest_handler:init(#{apps => [?APP]}),
+                {"/api/v2", minirest:handler(#{apps => [?APP]}),
                  [{authorization, fun authorize_appid/1}]}],
-    emqx_rest:start_http(listener_name(Proto), Port, Options, Handlers).
+    minirest:start_http(listener_name(Proto), Port, Options, Handlers).
 
 stop_listener({Proto, Port, _}) ->
-    emqx_rest:stop_http(listener_name(Proto), Port).
+    minirest:stop_http(listener_name(Proto), Port).
 
 listeners() ->
     application:get_env(?APP, listeners, []).
