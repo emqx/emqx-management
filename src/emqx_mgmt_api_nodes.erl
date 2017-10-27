@@ -41,7 +41,7 @@ get(#{node := Node}, _Params) ->
 format(Node, {error, Reason}) -> [{node, Node}, {error, Reason}];
 
 format(Node, Info = #{memory_total := Total, memory_used := Used}) ->
-    Info#{node         := Node,
+    Info#{node         => Node,
           memory_total := emqx_mgmt_util:kmg(Total),
           memory_used  := emqx_mgmt_util:kmg(Used)}.
 
