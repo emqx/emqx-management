@@ -18,6 +18,8 @@
 
 -author("Feng Lee <feng@emqtt.io>").
 
+-include_lib("emqx/include/emqx.hrl").
+
 -rest_api(#{name   => list_all_plugins,
             method => 'GET',
             path   => "/plugins/",
@@ -45,14 +47,20 @@
 -export([list/2, load/2, unload/2]).
 
 list(#{node := Node}, _Params) ->
-    {ok, emqx_mgmt:list_plugins(Node)};
+    {ok, format(emqx_mgmt:list_plugins(Node))};
 
 list(_Bindings, _Params) ->
-    {ok, emqx_mgmt:list_plugins()}.
+    {ok, format(emqx_mgmt:list_plugins())}.
 
 load(#{node := Node, plugin := Plugin}, _Params) ->
     emqx_mgmt:load_plugin(Node, Plugin).
 
 unload(#{node := Node, plugin := Plugin}, _Params) ->
     emqx_mgmt:unload_plugin(Node, Plugin).
+
+format(#mqtt_plugin{name = Name, version = Ver, descr = Descr, active = Active}) ->
+    [{name, Name}, {version, iolist_to_binary(Ver)}, {description, iolist_to_binary(Descr)}, {active, Active}];
+
+format(Plugins) when is_list(Plugins) ->
+    [format(Plugin) || Plugin <- Plugins].
 
