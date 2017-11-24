@@ -53,7 +53,7 @@ list(Bindings, Params) when map_size(Bindings) == 0 ->
 list(#{node := Node}, Params) when Node =:= node() ->
     {ok, emqx_mgmt_api:paginate(mqtt_subproperty, Params, fun format/1)};
 
-list(#{node := Node}, Params) ->
+list(#{node := Node} = Bindings, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
         {badrpc, Reason} -> {error, #{message => Reason}};
         Res -> Res
