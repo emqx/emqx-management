@@ -33,7 +33,7 @@
 -export([list/2, get/2]).
 
 list(_Bindings, _Params) ->
-    {ok, [ Info#{node => Node} || {Node, Info} <- emqx_mgmt:list_brokers() ]}.
+    {ok, [Info#{node => Node} || {Node, Info} <- emqx_mgmt:list_brokers()]}.
 
 get(#{node := Node}, _Params) ->
     case emqx_mgmt:lookup_broker(Node) of

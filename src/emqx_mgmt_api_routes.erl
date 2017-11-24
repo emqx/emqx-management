@@ -18,6 +18,8 @@
 
 -author("Feng Lee <feng@emqtt.io>").
 
+-include_lib("emqx/include/emqx.hrl").
+
 -rest_api(#{name   => list_routes,
             method => 'GET',
             path   => "/routes/",
@@ -26,18 +28,18 @@
 
 -rest_api(#{name   => lookup_routes,
             method => 'GET',
-            url    => "/routes/:bin:topic",
+            path   => "/routes/:bin:topic",
             func   => lookup,
             descr  => "Lookup routes to a topic"}).
 
 -export([list/2, lookup/2]).
 
 list(Bindings, Params) when map_size(Bindings) == 0 ->
-    Qh = emqx_mgmt:query_handle(routes),
-    {ok, emqx_mgmt_api:paginate(Qh, emqx_mgmt:count(routes), Params, fun format/1)}.
+    {ok, emqx_mgmt_api:paginate(mqtt_route, Params, fun format/1)}.
 
 lookup(#{topic := Topic}, _Params) ->
-    {ok, emqx_mgmt:lookup_routes(Topic)}.
+    {ok, [format(R) || R <- emqx_mgmt:lookup_routes(Topic)]}.
 
-format(R) -> emqx_mgmt:item(route, R).
+format(#mqtt_route{topic = Topic, node = Node}) ->
+    #{topic => Topic, node => Node}.
 

@@ -20,9 +20,11 @@
 
 -include_lib("stdlib/include/qlc.hrl").
 
--export([paginate/4]).
+-export([paginate/3]).
 
-paginate(Qh, Count, Params, RowFun) ->
+paginate(Tables, Params, RowFun) ->
+    Qh = query_handle(Tables),
+    Count = count(Tables),
     Page = page(Params),
     Limit = limit(Params),
     Cursor = qlc:cursor(Qh),
@@ -34,6 +36,20 @@ paginate(Qh, Count, Params, RowFun) ->
     qlc:delete_cursor(Cursor),
     #{meta  => #{page => Page, limit => Limit, count => Count},
       items => [RowFun(Row) || Row <- Rows]}.
+
+query_handle(Table) when is_atom(Table) ->
+    qlc:q([R|| R <- ets:table(Table)]);
+query_handle([Table]) when is_atom(Table) ->
+    qlc:q([R|| R <- ets:table(Table)]);
+query_handle(Tables) ->
+    qlc:append([qlc:q([E || E <- ets:table(T)]) || T <- Tables]).
+
+count(Table) when is_atom(Table) ->
+    ets:info(Table, size);
+count([Table]) when is_atom(Table) ->
+    ets:info(Table, size);
+count(Tables) ->
+    lists:sum([count(T) || T <- Tables]).
 
 page(Params) ->
     list_to_integer(proplists:get_value("page", Params, "1")).

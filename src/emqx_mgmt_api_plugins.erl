@@ -33,13 +33,13 @@
             descr  => "List all plugins on a node"}).
 
 -rest_api(#{name   => load_plugin,
-            method => 'POST',
+            method => 'PUT',
             path   => "/nodes/:atom:node/plugins/:atom:plugin/load",
             func   => load,
             descr  => "Load a plugin"}).
 
 -rest_api(#{name   => unload_plugin,
-            method => 'post',
+            method => 'PUT',
             path   => "/nodes/:atom:node/plugins/:atom:plugin/unload",
             func   => unload,
             descr  => "Unload a plugin"}).
@@ -53,14 +53,19 @@ list(_Bindings, _Params) ->
     {ok, format(emqx_mgmt:list_plugins())}.
 
 load(#{node := Node, plugin := Plugin}, _Params) ->
-    emqx_mgmt:load_plugin(Node, Plugin).
+    return(emqx_mgmt:load_plugin(Node, Plugin)).
 
 unload(#{node := Node, plugin := Plugin}, _Params) ->
-    emqx_mgmt:unload_plugin(Node, Plugin).
+    return(emqx_mgmt:unload_plugin(Node, Plugin)).
 
 format(#mqtt_plugin{name = Name, version = Ver, descr = Descr, active = Active}) ->
     [{name, Name}, {version, iolist_to_binary(Ver)}, {description, iolist_to_binary(Descr)}, {active, Active}];
 
 format(Plugins) when is_list(Plugins) ->
     [format(Plugin) || Plugin <- Plugins].
+
+return(ok) ->
+    ok;
+return({error, Reason}) ->
+    {error, #{message => Reason}}.
 

@@ -235,15 +235,7 @@ lookup_subscriptions(Key) ->
     lists:append([lookup_subscriptions(Node, Key) || Node <- ekka_mnesia:running_nodes()]).
  
 lookup_subscriptions(Node, Key) when Node =:= node() ->
-    Keys = ets:lookup(mqtt_subscription, Key),
-    Subscriptions =
-    case length(Keys) == 0 of
-        true ->
-            ets:match_object(mqtt_subproperty, {{Key, '_'}, '_'});
-        false ->
-            lists:append([ets:lookup(mqtt_subproperty, {T, S}) || {T, S} <- Keys])
-    end,
-    [item(subscription, Sub) || Sub <- Subscriptions];
+    emqx:subscriptions(Key);
 
 lookup_subscriptions(Node, Key) ->
     rpc_call(Node, lookup_subscriptions, [Node, Key]).
@@ -255,12 +247,11 @@ lookup_subscriptions(Node, Key) ->
 list_routes() ->
     case check_row_limit(tables(routes)) of
         false -> throw(max_row_limit);
-        ok ->
-            [item(route, R) || R <- lists:append([ets:tab2list(Tab) || Tab <- tables(routes)])]
+        ok    -> lists:append([ets:tab2list(Tab) || Tab <- tables(routes)])
     end.
 
 lookup_routes(Topic) ->
-    [item(route, R) || R <- lists:append([ets:lookup(Tab, Topic) || Tab <- tables(routes)])].
+    emqx_router:get_routes(Topic).
 
 %%--------------------------------------------------------------------
 %% PubSub

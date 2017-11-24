@@ -20,6 +20,12 @@
 
 -include_lib("emqx/include/emqx.hrl").
 
+-rest_api(#{name   => list_subscriptions,
+            method => 'GET',
+            path   => "/subscriptions/",
+            func   => list,
+            descr  => "A list of subscriptions in the cluster"}).
+
 -rest_api(#{name   => list_node_subscriptions,
             method => 'GET',
             path   => "/nodes/:atom:node/subscriptions/",
@@ -40,9 +46,12 @@
 
 -export([list/2, lookup/2]).
 
+list(Bindings, Params) when map_size(Bindings) == 0 ->
+    %%TODO: across nodes?
+    list(#{node => node()}, Params);
+
 list(#{node := Node}, Params) when Node =:= node() ->
-    Qh = emqx_mgmt:query_handle(subscriptions),
-    {ok, emqx_mgmt_api:paginate(Qh, emqx_mgmt:count(subscriptions), Params, fun format/1)}.
+    {ok, emqx_mgmt_api:paginate(mqtt_subproperty, Params, fun format/1)}.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
     {ok, format(emqx_mgmt:lookup_subscriptions(Node, ClientId))};
@@ -53,13 +62,14 @@ lookup(#{clientid := ClientId}, _Params) ->
 format(Items) when is_list(Items) ->
     [format(Item) || Item <- Items];
 
-format(#{topic := Topic, clientid := ClientId, options := Options}) ->
+format({{Topic, Subscriber}, Options}) ->
+    format({Subscriber, Topic, Options});
+format({Subscriber, Topic, Options}) ->
     QoS = proplists:get_value(qos, Options),
-    [{topic, Topic}, {client_id, maybe_to_binary(ClientId)}, {qos, QoS}].
+    #{node => node(), topic => Topic, client_id => client_id(Subscriber), qos => QoS}.
 
-maybe_to_binary(ClientId) when is_pid(ClientId) ->
-    list_to_binary(pid_to_list(ClientId));
-
-maybe_to_binary(ClientId) ->
-    ClientId.
+client_id(SubPid) when is_pid(SubPid) ->
+    list_to_binary(pid_to_list(SubPid));
+client_id({SubId, _SubPid}) ->
+    SubId.
 

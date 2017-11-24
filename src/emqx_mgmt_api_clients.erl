@@ -18,6 +18,12 @@
 
 -include_lib("emqx/include/emqx.hrl").
 
+-rest_api(#{name   => list_clients,
+            method => 'GET',
+            path   => "/clients/",
+            func   => list,
+            descr  => "A list of clients in the cluster"}).
+
 -rest_api(#{name   => list_node_clients,
             method => 'GET',
             path   => "nodes/:atom:node/clients/",
@@ -52,9 +58,12 @@
 
 -export([list/2, lookup/2, kickout/2, clean_acl_cache/2]).
 
+list(Bindings, Params) when map_size(Bindings) == 0 ->
+    %%TODO: across nodes?
+    list(#{node => node()}, Params);
+
 list(#{node := Node}, Params) when Node =:= node() ->
-    QH = emqx_mgmt:query_handle(clients),
-    {ok, emqx_mgmt_api:paginate(QH, emqx_mgmt:count(clients), Params, fun format/1)};
+    {ok, emqx_mgmt_api:paginate(mqtt_client, Params, fun format/1)};
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
@@ -63,8 +72,8 @@ list(Bindings = #{node := Node}, Params) ->
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    Items = emqx_mgmt:lookup_client(Node, ClientId),
-    {ok, [format(Item) || Item <- Items]};
+    Clients = emqx_mgmt:lookup_client(Node, ClientId),
+    {ok, [format(Client) || Client <- Clients]};
 
 lookup(#{clientid := ClientId}, _Params) ->
     {ok, format(emqx_mgmt:lookup_client(ClientId))}.
@@ -88,7 +97,8 @@ format(#mqtt_client{client_id    = ClientId,
                     proto_ver    = ProtoVer,
                     keepalive    = KeepAlvie,
                     connected_at = ConnectedAt}) ->
-    #{client_id    => ClientId,
+    #{node         => node(),
+      client_id    => ClientId,
       username     => Username,
       ipaddress    => iolist_to_binary(ntoa(IpAddr)),
       port         => Port,
