@@ -51,7 +51,13 @@ list(Bindings, Params) when map_size(Bindings) == 0 ->
     list(#{node => node()}, Params);
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    {ok, emqx_mgmt_api:paginate(mqtt_subproperty, Params, fun format/1)}.
+    {ok, emqx_mgmt_api:paginate(mqtt_subproperty, Params, fun format/1)};
+
+list(#{node := Node}, Params) ->
+    case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
+        {badrpc, Reason} -> {error, #{message => Reason}};
+        Res -> Res
+    end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
     {ok, format(emqx_mgmt:lookup_subscriptions(Node, ClientId))};
