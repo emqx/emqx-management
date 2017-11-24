@@ -66,6 +66,8 @@ format(Plugins) when is_list(Plugins) ->
 
 return(ok) ->
     ok;
+return({ok, _}) ->
+    ok;
 return({error, Reason}) ->
     {error, #{message => Reason}}.
 
