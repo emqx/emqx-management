@@ -43,7 +43,7 @@ cmd(["del_app", AppId]) ->
     end;
 
 cmd(["list_apps"]) ->
-    list:foreach(fun({AppId, AppSecret}) ->
+    lists:foreach(fun({AppId, AppSecret}) ->
           ?PRINT("~s: ~s~n", [AppId, AppSecret])
       end, emqx_mgmt_auth:list_apps());
 

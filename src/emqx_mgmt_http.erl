@@ -72,12 +72,7 @@ authorize_appid(Req) ->
         undefined -> false;
         "Basic " ++ BasicAuth ->
             {AppId, AppSecret} = user_passwd(BasicAuth),
-            case emqx_mgmt_auth:is_authorized(AppId, AppSecret) of
-                ok -> true;
-                {error, Reason} ->
-                    lager:error("Auth failure: appid=~s, reason=~p", [AppId, Reason]),
-                    false
-            end
+            emqx_mgmt_auth:is_authorized(AppId, AppSecret)
     end.
 
 user_passwd(BasicAuth) ->

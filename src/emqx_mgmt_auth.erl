@@ -18,6 +18,8 @@
 
 %% Mnesia Bootstrap
 -export([mnesia/1]).
+-boot_mnesia({mnesia, [boot]}).
+-copy_mnesia({mnesia, [copy]}).
 
 %% APP Management API
 -export([add_app/1, get_appsecret/1, del_app/1, list_apps/0]).
