@@ -60,7 +60,7 @@ list_apps(_Bindings, _Params) ->
     {ok, [format(Apps)|| Apps <- emqx_mgmt_auth:list_apps()]}.
 
 lookup_app(#{appid := AppId}, _Params) ->
-    [{app_id, AppId}, {secret, emqx_mgmt_auth:get_appsecret(AppId)}];
+    [{app_id, AppId}, {secret, emqx_mgmt_auth:get_appsecret(AppId)}].
 
 format({AppId, AppSecret}) ->
     [{app_id, AppId}, {secret, AppSecret}].
