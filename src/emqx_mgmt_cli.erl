@@ -30,7 +30,7 @@
 
 -export([status/1, broker/1, cluster/1, users/1, clients/1, sessions/1,
          routes/1, topics/1, subscriptions/1, plugins/1, bridges/1,
-         listeners/1, vm/1, mnesia/1, trace/1, acl/1, license/1, application/1, configs/1]).
+         listeners/1, vm/1, mnesia/1, trace/1, acl/1, license/1, mgmt/1, configs/1]).
 
 -define(PROC_INFOKEYS, [status,
                         memory,
@@ -54,7 +54,7 @@ load() ->
 is_cmd(Fun) ->
     not lists:member(Fun, [init, load, module_info]).
 
-application(["add_app", AppId]) ->
+mgmt(["add_app", AppId]) ->
     case emqx_mgmt_auth:add_app(list_to_binary(AppId)) of
         {ok, Secret} ->
             ?PRINT("AppSecret: ~s~n", [Secret]);
@@ -64,7 +64,7 @@ application(["add_app", AppId]) ->
             ?PRINT("Error: ~p~n", [Reason])
     end;
 
-application(["del_app", AppId]) ->
+mgmt(["del_app", AppId]) ->
     case emqx_mgmt_auth:del_app(list_to_binary(AppId)) of
         ok -> ?PRINT_MSG("ok~n");
         {error, not_found} ->
@@ -73,12 +73,12 @@ application(["del_app", AppId]) ->
             ?PRINT("Error: ~p~n", [Reason])
     end;
 
-application(["list_apps"]) ->
+mgmt(["list_apps"]) ->
     lists:foreach(fun({AppId, AppSecret}) ->
           ?PRINT("~s: ~s~n", [AppId, AppSecret])
       end, emqx_mgmt_auth:list_apps());
 
-application(_) ->
+mgmt(_) ->
     ?USAGE([{"mgmt add_app <AppId>", "Add Application of REST API"},
             {"mgmt del_app <AppId>", "Delete Application of REST API"},
             {"mgmt list_apps",       "List Applications"}]).

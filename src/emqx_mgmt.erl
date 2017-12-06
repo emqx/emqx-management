@@ -291,7 +291,7 @@ list_plugins() ->
     [{Node, list_plugins(Node)} || Node <- ekka_mnesia:running_nodes()].
 
 list_plugins(Node) when Node =:= node() ->
-    emqx_plugins:list(Node);
+    emqx_plugins:list();
 list_plugins(Node) ->
     rpc_call(Node, list_plugins, [Node]).
 

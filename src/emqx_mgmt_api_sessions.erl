@@ -49,7 +49,8 @@ list(Bindings, Params) when map_size(Bindings) =:= 0 ->
     list(#{node => node()}, Params);
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    {ok, emqx_mgmt_api:paginate(mqtt_local_session, Params, fun format/1)};
+    QH = emqx_mgmt:query_handle(sessions),
+    {ok, emqx_mgmt_api:paginate(QH, emqx_mgmt:count(sessions), Params, fun format/1)};
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
