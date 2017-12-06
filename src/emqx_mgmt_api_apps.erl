@@ -22,19 +22,19 @@
 
 -rest_api(#{name   => add_app,
             method => 'POST',
-            path   => "/apps/add_app",
+            path   => "/apps/",
             func   => add_app,
             descr  => "Add Application"}).
 
 -rest_api(#{name   => del_app,
             method => 'DELETE',
-            path   => "/apps/del_app/:bin:appid",
+            path   => "/apps/:bin:appid",
             func   => del_app,
             descr  => "Delete Application"}).
 
 -rest_api(#{name   => list_apps,
             method => 'GET',
-            path   => "/apps/list_apps",
+            path   => "/apps/",
             func   => list_apps,
             descr  => "List Applications"}).
 
