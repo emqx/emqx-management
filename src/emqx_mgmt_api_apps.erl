@@ -38,7 +38,13 @@
             func   => list_apps,
             descr  => "List Applications"}).
 
--export([add_app/2, del_app/2, list_apps/2]).
+-rest_api(#{name   => lookup_app,
+            method => 'GET',
+            path   => "/apps/:bin:appid",
+            func   => lookup_app,
+            descr  => "Lookup Application"}).
+
+-export([add_app/2, del_app/2, list_apps/2, lookup_app/2]).
 
 add_app(_Bindings, Params) ->
     AppId = get_value(<<"app_id">>, Params),
@@ -52,6 +58,9 @@ del_app(#{appid := AppId}, _Params) ->
 
 list_apps(_Bindings, _Params) ->
     {ok, [format(Apps)|| Apps <- emqx_mgmt_auth:list_apps()]}.
+
+lookup_app(#{appid := AppId}, _Params) ->
+    [{app_id, AppId}, {secret, emqx_mgmt_auth:get_appsecret(AppId)}];
 
 format({AppId, AppSecret}) ->
     [{app_id, AppId}, {secret, AppSecret}].
