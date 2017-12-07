@@ -9,7 +9,7 @@ dep_minirest = git https://github.com/emqx/minirest master
 LOCAL_DEPS = mnesia
 
 BUILD_DEPS = emqx cuttlefish
-dep_emqx = git git@github.com:emqx/emqx-enterprise
+dep_emqx = git https://github.com/emqtt/emqttd.git X
 dep_cuttlefish = git https://github.com/emqtt/cuttlefish
 
 NO_AUTOPATCH = cuttlefish
