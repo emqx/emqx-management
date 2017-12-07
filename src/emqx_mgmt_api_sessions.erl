@@ -18,11 +18,23 @@
 
 -include_lib("emqx/include/emqx.hrl").
 
+-rest_api(#{name   => list_sessions,
+            method => 'GET',
+            path   => "/sessions/",
+            func   => list,
+            descr  => "A list of sessions in the cluster"}).
+
 -rest_api(#{name   => list_node_sessions,
             method => 'GET',
             path   => "nodes/:atom:node/sessions/",
             func   => list,
             descr  => "A list of sessions on a node"}).
+
+-rest_api(#{name   => lookup_session,
+            method => 'GET',
+            path   => "/sessions/:bin:clientid",
+            func   => lookup,
+            descr  => "Lookup a session in the cluster"}).
 
 -rest_api(#{name   => lookup_node_session,
             method => 'GET',
@@ -30,18 +42,15 @@
             func   => lookup,
             descr  => "Lookup a session on the node"}).
 
--rest_api(#{name   => lookup_session,
-            method => 'GET',
-            path   => "nodes/:atom:node/sessions/:bin:clientid",
-            func   => lookup,
-            descr  => "Lookup a session in the cluster"}).
-
 -export([list/2, lookup/2]).
 
+list(Bindings, Params) when map_size(Bindings) =:= 0 ->
+    %%TODO: across nodes?
+    list(#{node => node()}, Params);
+
 list(#{node := Node}, Params) when Node =:= node() ->
-    {ok, emqx_mgmt_api:paginate(emqx_mgmt:query_handle(sessions),
-                                emqx_mgmt:count(sessions),
-                                Params, fun format/1)};
+    QH = emqx_mgmt:query_handle(sessions),
+    {ok, emqx_mgmt_api:paginate(QH, emqx_mgmt:count(sessions), Params, fun format/1)};
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
@@ -62,5 +71,4 @@ format(Items) when is_list(Items) ->
     [format(Item) || Item <- Items];
 
 format(Item = #{created_at := CreatedAt}) ->
-    Item#{created_at => iolist_to_binary(emqx_mgmt_util:strftime(CreatedAt))}.
-
+    Item#{node => node(), created_at => iolist_to_binary(emqx_mgmt_util:strftime(CreatedAt))}.

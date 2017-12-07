@@ -51,18 +51,24 @@ subscribe(_Bindings, Params) ->
     emqx_mgmt:subscribe(ClientId, Topic, QoS).
 
 publish(_Bindings, Params) ->
-    Topic    = get_value(<<"topic">>, Params),
+    Topics   = topics(Params),
     ClientId = get_value(<<"client_id">>, Params),
     Payload  = get_value(<<"payload">>, Params, <<>>),
     Qos      = get_value(<<"qos">>, Params, 0),
     Retain   = get_value(<<"retain">>, Params, false),
-    Msg = emqx_message:make(ClientId, Qos, Topic, Payload),
-    emqx_mgmt:publish(Msg#mqtt_message{retain = Retain}).
+    lists:foreach(fun(Topic) ->
+        Msg = emqx_message:make(ClientId, Qos, Topic, Payload),
+        emqx_mgmt:publish(Msg#mqtt_message{retain = Retain})
+    end, Topics).
 
 unsubscribe(_Bindings, Params) ->
     ClientId = get_value(<<"client_id">>, Params),
     Topic    = get_value(<<"topic">>, Params),
     emqx_mgmt:unsubscribe(ClientId, Topic).
+
+topics(Params) ->
+    Topics = [get_value(<<"topic">>, Params) | binary:split(get_value(<<"topics">>, Params), <<",">>, [global])],
+    [Topic || Topic <- Topics, Topic =/= undefined].
 
 %%TODO:
 

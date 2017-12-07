@@ -32,31 +32,31 @@
 
 -rest_api(#{name   => get_all_configs,
             method => 'GET',
-            path   => "/nodes/:node/configs/",
+            path   => "/nodes/:atom:node/configs/",
             func   => get_configs,
             descr  => "Get all configs of a node"}).
 
 -rest_api(#{name   => update_config,
             method => 'PUT',
-            path   => "/configs/:app",
+            path   => "/configs/:atom:app",
             func   => update_config,
             descr  => "Update config of an application in the cluster"}).
 
 -rest_api(#{name   => update_node_config,
             method => 'PUT',
-            path   => "/nodes/:node/configs/:app",
+            path   => "/nodes/:atom:node/configs/:atom:app",
             func   => update_config,
             descr  => "Update config of an application on a node"}).
 
 -rest_api(#{name   => get_plugin_configs,
             method => 'GET',
-            path   => "/nodes/:node/plugin_configs/:plugin",
+            path   => "/nodes/:atom:node/plugin_configs/:atom:plugin",
             func   => get_plugin_configs,
             descr  => "Get configurations of a plugin on the node"}).
 
 -rest_api(#{name   => update_plugin_configs,
             method => 'PUT',
-            path   => "/nodes/:node/plugin_configs/:plugin",
+            path   => "/nodes/:atom:node/plugin_configs/:atom:plugin",
             func   => update_plugin_configs,
             descr  => "Update configurations of a plugin on the node"}).
 
@@ -69,24 +69,25 @@ get_configs(_Binding, _Params) ->
     {ok, [{Node, format(Configs)} || {Node, Configs} <- emqx_mgmt:get_all_configs()]}.
 
 update_config(#{node := Node, app := App}, Params) ->
-    Key   = get_value(<<"key">>, Params),
-    Value = get_value(<<"value">>, Params),
+    Key   = binary_to_list(get_value(<<"key">>, Params)),
+    Value = binary_to_list(get_value(<<"value">>, Params)),
     emqx_mgmt:update_config(Node, App, Key, Value);
 
 update_config(#{app := App}, Params) ->
-    Key   = get_value(<<"key">>, Params),
-    Value = get_value(<<"value">>, Params),
+    Key   = binary_to_list(get_value(<<"key">>, Params)),
+    Value = binary_to_list(get_value(<<"value">>, Params)),
     emqx_mgmt:update_config(App, Key, Value).
 
 get_plugin_configs(#{node := Node, plugin := Plugin}, _Params) ->
-    {ok, [ format_plugin_config(Config) 
-           || Config <- emqx_mgmt:get_plugin_configs(Node, Plugin) ]}.
+    {ok, Configs} = emqx_mgmt:get_plugin_configs(Node, Plugin),
+    {ok, [ format_plugin_config(Config) || Config <-  Configs]}.
 
 update_plugin_configs(#{node := Node, plugin := Plugin}, Params) ->
     case emqx_mgmt:update_plugin_configs(Node, Plugin, Params) of
         ok  ->
             ensure_reload_plugin(Plugin);
-        _ ->
+        Error ->
+            lager:error("MGMT update_plugin_configs error:~p~n", [Error]),
             {error, [{code, ?ERROR2}]}
     end.
 

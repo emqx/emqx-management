@@ -22,6 +22,8 @@
 
 -define(APP, emqx_management).
 
+-define(EXCEPT, [add_app, del_app, list_apps, lookup_app]).
+
 %%--------------------------------------------------------------------
 %% Start/Stop Listeners
 %%--------------------------------------------------------------------
@@ -34,7 +36,7 @@ stop_listeners() ->
 
 start_listener({Proto, Port, Options}) when Proto == http orelse Proto == https ->
     Handlers = [{"/status", {?MODULE, handle_request, []}},
-                {"/api/v2", minirest:handler(#{apps => [?APP]}),
+                {"/api/v2", minirest:handler(#{apps => [?APP], except => ?EXCEPT }),
                  [{authorization, fun authorize_appid/1}]}],
     minirest:start_http(listener_name(Proto), Port, Options, Handlers).
 
@@ -72,12 +74,7 @@ authorize_appid(Req) ->
         undefined -> false;
         "Basic " ++ BasicAuth ->
             {AppId, AppSecret} = user_passwd(BasicAuth),
-            case emqx_mgmt_auth:is_authorized(AppId, AppSecret) of
-                ok -> true;
-                {error, Reason} ->
-                    lager:error("Auth failure: appid=~s, reason=~p", [AppId, Reason]),
-                    false
-            end
+            emqx_mgmt_auth:is_authorized(AppId, AppSecret)
     end.
 
 user_passwd(BasicAuth) ->
