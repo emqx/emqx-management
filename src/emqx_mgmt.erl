@@ -333,7 +333,7 @@ get_alarms(Node) ->
 %%--------------------------------------------------------------------
 
 update_configs(App, Terms) ->
-    emqx_config:write(App, Terms).
+    emqx_mgmt_config:write(App, Terms).
 
 update_config(App, Key, Value) ->
     Results = [update_config(Node, App, Key, Value) || Node <- ekka_mnesia:running_nodes()],
@@ -343,7 +343,7 @@ update_config(App, Key, Value) ->
     end.
 
 update_config(Node, App, Key, Value) when Node =:= node() ->
-    emqx_config:set(App, Key, Value);
+    emqx_mgmt_config:set(App, Key, Value);
 
 update_config(Node, App, Key, Value) ->
     rpc_call(Node, update_config, [Node, App, Key, Value]).
@@ -358,13 +358,13 @@ get_all_configs(Node) ->
     rpc_call(Node, get_config, [Node]).
 
 get_plugin_configs(PluginName) ->
-    emqx_config:read(PluginName).
+    emqx_mgmt_config:read(PluginName).
 
 get_plugin_configs(Node, PluginName) ->
     rpc_call(Node, get_plugin_configs, [PluginName]).
 
 update_plugin_configs(PluginName, Terms) ->
-    emqx_config:write(PluginName, Terms).
+    emqx_mgmt_config:write(PluginName, Terms).
 
 update_plugin_configs(Node, PluginName, Terms) ->
     rpc_call(Node, update_plugin_configs, [PluginName, Terms]).

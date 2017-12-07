@@ -42,12 +42,6 @@
             func   => lookup,
             descr  => "Lookup a session on the node"}).
 
--rest_api(#{name   => lookup_session,
-            method => 'GET',
-            path   => "nodes/:atom:node/sessions/:bin:clientid",
-            func   => lookup,
-            descr  => "Lookup a session in the cluster"}).
-
 -export([list/2, lookup/2]).
 
 list(Bindings, Params) when map_size(Bindings) =:= 0 ->

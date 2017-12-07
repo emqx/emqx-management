@@ -47,10 +47,10 @@
 -export([list/2, load/2, unload/2]).
 
 list(#{node := Node}, _Params) ->
-    {ok, format(emqx_mgmt:list_plugins(Node))};
+    {ok, [format(Plugin) || Plugin <- emqx_mgmt:list_plugins(Node)]};
 
 list(_Bindings, _Params) ->
-    {ok, format(emqx_mgmt:list_plugins())}.
+    {ok, [format({Node, Plugins}) || {Node, Plugins} <- emqx_mgmt:list_plugins()]}.
 
 load(#{node := Node, plugin := Plugin}, _Params) ->
     return(emqx_mgmt:load_plugin(Node, Plugin)).
@@ -58,11 +58,11 @@ load(#{node := Node, plugin := Plugin}, _Params) ->
 unload(#{node := Node, plugin := Plugin}, _Params) ->
     return(emqx_mgmt:unload_plugin(Node, Plugin)).
 
-format(#mqtt_plugin{name = Name, version = Ver, descr = Descr, active = Active}) ->
-    [{name, Name}, {version, iolist_to_binary(Ver)}, {description, iolist_to_binary(Descr)}, {active, Active}];
+format({Node, Plugins}) ->
+    [{node, Node}, {plugins, [format(Plugin) || Plugin <- Plugins]}];
 
-format(Plugins) when is_list(Plugins) ->
-    [format(Plugin) || Plugin <- Plugins].
+format(#mqtt_plugin{name = Name, version = Ver, descr = Descr, active = Active}) ->
+    [{name, Name}, {version, iolist_to_binary(Ver)}, {description, iolist_to_binary(Descr)}, {active, Active}].
 
 return(ok) ->
     ok;
