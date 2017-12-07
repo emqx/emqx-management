@@ -1,10 +1,10 @@
 PROJECT = emqx_management
 PROJECT_DESCRIPTION = EMQ X Management API and CLI
-PROJECT_VERSION = 2.3.0
+PROJECT_VERSION = 2.3.2
 PROJECT_MOD = emqx_mgmt_app
 
 DEPS = minirest
-dep_minirest = git https://github.com/emqx/minirest
+dep_minirest = git https://github.com/emqx/minirest master
 
 LOCAL_DEPS = mnesia
 

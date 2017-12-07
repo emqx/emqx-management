@@ -21,6 +21,46 @@
   {datatype, integer}
 ]}.
 
+{mapping, "management.listener.http.backlog", "emqx_management.listeners", [
+  {default, 1024},
+  {datatype, integer}
+]}.
+
+{mapping, "management.listener.http.send_timeout", "emqx_management.listeners", [
+  {datatype, {duration, ms}},
+  {default, "15s"}
+]}.
+
+{mapping, "management.listener.http.send_timeout_close", "emqx_management.listeners", [
+  {datatype, flag},
+  {default, on}
+]}.
+
+{mapping, "management.listener.http.recbuf", "emqx_management.listeners", [
+  {datatype, bytesize},
+  hidden
+]}.
+
+{mapping, "management.listener.http.sndbuf", "emqx_management.listeners", [
+  {datatype, bytesize},
+  hidden
+]}.
+
+{mapping, "management.listener.http.buffer", "emqx_management.listeners", [
+  {datatype, bytesize},
+  hidden
+]}.
+
+{mapping, "management.listener.http.tune_buffer", "emqx_management.listeners", [
+  {datatype, flag},
+  hidden
+]}.
+
+{mapping, "management.listener.http.nodelay", "emqx_management.listeners", [
+  {datatype, {enum, [true, false]}},
+  hidden
+]}.
+
 {mapping, "management.listener.https", "emqx_management.listeners", [
   {datatype, [integer, ip]}
 ]}.
@@ -33,6 +73,46 @@
 {mapping, "management.listener.https.max_clients", "emqx_management.listeners", [
   {default, 64},
   {datatype, integer}
+]}.
+
+{mapping, "management.listener.https.backlog", "emqx_management.listeners", [
+  {default, 1024},
+  {datatype, integer}
+]}.
+
+{mapping, "management.listener.https.send_timeout", "emqx_management.listeners", [
+  {datatype, {duration, ms}},
+  {default, "15s"}
+]}.
+
+{mapping, "management.listener.https.send_timeout_close", "emqx_management.listeners", [
+  {datatype, flag},
+  {default, on}
+]}.
+
+{mapping, "management.listener.https.recbuf", "emqx_management.listeners", [
+  {datatype, bytesize},
+  hidden
+]}.
+
+{mapping, "management.listener.https.sndbuf", "emqx_management.listeners", [
+  {datatype, bytesize},
+  hidden
+]}.
+
+{mapping, "management.listener.https.buffer", "emqx_management.listeners", [
+  {datatype, bytesize},
+  hidden
+]}.
+
+{mapping, "management.listener.https.tune_buffer", "emqx_management.listeners", [
+  {datatype, flag},
+  hidden
+]}.
+
+{mapping, "management.listener.https.nodelay", "emqx_management.listeners", [
+  {datatype, {enum, [true, false]}},
+  hidden
 ]}.
 
 {mapping, "management.listener.https.handshake_timeout", "emqx_management.listeners", [
@@ -66,6 +146,15 @@
              Filter([{acceptors,   cuttlefish:conf_get(Prefix ++ ".acceptors", Conf)},
                      {max_clients, cuttlefish:conf_get(Prefix ++ ".max_clients", Conf)}])
          end,
+  TcpOpts = fun(Prefix) ->
+                Filter([{backlog, cuttlefish:conf_get(Prefix ++ ".backlog", Conf, undefined)},
+                        {send_timeout, cuttlefish:conf_get(Prefix ++ ".send_timeout", Conf, undefined)},
+                        {send_timeout_close, cuttlefish:conf_get(Prefix ++ ".send_timeout_close", Conf, undefined)},
+                        {recbuf,  cuttlefish:conf_get(Prefix ++ ".recbuf", Conf, undefined)},
+                        {sndbuf,  cuttlefish:conf_get(Prefix ++ ".sndbuf", Conf, undefined)},
+                        {buffer,  cuttlefish:conf_get(Prefix ++ ".buffer", Conf, undefined)},
+                        {nodelay, cuttlefish:conf_get(Prefix ++ ".nodelay", Conf, true)}])
+            end,
   SslOpts = fun(Prefix) ->
                 Filter([{handshake_timeout, cuttlefish:conf_get(Prefix ++ ".handshake_timeout", Conf) * 1000},
                         {keyfile,    cuttlefish:conf_get(Prefix ++ ".keyfile", Conf, undefined)},
@@ -74,14 +163,17 @@
                         {verify,     cuttlefish:conf_get(Prefix ++ ".verify", Conf, undefined)},
                         {fail_if_no_peer_cert, cuttlefish:conf_get(Prefix ++ ".fail_if_no_peer_cert", Conf, undefined)}])
               end,
-  lists:append([
-      case cuttlefish:conf_get("management.listener.http", Conf, undefined) of
-          undefined -> [];
-          HttpPort  -> [{http, HttpPort, Opts("management.listener.http")}]
-      end,
-      case cuttlefish:conf_get("management.listener.https", Conf, undefined) of
-          undefined -> [];
-          HttpsPort -> [{https, HttpsPort, [{sslopts, SslOpts("management.listener.https")} | Opts("management.listener.https")]}]
-      end])
+    lists:foldl(
+      fun(Proto, Acc) ->
+          Prefix = "management.listener." ++ atom_to_list(Proto),
+          case cuttlefish:conf_get(Prefix, Conf, undefined) of
+              undefined -> Acc;
+              Port ->
+                  io:format("Port: ~p~n", [Port]),
+                  io:format("SSlopts: ~p~n", [SslOpts]),
+                  [{Proto, Port, [{sockopts, TcpOpts(Prefix)} | Opts(Prefix)]
+                    ++ case Proto of http -> []; https -> [{sslopts, SslOpts(Prefix)}] end} | Acc]
+          end
+      end, [], [http, https])
 end}.
 
