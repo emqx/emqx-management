@@ -67,11 +67,10 @@ unsubscribe(_Bindings, Params) ->
     emqx_mgmt:unsubscribe(ClientId, Topic).
 
 topics(Params) ->
-    Topics = [get_value(<<"topic">>, Params) | binary:split(get_value(<<"topics">>, Params), <<",">>, [global])],
-    [Topic || Topic <- Topics, Topic =/= undefined].
+    Topics = [get_value(<<"topic">>, Params, <<"">>) | binary:split(get_value(<<"topics">>, Params, <<"">>), <<",">>, [global])],
+    [Topic || Topic <- Topics, Topic =/= <<"">>].
 
 %%TODO:
-
 %%validate(qos, Qos) ->
 %%    (Qos >= ?QOS_0) and (Qos =< ?QOS_2);
 
