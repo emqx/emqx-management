@@ -7,7 +7,6 @@
 ]}.
 
 {mapping, "management.listener.http", "emqx_management.listeners", [
-  {default, 8080},
   {datatype, [integer, ip]}
 ]}.
 
@@ -169,8 +168,6 @@
           case cuttlefish:conf_get(Prefix, Conf, undefined) of
               undefined -> Acc;
               Port ->
-                  io:format("Port: ~p~n", [Port]),
-                  io:format("SSlopts: ~p~n", [SslOpts]),
                   [{Proto, Port, [{sockopts, TcpOpts(Prefix)} | Opts(Prefix)]
                     ++ case Proto of http -> []; https -> [{sslopts, SslOpts(Prefix)}] end} | Acc]
           end
