@@ -22,12 +22,12 @@
 -copy_mnesia({mnesia, [copy]}).
 
 %% APP Management API
--export([add_app/1, get_appsecret/1, del_app/1, list_apps/0]).
+-export([add_app/3, lookup_app/1, get_appsecret/1, update_app/3, del_app/1, list_apps/0]).
 
 %% APP Auth/ACL API
 -export([is_authorized/2]).
 
--record(mqtt_app, {id, secret}).
+-record(mqtt_app, {id, secret, name, desc}).
 
 -type(appid() :: binary()).
 
@@ -50,10 +50,10 @@ mnesia(copy) ->
 %% Manage Apps
 %%--------------------------------------------------------------------
 
--spec(add_app(appid()) -> {ok, appsecret()} | {error, term()}).
-add_app(AppId) when is_binary(AppId) ->
+-spec(add_app(appid(), binary(), binary()) -> {ok, appsecret()} | {error, term()}).
+add_app(AppId, Name, Desc) when is_binary(AppId) ->
     Secret = emqx_guid:to_base62(emqx_guid:gen()),
-    App = #mqtt_app{id = AppId, secret = Secret},
+    App = #mqtt_app{id = AppId, secret = Secret, name = Name, desc = Desc},
     AddFun = fun() ->
                  case mnesia:wread({mqtt_app, AppId}) of
                      [] -> mnesia:write(App);
@@ -72,6 +72,25 @@ get_appsecret(AppId) when is_binary(AppId) ->
         [] -> undefined
     end.
 
+-spec(lookup_app(appid()) -> {{appid(), appsecret(), binary, binary} | undefined}).
+lookup_app(AppId) when is_binary(AppId) ->
+    case mnesia:dirty_read(mqtt_app, AppId) of
+        [#mqtt_app{id = AppId, secret = AppSecret, name = Name, desc = Desc}] -> {AppId, AppSecret, Name, Desc};
+        [] -> undefined
+    end.
+
+-spec(update_app(appid(), binary(), binary()) -> ok | {error, term()}).
+update_app(AppId, Name, Desc) ->
+    case mnesia:dirty_read(mqtt_app, AppId) of
+        [App = #mqtt_app{}] ->
+            case mnesia:transaction(fun() -> mnesia:write(App#mqtt_app{name = Name, desc = Desc}) end) of
+                {atomic, ok} -> ok;
+                {aborted, Reason} -> {error, Reason}
+            end;
+        [] ->
+            {error, ont_found}
+    end.
+
 -spec(del_app(appid()) -> ok | {error, term()}).
 del_app(AppId) when is_binary(AppId) ->
     case mnesia:transaction(fun mnesia:delete/1, [{mqtt_app, AppId}]) of
@@ -79,10 +98,12 @@ del_app(AppId) when is_binary(AppId) ->
         {aborted, Reason} -> {error, Reason}
     end.
 
--spec(list_apps() -> [{appid(), appsecret()}]).
+-spec(list_apps() -> [{appid(), appsecret(), binary, binary}]).
 list_apps() ->
-    [ {AppId, AppSecret} || #mqtt_app{id = AppId, secret = AppSecret} <- ets:tab2list(mqtt_app) ].
-
+    [ {AppId, AppSecret, Name, Desc} || #mqtt_app{id = AppId,
+                                                  secret = AppSecret,
+                                                  name = Name,
+                                                  desc = Desc} <- ets:tab2list(mqtt_app) ].
 %%--------------------------------------------------------------------
 %% Authenticate App
 %%--------------------------------------------------------------------

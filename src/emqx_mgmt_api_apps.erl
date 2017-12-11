@@ -44,11 +44,19 @@
             func   => lookup_app,
             descr  => "Lookup Application"}).
 
--export([add_app/2, del_app/2, list_apps/2, lookup_app/2]).
+-rest_api(#{name   => update_app,
+            method => 'PUT',
+            path   => "/apps/:bin:appid",
+            func   => update_app,
+            descr  => "Update Application"}).
+
+-export([add_app/2, del_app/2, list_apps/2, lookup_app/2, update_app/2]).
 
 add_app(_Bindings, Params) ->
     AppId = get_value(<<"app_id">>, Params),
-    case emqx_mgmt_auth:add_app(AppId) of
+    Name = get_value(<<"name">>, Params),
+    Desc = get_value(<<"desc">>, Params),
+    case emqx_mgmt_auth:add_app(AppId, Name, Desc) of
         {ok, AppSecret} -> {ok, [{secret, AppSecret}]};
         Error -> return(Error)
     end.
@@ -60,10 +68,20 @@ list_apps(_Bindings, _Params) ->
     {ok, [format(Apps)|| Apps <- emqx_mgmt_auth:list_apps()]}.
 
 lookup_app(#{appid := AppId}, _Params) ->
-    [{app_id, AppId}, {secret, emqx_mgmt_auth:get_appsecret(AppId)}].
+    case emqx_mgmt_auth:lookup_app(AppId) of
+        {AppId, AppSecret, Name, Desc} ->
+            {ok, [{app_id, AppId}, {secret, AppSecret}, {name, Name}, {desc, Desc}]};
+        undefined ->
+            {ok, []}
+    end.
 
-format({AppId, AppSecret}) ->
-    [{app_id, AppId}, {secret, AppSecret}].
+update_app(#{appid := AppId}, Params) ->
+    Name = get_value(<<"name">>, Params),
+    Desc = get_value(<<"desc">>, Params),
+    return(emqx_mgmt_auth:update_app(AppId, Name, Desc)).
+
+format({AppId, AppSecret, Name, Desc}) ->
+    [{app_id, AppId}, {name, Name}, {desc, Desc}].
 
 return(ok) ->
     ok;

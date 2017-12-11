@@ -22,7 +22,7 @@
 
 -define(APP, emqx_management).
 
--define(EXCEPT, [add_app, del_app, list_apps, lookup_app]).
+-define(EXCEPT, [add_app, del_app, list_apps, lookup_app, update_app]).
 
 %%--------------------------------------------------------------------
 %% Start/Stop Listeners

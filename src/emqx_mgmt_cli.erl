@@ -54,12 +54,28 @@ load() ->
 is_cmd(Fun) ->
     not lists:member(Fun, [init, load, module_info]).
 
-mgmt(["add_app", AppId]) ->
-    case emqx_mgmt_auth:add_app(list_to_binary(AppId)) of
+mgmt(["add_app", AppId, Name, Desc]) ->
+    case emqx_mgmt_auth:add_app(list_to_binary(AppId), list_to_binary(Name), list_to_binary(Desc)) of
         {ok, Secret} ->
             ?PRINT("AppSecret: ~s~n", [Secret]);
         {error, already_existed} ->
             ?PRINT_MSG("Error: already existed~n");
+        {error, Reason} ->
+            ?PRINT("Error: ~p~n", [Reason])
+    end;
+
+mgmt(["lookup_app", AppId]) ->
+    case emqx_mgmt_auth:lookup_app(list_to_binary(AppId)) of
+        {AppId1, AppSecret, Name, Desc} ->
+            ?PRINT("app_id: ~s,  secret: ~s, name: ~s, desc: ~s~n", [AppId1, AppSecret, Name, Desc]);
+        undefined ->
+            ?PRINT_MSG("Not Found.~n")
+    end;
+
+mgmt(["update_app", AppId, Name, Desc]) ->
+    case emqx_mgmt_auth:update_app(list_to_binary(AppId), list_to_binary(Name), list_to_binary(Desc)) of
+        ok ->
+            ?PRINT_MSG("update successfully.~n");
         {error, Reason} ->
             ?PRINT("Error: ~p~n", [Reason])
     end;
@@ -74,12 +90,14 @@ mgmt(["del_app", AppId]) ->
     end;
 
 mgmt(["list_apps"]) ->
-    lists:foreach(fun({AppId, AppSecret}) ->
-          ?PRINT("~s: ~s~n", [AppId, AppSecret])
+    lists:foreach(fun({AppId, AppSecret, Name, Desc}) ->
+          ?PRINT("app_id: ~s,  secret: ~s, name: ~s, desc: ~s~n", [AppId, AppSecret, Name, Desc])
       end, emqx_mgmt_auth:list_apps());
 
 mgmt(_) ->
-    ?USAGE([{"mgmt add_app <AppId>", "Add Application of REST API"},
+    ?USAGE([{"mgmt add_app <AppId> <Name> <Desc>", "Add Application of REST API"},
+            {"mgmt lookup_app <AppId>", "Get Application of REST API"},
+            {"mgmt update_app <AppId> <Name> <Desc>", "Get Application of REST API"},
             {"mgmt del_app <AppId>", "Delete Application of REST API"},
             {"mgmt list_apps",       "List Applications"}]).
 
