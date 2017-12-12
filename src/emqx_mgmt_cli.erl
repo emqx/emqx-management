@@ -53,9 +53,19 @@ load() ->
 
 is_cmd(Fun) ->
     not lists:member(Fun, [init, load, module_info]).
+mgmt(["add_app", AppId, Name, Desc, Status]) ->
+    mgmt(["add_app", AppId, Name, Desc, Status, undefined]);
 
-mgmt(["add_app", AppId, Name, Desc]) ->
-    case emqx_mgmt_auth:add_app(list_to_binary(AppId), list_to_binary(Name), list_to_binary(Desc)) of
+mgmt(["add_app", AppId, Name, Desc, Status, Expired]) ->
+    Expired1 = case Expired of
+        undefined -> undefined;
+        _ -> list_to_integer(Expired)
+    end,
+    case emqx_mgmt_auth:add_app(list_to_binary(AppId),
+                                list_to_binary(Name),
+                                list_to_binary(Desc),
+                                list_to_atom(Status),
+                                Expired1) of
         {ok, Secret} ->
             ?PRINT("AppSecret: ~s~n", [Secret]);
         {error, already_existed} ->
@@ -66,14 +76,19 @@ mgmt(["add_app", AppId, Name, Desc]) ->
 
 mgmt(["lookup_app", AppId]) ->
     case emqx_mgmt_auth:lookup_app(list_to_binary(AppId)) of
-        {AppId1, AppSecret, Name, Desc} ->
-            ?PRINT("app_id: ~s,  secret: ~s, name: ~s, desc: ~s~n", [AppId1, AppSecret, Name, Desc]);
+        {AppId1, AppSecret, Name, Desc, Status, Expired} ->
+            ?PRINT("app_id: ~s~nsecret: ~s~nname: ~s~ndesc: ~s~nstatus: ~s~nexpired: ~s~n", 
+                [AppId1, AppSecret, Name, Desc, Status, Expired]);
         undefined ->
             ?PRINT_MSG("Not Found.~n")
     end;
 
-mgmt(["update_app", AppId, Name, Desc]) ->
-    case emqx_mgmt_auth:update_app(list_to_binary(AppId), list_to_binary(Name), list_to_binary(Desc)) of
+mgmt(["update_app", AppId, Name, Desc, Status, Expired]) ->
+    case emqx_mgmt_auth:update_app(list_to_binary(AppId),
+                                   list_to_binary(Name),
+                                   list_to_binary(Desc),
+                                   list_to_atom(Status),
+                                   list_to_integer(Expired)) of
         ok ->
             ?PRINT_MSG("update successfully.~n");
         {error, Reason} ->
@@ -90,14 +105,15 @@ mgmt(["del_app", AppId]) ->
     end;
 
 mgmt(["list_apps"]) ->
-    lists:foreach(fun({AppId, AppSecret, Name, Desc}) ->
-          ?PRINT("app_id: ~s,  secret: ~s, name: ~s, desc: ~s~n", [AppId, AppSecret, Name, Desc])
-      end, emqx_mgmt_auth:list_apps());
+    lists:foreach(fun({AppId, AppSecret, Name, Desc, Status, Expired}) ->
+        ?PRINT("app_id: ~s, secret: ~s, name: ~s, desc: ~s, status: ~s, expired: ~s~n",
+            [AppId, AppSecret, Name, Desc, Status, Expired])
+    end, emqx_mgmt_auth:list_apps());
 
 mgmt(_) ->
-    ?USAGE([{"mgmt add_app <AppId> <Name> <Desc>", "Add Application of REST API"},
+    ?USAGE([{"mgmt add_app <AppId> <Name> <Desc> <status> <expired>", "Add Application of REST API"},
             {"mgmt lookup_app <AppId>", "Get Application of REST API"},
-            {"mgmt update_app <AppId> <Name> <Desc>", "Get Application of REST API"},
+            {"mgmt update_app <AppId> <Name> <Desc> <status> <expired>", "Get Application of REST API"},
             {"mgmt del_app <AppId>", "Delete Application of REST API"},
             {"mgmt list_apps",       "List Applications"}]).
 

@@ -22,12 +22,12 @@
 -copy_mnesia({mnesia, [copy]}).
 
 %% APP Management API
--export([add_app/3, lookup_app/1, get_appsecret/1, update_app/3, del_app/1, list_apps/0]).
+-export([add_app/5, lookup_app/1, get_appsecret/1, update_app/5, del_app/1, list_apps/0]).
 
 %% APP Auth/ACL API
 -export([is_authorized/2]).
 
--record(mqtt_app, {id, secret, name, desc}).
+-record(mqtt_app, {id, secret, name, desc, status, expired}).
 
 -type(appid() :: binary()).
 
@@ -50,10 +50,15 @@ mnesia(copy) ->
 %% Manage Apps
 %%--------------------------------------------------------------------
 
--spec(add_app(appid(), binary(), binary()) -> {ok, appsecret()} | {error, term()}).
-add_app(AppId, Name, Desc) when is_binary(AppId) ->
+-spec(add_app(appid(), binary(), binary(), boolean(), integer() | undefined) -> {ok, appsecret()} | {error, term()}).
+add_app(AppId, Name, Desc, Status, Expired) when is_binary(AppId) ->
     Secret = emqx_guid:to_base62(emqx_guid:gen()),
-    App = #mqtt_app{id = AppId, secret = Secret, name = Name, desc = Desc},
+    App = #mqtt_app{id = AppId,
+                    secret = Secret,
+                    name = Name,
+                    desc = Desc,
+                    status = Status,
+                    expired = Expired},
     AddFun = fun() ->
                  case mnesia:wread({mqtt_app, AppId}) of
                      [] -> mnesia:write(App);
@@ -72,18 +77,26 @@ get_appsecret(AppId) when is_binary(AppId) ->
         [] -> undefined
     end.
 
--spec(lookup_app(appid()) -> {{appid(), appsecret(), binary, binary} | undefined}).
+-spec(lookup_app(appid()) -> {{appid(), appsecret(), binary(), binary(), boolean(), integer() | undefined} | undefined}).
 lookup_app(AppId) when is_binary(AppId) ->
     case mnesia:dirty_read(mqtt_app, AppId) of
-        [#mqtt_app{id = AppId, secret = AppSecret, name = Name, desc = Desc}] -> {AppId, AppSecret, Name, Desc};
+        [#mqtt_app{id = AppId,
+                   secret = AppSecret,
+                   name = Name,
+                   desc = Desc,
+                   status = Status,
+                   expired = Expired}] -> {AppId, AppSecret, Name, Desc, Status, Expired};
         [] -> undefined
     end.
 
--spec(update_app(appid(), binary(), binary()) -> ok | {error, term()}).
-update_app(AppId, Name, Desc) ->
+-spec(update_app(appid(), binary(), binary(), boolean(), integer() | undefined) -> ok | {error, term()}).
+update_app(AppId, Name, Desc, Status, Expired) ->
     case mnesia:dirty_read(mqtt_app, AppId) of
         [App = #mqtt_app{}] ->
-            case mnesia:transaction(fun() -> mnesia:write(App#mqtt_app{name = Name, desc = Desc}) end) of
+            case mnesia:transaction(fun() -> mnesia:write(App#mqtt_app{name = Name,
+                                                                       desc = Desc,
+                                                                       status = Status,
+                                                                       expired = Expired}) end) of
                 {atomic, ok} -> ok;
                 {aborted, Reason} -> {error, Reason}
             end;
@@ -98,17 +111,27 @@ del_app(AppId) when is_binary(AppId) ->
         {aborted, Reason} -> {error, Reason}
     end.
 
--spec(list_apps() -> [{appid(), appsecret(), binary, binary}]).
+-spec(list_apps() -> [{appid(), appsecret(), binary(), binary(), boolean(), integer() | undefined}]).
 list_apps() ->
-    [ {AppId, AppSecret, Name, Desc} || #mqtt_app{id = AppId,
-                                                  secret = AppSecret,
-                                                  name = Name,
-                                                  desc = Desc} <- ets:tab2list(mqtt_app) ].
+    [ {AppId, AppSecret, Name, Desc, Status, Expired} || #mqtt_app{id = AppId,
+                                                                   secret = AppSecret,
+                                                                   name = Name,
+                                                                   desc = Desc,
+                                                                   status = Status,
+                                                                   expired = Expired} <- ets:tab2list(mqtt_app) ].
 %%--------------------------------------------------------------------
 %% Authenticate App
 %%--------------------------------------------------------------------
 
 -spec(is_authorized(appid(), appsecret()) -> boolean()).
 is_authorized(AppId, AppSecret) ->
-    case get_appsecret(AppId) of AppSecret -> true; _ -> false end.
+    case lookup_app(AppId) of
+        {_, AppSecret1, _, _, Status, Expired} ->
+            Status andalso is_expired(Expired) andalso AppSecret =:= AppSecret1;
+        _ ->
+            false
+    end.
+
+is_expired(undefined) -> true;
+is_expired(Expired)   -> Expired >= emqx_time:now_secs().
 
