@@ -3,8 +3,9 @@ PROJECT_DESCRIPTION = EMQ X Management API and CLI
 PROJECT_VERSION = 2.3.2
 PROJECT_MOD = emqx_mgmt_app
 
-DEPS = minirest
+DEPS = minirest clique
 dep_minirest = git https://github.com/emqx/minirest master
+dep_clique   = git https://github.com/emqtt/clique
 
 LOCAL_DEPS = mnesia
 

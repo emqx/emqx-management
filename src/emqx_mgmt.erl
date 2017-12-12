@@ -352,7 +352,7 @@ get_all_configs() ->
     [{Node, get_all_configs(Node)} || Node <- ekka_mnesia:running_nodes()].
 
 get_all_configs(Node) when Node =:= node()->
-    emqx_cli_config:all_cfgs();
+    emqx_mgmt_cli_cfg:all_cfgs();
 
 get_all_configs(Node) ->
     rpc_call(Node, get_config, [Node]).
