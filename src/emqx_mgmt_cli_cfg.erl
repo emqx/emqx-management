@@ -47,7 +47,26 @@ create_config_tab() ->
                 [FileName | _] = string:tokens(File, "."),
                 Configs = cuttlefish_conf:file(lists:concat([PluginsEtcDir, File])),
                 ets:insert(?TAB, {list_to_atom(FileName), Configs})
-            end, Files);
+            end, Files),
+            case emqx:env(expand_plugins_dir) of
+                {ok, Dir} ->
+                    PluginsDir = filelib:wildcard("*", Dir),
+                    lists:foreach(fun(PluginDir) ->
+                        case filelib:is_dir(Dir ++ PluginDir) of
+                            true ->
+                                Etc  = Dir ++ PluginDir ++ "/etc",
+                                case filelib:wildcard("*.conf", Etc) of
+                                    [] -> ok;
+                                    [Conf] ->
+                                        [FileName | _] = string:tokens(Conf, "."),
+                                        Configs = cuttlefish_conf:file(lists:concat([Etc,"/", Conf])),
+                                        ets:insert(?TAB, {list_to_atom(FileName), Configs})
+                                end;
+                            false -> ok
+                        end
+                    end, PluginsDir);
+                _ -> ok
+            end;
         _ ->
             ok
     end.

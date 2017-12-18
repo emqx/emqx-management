@@ -77,7 +77,7 @@ mgmt(["add_app", AppId, Name, Desc, Status, Expired]) ->
 mgmt(["lookup_app", AppId]) ->
     case emqx_mgmt_auth:lookup_app(list_to_binary(AppId)) of
         {AppId1, AppSecret, Name, Desc, Status, Expired} ->
-            ?PRINT("app_id: ~s~nsecret: ~s~nname: ~s~ndesc: ~s~nstatus: ~s~nexpired: ~s~n", 
+            ?PRINT("app_id: ~s~nsecret: ~s~nname: ~s~ndesc: ~s~nstatus: ~s~nexpired: ~p~n", 
                 [AppId1, AppSecret, Name, Desc, Status, Expired]);
         undefined ->
             ?PRINT_MSG("Not Found.~n")
@@ -106,7 +106,7 @@ mgmt(["del_app", AppId]) ->
 
 mgmt(["list_apps"]) ->
     lists:foreach(fun({AppId, AppSecret, Name, Desc, Status, Expired}) ->
-        ?PRINT("app_id: ~s, secret: ~s, name: ~s, desc: ~s, status: ~s, expired: ~s~n",
+        ?PRINT("app_id: ~s, secret: ~s, name: ~s, desc: ~s, status: ~s, expired: ~p~n",
             [AppId, AppSecret, Name, Desc, Status, Expired])
     end, emqx_mgmt_auth:list_apps());
 
@@ -383,10 +383,25 @@ plugins(["unload", Name]) ->
             ?PRINT("unload plugin error: ~p~n", [Reason])
     end;
 
+plugins(["add", Name]) ->
+    {ok, Path} = emqx:env(expand_plugins_dir),
+    Dir = Path ++ Name,
+    zip:unzip(Dir, [{cwd, Path}]),
+    Plugin = filename:basename(Dir, ".zip"),
+    case emqx_plugins:load_expand_plugin(Path ++ Plugin) of
+        ok ->
+            ?PRINT("Add plugin:~p successfully.~n", [Plugin]);
+        {error, {already_loaded,_}} ->
+            ?PRINT("Already loaded plugin:~p ~n", [Plugin]);
+        {error, Error} ->
+            ?PRINT("Add plugin:~p error: ~n", [Plugin, Error])
+    end;
+
 plugins(_) ->
     ?USAGE([{"plugins list",            "Show loaded plugins"},
             {"plugins load <Plugin>",   "Load plugin"},
-            {"plugins unload <Plugin>", "Unload plugin"}]).
+            {"plugins unload <Plugin>", "Unload plugin"},
+            {"plugins add <Plugin.zip>", "Add plugin"}]).
 
 %%--------------------------------------------------------------------
 %% @doc Bridges command
