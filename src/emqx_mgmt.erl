@@ -85,6 +85,7 @@ lookup_node(Node) -> node_info(Node).
 node_info(Node) when Node =:= node() ->
     Memory  = emqx_vm:get_memory(),
     Info = maps:from_list([{K, list_to_binary(V)} || {K, V} <- emqx_vm:loads()]),
+    BrokerInfo = emqx_broker:info(),
     Info#{name              => node(),
           otp_release       => iolist_to_binary(otp_rel()),
           memory_total      => get_value(allocated, Memory),
@@ -93,7 +94,10 @@ node_info(Node) when Node =:= node() ->
           process_used      => erlang:system_info(process_count),
           max_fds           => get_value(max_fds, erlang:system_info(check_io)),
           clients           => ets:info(mqtt_client, size),
-          node_status       => 'Running'};
+          node_status       => 'Running',
+          uptime            => iolist_to_binary(proplists:get_value(uptime, BrokerInfo)),
+          version           => iolist_to_binary(proplists:get_value(version, BrokerInfo))
+          };
 node_info(Node) ->
     rpc_call(Node, node_info, [Node]).
 
