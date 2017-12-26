@@ -52,10 +52,10 @@ count(Tables) ->
     lists:sum([count(T) || T <- Tables]).
 
 page(Params) ->
-    list_to_integer(proplists:get_value("page", Params, "1")).
+    list_to_integer(proplists:get_value("_page", Params, "1")).
 
 limit(Params) ->
-    case proplists:get_value("limit", Params) of
+    case proplists:get_value("_limit", Params) of
         undefined -> emqx_mgmt:max_row_limit();
         Size      -> list_to_integer(Size)
     end.
