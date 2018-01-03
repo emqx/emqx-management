@@ -35,7 +35,7 @@
 
 %% Clients, Sessions
 -export([list_clients/1, lookup_client/1, lookup_client/2,
-         kickout_client/1, clean_acl_cache/2]).
+         kickout_client/1, kickout_client/2, clean_acl_cache/2, clean_acl_cache/3]).
 
 -export([list_sessions/1, lookup_session/1, lookup_session/2]).
 
