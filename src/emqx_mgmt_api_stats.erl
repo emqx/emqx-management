@@ -34,7 +34,7 @@
 
 %% List stats of all nodes
 list(Bindings, _Params) when map_size(Bindings) == 0 ->
-    {ok, [#{node => Node, stats => Stats}
+    {ok, [[{node, Node} | Stats]
           || {Node, Stats} <- emqx_mgmt:get_stats()]}.
 
 %% List stats of a node
