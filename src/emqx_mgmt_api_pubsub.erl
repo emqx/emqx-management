@@ -36,13 +36,19 @@
             func   => publish,
             descr  => "Publish a MQTT message"}).
 
+-rest_api(#{name   => dmp_publish,
+            method => 'POST',
+            path   => "/dmp/publish",
+            func   => dmp_publish,
+            descr  => "DMP Publish a MQTT message for Device"}).
+
 -rest_api(#{name   => mqtt_unsubscribe,
             method => 'POST',
             path   => "/mqtt/unsubscribe",
             func   => unsubscribe,
             descr  => "Unsubscribe a topic"}).
 
--export([subscribe/2, publish/2, unsubscribe/2]).
+-export([subscribe/2, publish/2, dmp_publish/2, unsubscribe/2]).
 
 subscribe(_Bindings, Params) ->
     ClientId = get_value(<<"client_id">>, Params),
@@ -61,6 +67,25 @@ publish(_Bindings, Params) ->
         emqx_mgmt:publish(Msg#mqtt_message{retain = Retain})
     end, Topics).
 
+dmp_publish(_Bindings, Params) ->
+    case check_required_params(Params) of
+    ok ->
+        make_publish(Params),
+        {ok, [{code, 0}, {message, <<>>}]};
+    {error, Error} ->
+        {ok, [{code, 1}, {message, list_to_binary(Error)}]}
+    end.
+
+make_publish(Params) ->
+    Qos      = get_value(<<"qos">>, Params, 1),
+    Url      = get_value(<<"callback">>, Params),
+    Payload  = get_value(<<"payload">>, Params),
+    AppId    = get_value(<<"appId ">>, Params, <<"DMP">>),
+    TaskId   = get_value(<<"task_id">>, Params),
+    Topic    = get_value(<<"topic">>, Params),
+    Msg      = emqx_message:make(AppId, Qos, Topic, Payload, [{<<"url">>, Url}, {<<"task_id">>, TaskId}, {<<"return_filed">>, [<<"task_id">>]}]),
+    emqx_mgmt:publish(Msg).
+
 unsubscribe(_Bindings, Params) ->
     ClientId = get_value(<<"client_id">>, Params),
     Topic    = get_value(<<"topic">>, Params),
@@ -71,9 +96,28 @@ topics(Params) ->
     [Topic || Topic <- Topics, Topic =/= <<"">>].
 
 %%TODO:
+
 %%validate(qos, Qos) ->
 %%    (Qos >= ?QOS_0) and (Qos =< ?QOS_2);
 
 %%validate(topic, Topic) ->
 %%    emqx_topic:validate({name, Topic}).
 
+%% Internal function
+check_required_params(Params) ->
+    check_required_params(Params, required_params()).
+
+check_required_params(_, []) -> ok;
+check_required_params(Params, [Key | Rest]) ->
+    case lists:keytake(Key, 1, Params) of
+        {value, _, NewParams} -> check_required_params(NewParams, Rest);
+        false                 -> {error, binary_to_list(Key) ++ " must be specified"}
+    end.
+
+required_params() ->
+  [
+    <<"task_id">>,
+    <<"callback">>,
+    <<"topic">>,
+    <<"payload">>
+  ].
