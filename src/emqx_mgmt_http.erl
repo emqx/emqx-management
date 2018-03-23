@@ -47,7 +47,7 @@ listeners() ->
     application:get_env(?APP, listeners, []).
     
 listener_name(Proto) ->
-    list_to_atom("management:" ++ atom_to_list(Proto)).
+    list_to_atom("mgmt:" ++ atom_to_list(Proto)).
 
 %%--------------------------------------------------------------------
 %% Handle 'status' request
