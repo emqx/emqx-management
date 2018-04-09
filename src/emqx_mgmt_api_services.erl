@@ -54,9 +54,16 @@
             func   => delete_instances,
             descr  => "Delete instance"}).
 
+-rest_api(#{name   => update_instances,
+            method => 'PUT',
+            path   => "/instances",
+            func   => update_instances,
+            descr  => "Update instance"}).
+
 %% REST API
 -export([list/2, lookup/2]).
--export([list_instances/2, lookup_instances/2, create_instances/2, delete_instances/2]).
+-export([list_instances/2, lookup_instances/2, create_instances/2,
+         delete_instances/2, update_instances/2]).
 
 list(Bindings, Params) when map_size(Bindings) =:= 0 ->
     %% TODO: support type, status, name query???
@@ -76,15 +83,20 @@ lookup_instances(#{id := Id}, _Parasm) ->
     {ok, fm_allinfo(emqx_services:lookup_instance(Id))}.
 
 create_instances(_Bindings, Params) ->
-    Name = proplists:get_value(<<"name">>, Params),
-    Descr = proplists:get_value(<<"descr">>, Params),
-    Service = b2a(proplists:get_value(<<"serviceName">>, Params)),
-    Config = proplists:get_value(<<"config">>, Params),
+    Name = value(<<"name">>, Params),
+    Descr = value(<<"descr">>, Params),
+    Service = b2a(value(<<"serviceName">>, Params)),
+    Config = value(<<"config">>, Params),
     emqx_services:create_instance(Service, Name, Descr, config(Config)).
 
 delete_instances(Binding, Params) ->
-    InstanceId = proplists:get_value(<<"instanceId">>, Params),
+    InstanceId = value(<<"instanceId">>, Params),
     emqx_services:destroy_instance(InstanceId).
+
+update_instances(Binding, Params) ->
+    Id = value(<<"id">>, Params),
+    Config = value(<<"config">>, Params),
+    emqx_services:update_instance(Id, config(Config)).
 
 %%--------------------------------------------------------------------
 %% Interval Funs
@@ -129,6 +141,8 @@ config(Conf) -> config(Conf, []).
 config([], Acc) -> lists:reverse(Acc);
 config([{Key, Value}|T], Acc) ->
     config(T, [{binary_to_existing_atom(Key, utf8), Value}|Acc]).
+
+value(Key, PL) -> proplists:get_value(Key, PL).
 
 set_value(Key, Value, PL) ->
     [{Key, Value} | proplists:delete(Key, PL)].
