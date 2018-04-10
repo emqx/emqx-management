@@ -122,8 +122,9 @@ format(#mqtt_instance{id=Id, name=Name, service=Service, descr=Descr, status=Sta
             Res#{conf => Conf1}
     end.
 
-instance_status(Service) ->
-    #{running => 10, stopping => 1}.
+instance_status(Name) ->
+    #{running => emqx_services:running(Name),
+      stopped => emqx_services:stopped(Name)}.
 
 tune(Schema) -> tune(Schema, []).
 
