@@ -113,8 +113,10 @@ format(#mqtt_service{name=Name, type=Type, status=Status, descr=Descr, nodes=Nod
         true  -> Res#{schema => tune(Schema)}
     end;
 
-format(#mqtt_instance{id=Id, name=Name, service=Service, descr=Descr, status=Status, nodes=Nodes, conf=Conf}, DisplayConf) ->
-    Res = #{id => Id, name => Name, service => Service, descr => Descr, status => Status, nodes => Nodes},
+format(#mqtt_instance{id=Id, name=Name, service=Service, descr=Descr,
+                      status=Status, nodes=Nodes, conf=Conf, create_at=CreateAt}, DisplayConf) ->
+    Res = #{id => Id, name => Name, service => Service, descr => Descr,
+            status => Status, nodes => Nodes, type => type(Service), createAt => CreateAt},
     case DisplayConf of
         false -> Res;
         true  ->
@@ -125,6 +127,9 @@ format(#mqtt_instance{id=Id, name=Name, service=Service, descr=Descr, status=Sta
 instance_status(Name) ->
     #{running => emqx_services:running(Name),
       stopped => emqx_services:stopped(Name)}.
+
+type(Name) ->
+    [#mqtt_service{type=Type}] = mnesia:dirty_read(mqtt_service, Name), Type.
 
 tune(Schema) -> tune(Schema, []).
 
