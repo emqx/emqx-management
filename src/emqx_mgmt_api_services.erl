@@ -75,6 +75,7 @@ lookup(#{name := Name}, _Params) ->
 %%--------------------------------------------------------------------
 %% Instances API
 %%--------------------------------------------------------------------
+
 list_instances(_Bindings, Params) ->
     %% TODO: support type, status, name query???
     {ok, emqx_mgmt_api:paginate(mqtt_instance, Params, fun fm_overview/1)}.
@@ -87,7 +88,7 @@ create_instances(_Bindings, Params) ->
     Descr = value(<<"descr">>, Params),
     Service = b2a(value(<<"serviceName">>, Params)),
     Config = value(<<"config">>, Params),
-    emqx_services:create_instance(Service, Name, Descr, config(Config)).
+    emqx_services:create_instance(Service, Name, Descr, Config).
 
 delete_instances(Binding, Params) ->
     InstanceId = value(<<"instanceId">>, Params),
@@ -96,7 +97,7 @@ delete_instances(Binding, Params) ->
 update_instances(Binding, Params) ->
     Id = value(<<"id">>, Params),
     Config = value(<<"config">>, Params),
-    emqx_services:update_instance(Id, config(Config)).
+    emqx_services:update_instance(Id, Config).
 
 %%--------------------------------------------------------------------
 %% Interval Funs
@@ -106,11 +107,13 @@ fm_overview(Entriy) -> format(Entriy, false).
 
 fm_allinfo(Entriy) -> format(Entriy, true).
 
-format(#mqtt_service{name=Name, type=Type, status=Status, descr=Descr, nodes=Nodes, schema=Schema}, DisplaySchema) ->
+format(#mqtt_service{name=Name, app=App, type=Type, status=Status, descr=Descr, nodes=Nodes}, DisplaySchema) ->
     Res = #{name => Name, type => Type, status => Status, descr => Descr, nodes => Nodes, instances => instance_status(Name)},
     case DisplaySchema of
         false -> Res;
-        true  -> Res#{schema => tune(Schema)}
+        true  ->
+            {ok, Schema} = emqx_services:fetch_schema(App),
+            Res#{schema => tune(Schema)}
     end;
 
 format(#mqtt_instance{id=Id, name=Name, service=Service, descr=Descr,
@@ -134,13 +137,14 @@ type(Name) ->
 tune(Schema) -> tune(Schema, []).
 
 tune([], Acc) -> lists:reverse(Acc);
-tune([H|T], Acc) ->
-    Deft1 = lists:map(fun to_bin/1, proplists:get_value(default, H)),
+tune([H = #{key := Key, default := Deft, descr := Descr}|T], Acc) ->
+    Deft1 = lists:map(fun to_bin/1, Deft),
     Deft2 = case Deft1 of
+                []  -> <<"">>;
                 [V] -> V;
                 _   -> Deft1
             end,
-    tune(T, [set_value(default, Deft2, H) | Acc]).
+    tune(T, [H#{key := to_bin(Key), descr := to_bin(Descr), default := Deft2} | Acc]).
 
 config(Conf) -> config(Conf, []).
 
