@@ -20,25 +20,25 @@
 
 -import(proplists, [get_value/2, get_value/3]).
 
--import(emqx_web_hook_rule, [serialize/1]).
+-import(emqx_web_hook_rule, [serialize/1, serialize/2]).
 
 -rest_api(#{name   => create_rule,
             method => 'POST',
-            path   => "/rule/",
+            path   => "/rules/",
             func   => create,
-            descr  => "create rule"}).
+            descr  => "Create rule"}).
 
 -rest_api(#{name   => update_rule,
             method => 'PUT',
-            path   => "/rule/",
+            path   => "/rules/:int:id",
             func   => update,
-            descr  => "update rule"}).
+            descr  => "Update rule"}).
 
 -rest_api(#{name   => delete_rule,
             method => 'DELETE',
-            path   => "/rule/",
+            path   => "/rules/:int:id",
             func   => delete,
-            descr  => "delete rule"}).
+            descr  => "Delete rule"}).
 
 
 -export([create/2, update/2, delete/2]).
@@ -51,16 +51,11 @@ create(_Bindings, Params) ->
             emqx_web_hook_rule:insert(serialize(Params))
     end.
 
-update(_Bindings, Params) ->
+update(#{id := Id}, Params) ->
     %% FIXME: when modify ruleType, need config?
-    case check_required_params(Params, update_required_params()) of
-        {error, Reason} -> {error, list_to_binary(Reason)};
-        ok ->
-            emqx_web_hook_rule:update(serialize(Params))
-    end.
+    emqx_web_hook_rule:update(serialize(Id, Params)).
 
-delete(_Bindings, Params) ->
-    Id = get_value(<<"id">>, Params),
+delete(#{id := Id}, _Params) ->
     emqx_web_hook_rule:delete(Id).
 
 %%--------------------------------------------------------------------
@@ -76,7 +71,4 @@ check_required_params(Params, [Key | Rest]) ->
 
 create_required_params() ->
     [<<"id">>, <<"ruleType">>, <<"enable">>, <<"tenantID">>, <<"config">>].
-
-update_required_params() ->
-    [<<"id">>].
 
