@@ -60,10 +60,24 @@
             func   => update_instances,
             descr  => "Update instance"}).
 
+-rest_api(#{name   => start_instances,
+            method => 'PUT',
+            path   => "/instances/:bin:id/start",
+            func   => start_instance,
+            descr  => "Start instance"}).
+
+-rest_api(#{name   => stop_instances,
+            method => 'PUT',
+            path   => "/instances/:bin:id/stop",
+            func   => stop_instance,
+            descr  => "Stop instance"}).
+
+
 %% REST API
 -export([list/2, lookup/2]).
 -export([list_instances/2, lookup_instances/2, create_instances/2,
-         delete_instances/2, update_instances/2]).
+         delete_instances/2, update_instances/2, start_instance/2,
+         stop_instance/2]).
 
 list(Bindings, Params) when map_size(Bindings) =:= 0 ->
     %% TODO: support type, status, name query???
@@ -98,6 +112,12 @@ update_instances(Binding, Params) ->
     Id = value(<<"id">>, Params),
     Config = value(<<"config">>, Params),
     emqx_services:update_instance(Id, Config).
+
+start_instance(#{id := Id}, _Params) ->
+    emqx_services:enable_instance(Id, 1).
+
+stop_instance(#{id := Id}, _Params) ->
+    emqx_services:enable_instance(Id, 0).
 
 %%--------------------------------------------------------------------
 %% Interval Funs
