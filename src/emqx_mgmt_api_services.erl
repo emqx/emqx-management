@@ -56,7 +56,7 @@
 
 -rest_api(#{name   => update_instances,
             method => 'PUT',
-            path   => "/instances",
+            path   => "/instances/:bin:id",
             func   => update_instances,
             descr  => "Update instance"}).
 
@@ -104,14 +104,16 @@ create_instances(_Bindings, Params) ->
     Config = value(<<"config">>, Params),
     emqx_services:create_instance(Service, Name, Descr, Config).
 
-delete_instances(Binding, Params) ->
+delete_instances(_Binding, Params) ->
     InstanceId = value(<<"instanceId">>, Params),
     emqx_services:destroy_instance(InstanceId).
 
-update_instances(Binding, Params) ->
-    Id = value(<<"id">>, Params),
+update_instances(#{id := Id}, Params) ->
+    %% FIXME: need update Name & Descr
     Config = value(<<"config">>, Params),
-    emqx_services:update_instance(Id, Config).
+    Name = value(<<"name">>, Params),
+    Descr = value(<<"descr">>, Params),
+    emqx_services:update_instance(Id, Name, Descr, Config).
 
 start_instance(#{id := Id}, _Params) ->
     emqx_services:enable_instance(Id, 1).
@@ -166,16 +168,7 @@ tune([H = #{key := Key, default := Deft, descr := Descr}|T], Acc) ->
             end,
     tune(T, [H#{key := to_bin(Key), descr := to_bin(Descr), default := Deft2} | Acc]).
 
-config(Conf) -> config(Conf, []).
-
-config([], Acc) -> lists:reverse(Acc);
-config([{Key, Value}|T], Acc) ->
-    config(T, [{binary_to_existing_atom(Key, utf8), Value}|Acc]).
-
 value(Key, PL) -> proplists:get_value(Key, PL).
-
-set_value(Key, Value, PL) ->
-    [{Key, Value} | proplists:delete(Key, PL)].
 
 to_bin({K, V}) when is_list(V) -> {K, list_to_binary(V)};
 to_bin(V) when is_list(V) -> list_to_binary(V);
