@@ -50,7 +50,7 @@
 
 -rest_api(#{name   => delete_instances,
             method => 'DELETE',
-            path   => "/instances",
+            path   => "/instances/:bin:id",
             func   => delete_instances,
             descr  => "Delete instance"}).
 
@@ -104,9 +104,8 @@ create_instances(_Bindings, Params) ->
     Config = value(<<"config">>, Params),
     emqx_services:create_instance(Service, Name, Descr, Config).
 
-delete_instances(_Binding, Params) ->
-    InstanceId = value(<<"instanceId">>, Params),
-    emqx_services:destroy_instance(InstanceId).
+delete_instances(#{id := Id}, _Params) ->
+    emqx_services:destroy_instance(Id).
 
 update_instances(#{id := Id}, Params) ->
     %% FIXME: need update Name & Descr
