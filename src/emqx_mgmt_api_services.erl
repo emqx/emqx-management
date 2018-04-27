@@ -128,8 +128,8 @@ fm_overview(Entriy) -> format(Entriy, false).
 
 fm_allinfo(Entriy) -> format(Entriy, true).
 
-format(#mqtt_service{name=Name, app=App, type=Type, status=Status, descr=Descr, nodes=Nodes}, DisplaySchema) ->
-    Res = #{name => Name, type => Type, status => Status, descr => Descr, nodes => Nodes, instances => instance_status(Name)},
+format(#mqtt_service{name=App, type=Type, status=Status, descr=Descr, nodes=Nodes}, DisplaySchema) ->
+    Res = #{name => App, type => Type, status => Status, descr => Descr, nodes => Nodes, instances => instance_status(App)},
     case DisplaySchema of
         false -> Res;
         true  ->
