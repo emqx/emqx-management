@@ -30,6 +30,12 @@
             func   => lookup,
             descr  => "Lookup services by a name"}).
 
+-rest_api(#{name   => query_available_deps,
+            method => 'GET',
+            path   => "/services/:atom:name/available_deps",
+            func   => available_deps,
+            descr  => "Query available services form Cloud"}).
+
 -rest_api(#{name   => list_instances,
             method => 'GET',
             path   => "/instances",
@@ -74,7 +80,7 @@
 
 
 %% REST API
--export([list/2, lookup/2]).
+-export([list/2, lookup/2, available_deps/2]).
 -export([list_instances/2, lookup_instances/2, create_instances/2,
          delete_instances/2, update_instances/2, start_instance/2,
          stop_instance/2]).
@@ -85,6 +91,10 @@ list(Bindings, Params) when map_size(Bindings) =:= 0 ->
 
 lookup(#{name := Name}, _Params) ->
     {ok, fm_allinfo(emqx_services:lookup(Name))}.
+
+available_deps(#{name := Name}, Params) ->
+    Platform = list_to_atom(value("platform", Params)),
+    {ok, emqx_services:available_deps(Name, Platform)}.
 
 %%--------------------------------------------------------------------
 %% Instances API
