@@ -147,10 +147,10 @@ format(#mqtt_service{name=App, type=Type, status=Status, descr=Descr, nodes=Node
             Res#{schema => tune(Schema)}
     end;
 
-format(#mqtt_instance{id=Id, name=Name, service=Service, descr=Descr,
-                      status=Status, nodes=Nodes, conf=Conf, create_at=CreateAt}, DisplayConf) ->
-    Res = #{id => Id, name => Name, service => Service, descr => Descr,
-            status => Status, nodes => Nodes, type => type(Service), createAt => CreateAt},
+format(#mqtt_instance{id=Id, name=Name, service=Service, descr=Descr, status=Status,
+                      nodes=Nodes, conf=Conf, create_at=CreateAt, uptime=Uptime}, DisplayConf) ->
+    Res = #{id => Id, name => Name, service => Service, descr => Descr, status => Status,
+            nodes => Nodes, type => type(Service), createAt => CreateAt, uptime => Uptime},
     case DisplayConf of
         false -> Res;
         true  ->
