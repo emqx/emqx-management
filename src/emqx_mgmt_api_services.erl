@@ -94,7 +94,11 @@ lookup(#{name := Name}, _Params) ->
 
 available_deps(#{name := Name}, Params) ->
     Platform = list_to_atom(value("platform", Params)),
-    {ok, emqx_services:available_deps(Name, Platform)}.
+    case emqx_services:available_deps(Name, Platform) of
+        {error, Reason} ->
+            {ok, #{enable => false, reason => Reason}};
+        Deps -> {ok, #{enable => true, clusters => Deps}}
+    end.
 
 %%--------------------------------------------------------------------
 %% Instances API
