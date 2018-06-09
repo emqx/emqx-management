@@ -77,13 +77,15 @@ dmp_publish(_Bindings, Params) ->
     end.
 
 make_publish(Params) ->
-    Qos      = get_value(<<"qos">>, Params, 1),
-    Url      = get_value(<<"callback">>, Params),
-    Payload  = get_value(<<"payload">>, Params),
-    AppId    = get_value(<<"appId ">>, Params, <<"DMP">>),
-    TaskId   = get_value(<<"task_id">>, Params),
-    Topic    = get_value(<<"topic">>, Params),
-    Msg      = emqx_message:make(AppId, Qos, Topic, Payload, [{<<"url">>, Url}, {<<"task_id">>, TaskId}, {<<"return_filed">>, [<<"task_id">>]}]),
+    Qos     = get_value(<<"qos">>, Params, 1),
+    Url     = get_value(<<"callback">>, Params),
+    Payload = get_value(<<"payload">>, Params),
+    AppId   = get_value(<<"appId ">>, Params, <<"DMP">>),
+    TaskId  = get_value(<<"task_id">>, Params),
+    Topic   = mountpoint(Params),
+    Msg     = emqx_message:make(AppId, Qos, Topic, Payload, [{<<"url">>, Url},
+                                                             {<<"task_id">>, TaskId},
+                                                             {<<"return_filed">>,[<<"task_id">>]}]),
     emqx_mgmt:publish(Msg).
 
 unsubscribe(_Bindings, Params) ->
@@ -121,3 +123,16 @@ required_params() ->
     <<"topic">>,
     <<"payload">>
   ].
+
+mountpoint(Params) ->
+    Topic     = get_value(<<"topic">>, Params),
+    TenantID  = get_value(<<"tenantID">>, Params),
+    ProductID = get_value(<<"productID">>, Params),
+    DeviceID  = get_value(<<"deviceID">>, Params),
+    Mountpoint = <<"dn/tenants/${tenantID}/products/${productID}/devices/${deviceID}/">>,
+    Mountpoint1 = binary:replace(
+                    binary:replace(
+                      binary:replace(Mountpoint, <<"${tenantID}">>, TenantID),
+                    <<"${productID}">>, ProductID),
+                  <<"${deviceID}">>, DeviceID),
+    <<Mountpoint1/binary, Topic/binary>>.
