@@ -158,7 +158,7 @@ broker(["stats"]) ->
 
 broker(["metrics"]) ->
     foreach(fun({Metric, Val}) ->
-                ?PRINT("~-24s: ~w~n", [Metric, Val])
+                ?PRINT("~-30s: ~w~n", [Metric, Val])
             end, lists:sort(emqx_metrics:all()));
 
 broker(["pubsub"]) ->
