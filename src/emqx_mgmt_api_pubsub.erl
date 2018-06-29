@@ -126,13 +126,8 @@ required_params() ->
 
 mountpoint(Params) ->
     Topic     = get_value(<<"topic">>, Params),
+    Protocol  = get_value(<<"protocol">>, Params),
     TenantID  = get_value(<<"tenantID">>, Params),
     ProductID = get_value(<<"productID">>, Params),
     DeviceID  = get_value(<<"deviceID">>, Params),
-    Mountpoint = <<"dn/tenants/${tenantID}/products/${productID}/devices/${deviceID}/">>,
-    Mountpoint1 = binary:replace(
-                    binary:replace(
-                      binary:replace(Mountpoint, <<"${tenantID}">>, TenantID),
-                    <<"${productID}">>, ProductID),
-                  <<"${deviceID}">>, DeviceID),
-    <<Mountpoint1/binary, Topic/binary>>.
+    emqx_topic:encode(Topic, [Protocol, TenantID, ProductID, DeviceID]).
