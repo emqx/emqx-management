@@ -77,15 +77,17 @@ dmp_publish(_Bindings, Params) ->
     end.
 
 make_publish(Params) ->
-    Qos     = get_value(<<"qos">>, Params, 1),
-    Url     = get_value(<<"callback">>, Params),
-    Payload = get_value(<<"payload">>, Params),
-    AppId   = get_value(<<"appId ">>, Params, <<"DMP">>),
-    TaskId  = get_value(<<"task_id">>, Params),
-    Topic   = mountpoint(Params),
-    Msg     = emqx_message:make(AppId, Qos, Topic, Payload, [{<<"url">>, Url},
-                                                             {<<"task_id">>, TaskId},
-                                                             {<<"return_filed">>,[<<"task_id">>]}]),
+    Qos      = get_value(<<"qos">>, Params, 1),
+    Url      = get_value(<<"callback">>, Params),
+    Payload  = get_value(<<"payload">>, Params),
+    AppId    = get_value(<<"app_id">>, Params, <<"DMP">>),
+    TaskId   = get_value(<<"task_id">>, Params),
+    DataType = get_value(<<"data_type">>, Params, 1),
+    Topic    = mountpoint(Params),
+    Msg      = emqx_message:make(AppId, Qos, Topic, Payload, [{<<"url">>, Url},
+                                                              {<<"task_id">>, TaskId},
+                                                              {<<"return_filed">>,[<<"task_id">>]},
+                                                              {<<"data_type">>, DataType}]),
     emqx_mgmt:publish(Msg).
 
 unsubscribe(_Bindings, Params) ->
@@ -129,5 +131,8 @@ mountpoint(Params) ->
     Protocol  = get_value(<<"protocol">>, Params),
     TenantID  = get_value(<<"tenantID">>, Params),
     ProductID = get_value(<<"productID">>, Params),
-    DeviceID  = get_value(<<"deviceID">>, Params),
+    GroupIDOrDeviceID = case get_value(<<"groupID">>, Params) of
+        undefined -> get_value(<<"deviceID">>, Params);
+        GroupID -> GroupID
+    end,
     emqx_topic:encode(Topic, [<<"dn">>, Protocol, TenantID, ProductID, DeviceID]).
