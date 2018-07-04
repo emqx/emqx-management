@@ -130,4 +130,4 @@ mountpoint(Params) ->
     TenantID  = get_value(<<"tenantID">>, Params),
     ProductID = get_value(<<"productID">>, Params),
     DeviceID  = get_value(<<"deviceID">>, Params),
-    emqx_topic:encode(Topic, [Protocol, TenantID, ProductID, DeviceID]).
+    emqx_topic:encode(Topic, [<<"dn">>, Protocol, TenantID, ProductID, DeviceID]).
