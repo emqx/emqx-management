@@ -135,4 +135,4 @@ mountpoint(Params) ->
         undefined -> get_value(<<"deviceID">>, Params);
         GroupID -> GroupID
     end,
-    emqx_topic:encode(Topic, [<<"dn">>, Protocol, TenantID, ProductID, DeviceID]).
+    emqx_topic:encode(Topic, [<<"dn">>, Protocol, TenantID, ProductID, GroupIDOrDeviceID]).
