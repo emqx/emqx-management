@@ -48,7 +48,15 @@
             func   => unsubscribe,
             descr  => "Unsubscribe a topic"}).
 
--export([subscribe/2, publish/2, dmp_publish/2, unsubscribe/2]).
+-rest_api(#{name   => publish_lwm2m,
+            method => 'POST',
+            path   => "/dmp/publish_lwm2m",
+            func   => publish_lwm2m,
+            descr  => "DM Publish a MQTT message for Device"}).
+
+-export([subscribe/2, publish/2, dmp_publish/2, unsubscribe/2, publish_lwm2m/2]).
+
+-define(PROTOCOL_TYPE_LWM2M, <<"lwm2m">>).
 
 subscribe(_Bindings, Params) ->
     ClientId = get_value(<<"client_id">>, Params),
@@ -126,6 +134,13 @@ required_params() ->
     <<"payload">>
   ].
 
+required_lwm2m_params() ->
+  [<<"tenantId">>,
+   <<"productId">>,
+   <<"deviceId">>,
+   <<"payload">>].
+
+
 mountpoint(Params) ->
     Topic     = get_value(<<"topic">>, Params),
     Protocol  = get_value(<<"protocol">>, Params),
@@ -136,3 +151,78 @@ mountpoint(Params) ->
         GroupID -> GroupID
     end,
     emqx_topic:encode(Topic, [<<"dn">>, Protocol, TenantID, ProductID, GroupIDOrDeviceID]).
+
+publish_lwm2m(_Bindings, Params) ->
+    lager:debug("DM Publish lwm2m API:~p~n", [Params]),
+    case check_required_params(Params, required_lwm2m_params()) of
+    ok ->
+        Ttl          = get_value(<<"ttl">>, Params, 7200),
+        AppId        = get_value(<<"appId ">>, Params, <<"DM_LWM2M">>),
+        Payload      = get_value(<<"payload">>, Params),
+        TaskId       = to_binary(get_value(<<"taskId">>, Payload)),
+        MsgType      = get_value(<<"msgType">>, Payload),
+        TaskType     = get_value(<<"taskType">>, Payload),
+        ProtocolType = get_value(<<"protocolType">>, Payload),
+        Lwm2mData    = lwm2m_data(MsgType, Payload),
+        MsgId = emqx_guid:gen(),
+        MqttPayload = [{<<"cacheID">>, emqx_guid:to_base62(MsgId)}, {<<"taskId">>, TaskId}, {<<"msgType">>, MsgType}, {<<"data">>, Lwm2mData}, {<<"taskType">>, TaskType}],
+        MountTopic  = mount_lwm2m_topic(Params),
+        Msg = emqx_message:make(MsgId , AppId, 0, MountTopic, jsx:encode(MqttPayload), [{<<"protocolType">>, ProtocolType}, {<<"ttl">>, Ttl}, {<<"taskId">>, TaskId}]),
+        emqx_mgmt:publish(Msg),
+        {ok, [{code, 0}, {message, <<>>}]};
+    {error, Error} ->
+        {ok, [{code, 1}, {message, list_to_binary(Error)}]}
+    end.
+
+mount_lwm2m_topic(Params) ->
+    Fun = fun(Key, T) -> Value = to_binary(proplists:get_value(Key, Params)), <<Value/binary, "/", T/binary>> end,
+    MountTopic = lists:foldr(Fun, <<"v1/dn/dm">>, [<<"tenantId">>, <<"productId">>, <<"deviceId">>]),
+    <<?PROTOCOL_TYPE_LWM2M/binary, "/", MountTopic/binary>>.
+
+to_binary(L) when is_list(L) ->
+    list_to_binary(L);
+to_binary(I) when is_integer(I) ->
+    integer_to_binary(I);
+to_binary(B) when is_binary(B) ->
+    B.
+
+lwm2m_data(MsgType, Payload) ->
+    Keys = lwm2m_data_key(MsgType),
+    mapping_lwm2m_data(Keys, Payload, []).
+ mapping_lwm2m_data([], _Payload, Acc) ->
+     Acc;
+ mapping_lwm2m_data([<<"valueType">>|Keys], Payload, Acc) ->
+    mapping_lwm2m_data(Keys, Payload, [{<<"type">>, get_value(<<"valueType">>, Payload)}|Acc]);
+ mapping_lwm2m_data([Key|Keys], Payload, Acc) ->
+    mapping_lwm2m_data(Keys, Payload, [{Key, get_value(Key, Payload)}|Acc]).
+
+lwm2m_data_key(<<"read">>) ->
+    [<<"path">>];
+lwm2m_data_key(<<"write">>) ->
+    [<<"path">>,
+     <<"valueType">>,
+     <<"value">>];
+lwm2m_data_key(<<"discover">>) ->
+    [<<"path">>];
+lwm2m_data_key(<<"write-attr">>) ->
+    [<<"path">>,
+     <<"value">>,
+     <<"pmin">>,
+     <<"pmax">>,
+     <<"gt">>,
+     <<"lt">>];
+lwm2m_data_key(<<"execute">>) ->
+    [<<"path">>,
+     <<"args">>];
+lwm2m_data_key(<<"create">>) ->
+    [<<"objectID">>,
+     <<"value">>];
+lwm2m_data_key(<<"delete">>) ->
+    [<<"objectID">>,
+     <<"objectInstID">>];
+lwm2m_data_key(<<"observe">>) ->
+    [<<"path">>];
+lwm2m_data_key(<<"cancel-observe">>) ->
+    [<<"path">>].
+
+
