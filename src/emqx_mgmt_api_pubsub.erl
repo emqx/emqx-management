@@ -138,7 +138,8 @@ required_lwm2m_params() ->
   [<<"tenantId">>,
    <<"productId">>,
    <<"deviceId">>,
-   <<"payload">>].
+   <<"payload">>,
+   <<"callback">>].
 
 
 mountpoint(Params) ->
@@ -157,17 +158,18 @@ publish_lwm2m(_Bindings, Params) ->
     case check_required_params(Params, required_lwm2m_params()) of
     ok ->
         Ttl          = get_value(<<"ttl">>, Params, 7200),
+        Callback     = get_value(<<"callback">>, Params),
         AppId        = get_value(<<"appId ">>, Params, <<"DM_LWM2M">>),
         Payload      = get_value(<<"payload">>, Params),
         TaskId       = to_binary(get_value(<<"taskId">>, Payload)),
         MsgType      = get_value(<<"msgType">>, Payload),
         TaskType     = get_value(<<"taskType">>, Payload),
-        ProtocolType = get_value(<<"protocolType">>, Payload),
         Lwm2mData    = lwm2m_data(MsgType, Payload),
         MsgId = emqx_guid:gen(),
-        MqttPayload = [{<<"cacheID">>, emqx_guid:to_base62(MsgId)}, {<<"taskId">>, TaskId}, {<<"msgType">>, MsgType}, {<<"data">>, Lwm2mData}, {<<"taskType">>, TaskType}],
+        MqttPayload = [{<<"cacheID">>, emqx_guid:to_base62(MsgId)}, {<<"callback">>, Callback}, {<<"taskId">>, TaskId}, {<<"msgType">>, MsgType}, {<<"data">>, Lwm2mData}, {<<"taskType">>, TaskType}],
         MountTopic  = mount_lwm2m_topic(Params),
-        Msg = emqx_message:make(MsgId , AppId, 0, MountTopic, jsx:encode(MqttPayload), [{<<"protocolType">>, ProtocolType}, {<<"ttl">>, Ttl}, {<<"taskId">>, TaskId}]),
+        Msg = emqx_message:make(MsgId , AppId, 0, MountTopic, jsx:encode(MqttPayload), 
+                                [{<<"ttl">>, Ttl}, {<<"taskId">>, TaskId}]),
         emqx_mgmt:publish(Msg),
         {ok, [{code, 0}, {message, <<>>}]};
     {error, Error} ->
