@@ -56,6 +56,7 @@
 
 -export([subscribe/2, publish/2, dmp_publish/2, unsubscribe/2, publish_lwm2m/2]).
 
+-define(DN, <<"dn">>).
 -define(PROTOCOL_TYPE_LWM2M, <<"lwm2m">>).
 
 subscribe(_Bindings, Params) ->
@@ -161,12 +162,14 @@ publish_lwm2m(_Bindings, Params) ->
         Callback     = get_value(<<"callback">>, Params),
         AppId        = get_value(<<"appId ">>, Params, <<"DM_LWM2M">>),
         Payload      = get_value(<<"payload">>, Params),
-        TaskId       = to_binary(get_value(<<"taskId">>, Payload)),
+        TaskId       = get_value(<<"taskId">>, Payload),
         MsgType      = get_value(<<"msgType">>, Payload),
-        TaskType     = get_value(<<"taskType">>, Payload),
         Lwm2mData    = lwm2m_data(MsgType, Payload),
         MsgId = emqx_guid:gen(),
-        MqttPayload = [{<<"cacheID">>, emqx_guid:to_base62(MsgId)}, {<<"callback">>, Callback}, {<<"taskId">>, TaskId}, {<<"msgType">>, MsgType}, {<<"data">>, Lwm2mData}, {<<"taskType">>, TaskType}],
+        MqttPayload = [{<<"cacheID">>, emqx_guid:to_base62(MsgId)},
+                       {<<"taskId">>, TaskId},
+                       {<<"msgType">>, MsgType},
+                       {<<"data">>, Lwm2mData}],
         MountTopic  = mount_lwm2m_topic(Params),
         Msg = emqx_message:make(MsgId , AppId, 0, MountTopic, jsx:encode(MqttPayload), 
                                 [{<<"ttl">>, Ttl}, {<<"taskId">>, TaskId}]),
@@ -178,8 +181,8 @@ publish_lwm2m(_Bindings, Params) ->
 
 mount_lwm2m_topic(Params) ->
     Fun = fun(Key, T) -> Value = to_binary(proplists:get_value(Key, Params)), <<Value/binary, "/", T/binary>> end,
-    MountTopic = lists:foldr(Fun, <<"v1/dn/dm">>, [<<"tenantId">>, <<"productId">>, <<"deviceId">>]),
-    <<?PROTOCOL_TYPE_LWM2M/binary, "/", MountTopic/binary>>.
+    MountTopic = lists:foldr(Fun, <<"inbox">>, [<<"tenantId">>, <<"productId">>, <<"deviceId">>]),
+    <<?DN/binary, $/, ?PROTOCOL_TYPE_LWM2M/binary, $/, MountTopic/binary>>.
 
 to_binary(L) when is_list(L) ->
     list_to_binary(L);
