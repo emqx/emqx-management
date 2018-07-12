@@ -136,9 +136,9 @@ required_params() ->
   ].
 
 required_lwm2m_params() ->
-  [<<"tenantId">>,
-   <<"productId">>,
-   <<"deviceId">>,
+  [<<"tenantID">>,
+   <<"productID">>,
+   <<"deviceID">>,
    <<"payload">>,
    <<"callback">>].
 
@@ -160,19 +160,20 @@ publish_lwm2m(_Bindings, Params) ->
     ok ->
         Ttl          = get_value(<<"ttl">>, Params, 7200),
         Callback     = get_value(<<"callback">>, Params),
-        AppId        = get_value(<<"appId ">>, Params, <<"DM_LWM2M">>),
+        AppId        = get_value(<<"appID ">>, Params, <<"DM_LWM2M">>),
         Payload      = get_value(<<"payload">>, Params),
-        TaskId       = get_value(<<"taskId">>, Payload),
+        TaskId       = get_value(<<"taskID">>, Payload),
         MsgType      = get_value(<<"msgType">>, Payload),
         Lwm2mData    = lwm2m_data(MsgType, Payload),
         MsgId = emqx_guid:gen(),
         MqttPayload = [{<<"cacheID">>, emqx_guid:to_base62(MsgId)},
-                       {<<"taskId">>, TaskId},
+                       {<<"callback">>, Callback},
+                       {<<"taskID">>, TaskId},
                        {<<"msgType">>, MsgType},
                        {<<"data">>, Lwm2mData}],
         MountTopic  = mount_lwm2m_topic(Params),
         Msg = emqx_message:make(MsgId , AppId, 0, MountTopic, jsx:encode(MqttPayload), 
-                                [{<<"ttl">>, Ttl}, {<<"taskId">>, TaskId}]),
+                                [{<<"ttl">>, Ttl}, {<<"taskID">>, TaskId}]),
         emqx_mgmt:publish(Msg),
         {ok, [{code, 0}, {message, <<>>}]};
     {error, Error} ->
@@ -181,7 +182,7 @@ publish_lwm2m(_Bindings, Params) ->
 
 mount_lwm2m_topic(Params) ->
     Fun = fun(Key, T) -> Value = to_binary(proplists:get_value(Key, Params)), <<Value/binary, "/", T/binary>> end,
-    MountTopic = lists:foldr(Fun, <<"inbox">>, [<<"tenantId">>, <<"productId">>, <<"deviceId">>]),
+    MountTopic = lists:foldr(Fun, <<"inbox">>, [<<"tenantID">>, <<"productID">>, <<"deviceID">>]),
     <<?DN/binary, $/, ?PROTOCOL_TYPE_LWM2M/binary, $/, MountTopic/binary>>.
 
 to_binary(L) when is_list(L) ->
