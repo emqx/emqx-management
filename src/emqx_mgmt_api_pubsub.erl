@@ -216,7 +216,8 @@ lwm2m_data_key(<<"write-attr">>) ->
      <<"pmin">>,
      <<"pmax">>,
      <<"gt">>,
-     <<"lt">>];
+     <<"lt">>,
+     <<"st">>];
 lwm2m_data_key(<<"execute">>) ->
     [<<"path">>,
      <<"args">>];
