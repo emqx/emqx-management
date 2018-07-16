@@ -1,5 +1,4 @@
-%%--------------------------------------------------------------------
-%% Copyright (c) 2013-2017 EMQ Enterprise, Inc. (http://emqtt.io)
+%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -12,12 +11,11 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-%%--------------------------------------------------------------------
 
 %% @doc Hot Configuration
 %%
 %% TODO: How to persist the configuration?
-%% 
+%%
 %% 1. Store in mnesia database?
 %% 2. Store in dets?
 %% 3. Store in data/app.config?
@@ -32,7 +30,7 @@
 %% @doc Read the configuration of an application.
 -spec(read(atom()) -> {ok, list(env())} | {error, term()}).
 read(App) ->
-    %% TODO: 
+    %% TODO:
     %% 1. Read the app.conf from etc folder
     %% 2. Cuttlefish to read the conf
     %% 3. Return the terms and schema

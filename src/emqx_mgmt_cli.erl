@@ -1,5 +1,4 @@
-%%--------------------------------------------------------------------
-%% Copyright (c) 2015-2017 EMQ Enterprise, Inc. (http://emqtt.io).
+%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -12,14 +11,10 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-%%--------------------------------------------------------------------
 
 -module(emqx_mgmt_cli).
 
--include_lib("emqx/include/emqx_cli.hrl").
-
 -include_lib("emqx/include/emqx.hrl").
-
 -include_lib("emqx/include/emqx_mqtt.hrl").
 
 -import(lists, [foreach/2]).
@@ -67,20 +62,20 @@ mgmt(["add_app", AppId, Name, Desc, Status, Expired]) ->
                                 list_to_atom(Status),
                                 Expired1) of
         {ok, Secret} ->
-            ?PRINT("AppSecret: ~s~n", [Secret]);
+            emqx_cli:print("AppSecret: ~s~n", [Secret]);
         {error, already_existed} ->
-            ?PRINT_MSG("Error: already existed~n");
+            emqx_cli:print("Error: already existed~n");
         {error, Reason} ->
-            ?PRINT("Error: ~p~n", [Reason])
+            emqx_cli:print("Error: ~p~n", [Reason])
     end;
 
 mgmt(["lookup_app", AppId]) ->
     case emqx_mgmt_auth:lookup_app(list_to_binary(AppId)) of
         {AppId1, AppSecret, Name, Desc, Status, Expired} ->
-            ?PRINT("app_id: ~s~nsecret: ~s~nname: ~s~ndesc: ~s~nstatus: ~s~nexpired: ~p~n", 
-                [AppId1, AppSecret, Name, Desc, Status, Expired]);
+            emqx_cli:print("app_id: ~s~nsecret: ~s~nname: ~s~ndesc: ~s~nstatus: ~s~nexpired: ~p~n",
+                           [AppId1, AppSecret, Name, Desc, Status, Expired]);
         undefined ->
-            ?PRINT_MSG("Not Found.~n")
+            emqx_cli:print("Not Found.~n")
     end;
 
 mgmt(["update_app", AppId, Name, Desc, Status, Expired]) ->
@@ -90,32 +85,32 @@ mgmt(["update_app", AppId, Name, Desc, Status, Expired]) ->
                                    list_to_atom(Status),
                                    list_to_integer(Expired)) of
         ok ->
-            ?PRINT_MSG("update successfully.~n");
+            emqx_cli:print("update successfully.~n");
         {error, Reason} ->
-            ?PRINT("Error: ~p~n", [Reason])
+            emqx_cli:print("Error: ~p~n", [Reason])
     end;
 
 mgmt(["del_app", AppId]) ->
     case emqx_mgmt_auth:del_app(list_to_binary(AppId)) of
-        ok -> ?PRINT_MSG("ok~n");
+        ok -> emqx_cli:print("ok~n");
         {error, not_found} ->
-            ?PRINT_MSG("Error: app not found~n");
+            emqx_cli:print("Error: app not found~n");
         {error, Reason} ->
-            ?PRINT("Error: ~p~n", [Reason])
+            emqx_cli:print("Error: ~p~n", [Reason])
     end;
 
 mgmt(["list_apps"]) ->
     lists:foreach(fun({AppId, AppSecret, Name, Desc, Status, Expired}) ->
-        ?PRINT("app_id: ~s, secret: ~s, name: ~s, desc: ~s, status: ~s, expired: ~p~n",
-            [AppId, AppSecret, Name, Desc, Status, Expired])
+        emqx_cli:print("app_id: ~s, secret: ~s, name: ~s, desc: ~s, status: ~s, expired: ~p~n",
+                       [AppId, AppSecret, Name, Desc, Status, Expired])
     end, emqx_mgmt_auth:list_apps());
 
 mgmt(_) ->
-    ?USAGE([{"mgmt add_app <AppId> <Name> <Desc> <status> <expired>", "Add Application of REST API"},
-            {"mgmt lookup_app <AppId>", "Get Application of REST API"},
-            {"mgmt update_app <AppId> <Name> <Desc> <status> <expired>", "Get Application of REST API"},
-            {"mgmt del_app <AppId>", "Delete Application of REST API"},
-            {"mgmt list_apps",       "List Applications"}]).
+    emqx_cli:usage([{"mgmt add_app <AppId> <Name> <Desc> <status> <expired>", "Add Application of REST API"},
+                    {"mgmt lookup_app <AppId>", "Get Application of REST API"},
+                    {"mgmt update_app <AppId> <Name> <Desc> <status> <expired>", "Get Application of REST API"},
+                    {"mgmt del_app <AppId>", "Delete Application of REST API"},
+                    {"mgmt list_apps",       "List Applications"}]).
 
 configs(["set"]) ->
     emqx_mgmt_cli_cfg:set_usage(), ok;
@@ -124,23 +119,24 @@ configs(Cmd) when length(Cmd) > 2 ->
     emqx_mgmt_cli_cfg:run(["config" | Cmd]), ok;
 
 configs(_) ->
-    ?USAGE([{"configs set",                           "Show All configs Item"},
-            {"configs set <Key>=<Value> --app=<app>", "Set Config Item"},
-            {"configs show <Key> --app=<app>",      "show Config Item"}]).
+    emqx_cli:usage([{"configs set",                           "Show All configs Item"},
+                    {"configs set <Key>=<Value> --app=<app>", "Set Config Item"},
+                    {"configs show <Key> --app=<app>",        "show Config Item"}]).
+
 %%--------------------------------------------------------------------
 %% @doc Node status
 
 status([]) ->
     {InternalStatus, _ProvidedStatus} = init:get_status(),
-    ?PRINT("Node ~p is ~p~n", [node(), InternalStatus]),
+    emqx_cli:print("Node ~p is ~p~n", [node(), InternalStatus]),
     case lists:keysearch(?APP, 1, application:which_applications()) of
         false ->
-            ?PRINT("~s is not running~n", [?APP]);
+            emqx_cli:print("~s is not running~n", [?APP]);
         {value, {?APP, _Desc, Vsn}} ->
-            ?PRINT("~s ~s is running~n", [?APP, Vsn])
+            emqx_cli:print("~s ~s is running~n", [?APP, Vsn])
     end;
 status(_) ->
-     ?PRINT_CMD("status", "Show broker status").
+     emqx_cli:usage("status", "Show broker status").
 
 %%--------------------------------------------------------------------
 %% @doc Query broker
@@ -148,85 +144,87 @@ status(_) ->
 broker([]) ->
     Funs = [sysdescr, version, uptime, datetime],
     foreach(fun(Fun) ->
-                ?PRINT("~-10s: ~s~n", [Fun, emqx_broker:Fun()])
+                emqx_cli:usage("~-10s: ~s~n", [Fun, emqx_broker:Fun()])
             end, Funs);
 
 broker(["stats"]) ->
     foreach(fun({Stat, Val}) ->
-                ?PRINT("~-20s: ~w~n", [Stat, Val])
+                emqx_cli:usage("~-20s: ~w~n", [Stat, Val])
             end, emqx_stats:getstats());
 
 broker(["metrics"]) ->
     foreach(fun({Metric, Val}) ->
-                ?PRINT("~-24s: ~w~n", [Metric, Val])
+                emqx_cli:usage("~-24s: ~w~n", [Metric, Val])
             end, lists:sort(emqx_metrics:all()));
 
 broker(["pubsub"]) ->
     Pubsubs = supervisor:which_children(emqx_pubsub_sup:pubsub_pool()),
     foreach(fun({{_, Id}, Pid, _, _}) ->
                 ProcInfo = erlang:process_info(Pid, ?PROC_INFOKEYS),
-                ?PRINT("pubsub: ~w~n", [Id]),
+                emqx_cli:usage("pubsub: ~w~n", [Id]),
                 foreach(fun({Key, Val}) ->
-                            ?PRINT("  ~-18s: ~w~n", [Key, Val])
+                            emqx_cli:usage("  ~-18s: ~w~n", [Key, Val])
                         end, ProcInfo)
              end, lists:reverse(Pubsubs));
 
 broker(_) ->
-    ?USAGE([{"broker",         "Show broker version, uptime and description"},
-            {"broker pubsub",  "Show process_info of pubsub"},
-            {"broker stats",   "Show broker statistics of clients, topics, subscribers"},
-            {"broker metrics", "Show broker metrics"}]).
+    emqx_cli:usage([{"broker",         "Show broker version, uptime and description"},
+                    {"broker pubsub",  "Show process_info of pubsub"},
+                    {"broker stats",   "Show broker statistics of clients, topics, subscribers"},
+                    {"broker metrics", "Show broker metrics"}]).
 
-%%--------------------------------------------------------------------
+%%-----------------------------------------------------------------------------
 %% @doc Cluster with other nodes
 
 cluster(["join", SNode]) ->
     case ekka:join(ekka_node:parse_name(SNode)) of
         ok ->
-            ?PRINT_MSG("Join the cluster successfully.~n"),
+            emqx_cli:print("Join the cluster successfully.~n"),
             cluster(["status"]);
         ignore ->
-            ?PRINT_MSG("Ignore.~n");
+            emqx_cli:print("Ignore.~n");
         {error, Error} ->
-            ?PRINT("Failed to join the cluster: ~p~n", [Error])
+            emqx_cli:print("Failed to join the cluster: ~p~n", [Error])
     end;
 
 cluster(["leave"]) ->
     case ekka:leave() of
         ok ->
-            ?PRINT_MSG("Leave the cluster successfully.~n"),
+            emqx_cli:print("Leave the cluster successfully.~n"),
             cluster(["status"]);
         {error, Error} ->
-            ?PRINT("Failed to leave the cluster: ~p~n", [Error])
+            emqx_cli:print("Failed to leave the cluster: ~p~n", [Error])
     end;
 
 cluster(["force-leave", SNode]) ->
     case ekka:force_leave(ekka_node:parse_name(SNode)) of
         ok ->
-            ?PRINT_MSG("Remove the node from cluster successfully.~n"),
+            emqx_cli:print("Remove the node from cluster successfully.~n"),
             cluster(["status"]);
         ignore ->
-            ?PRINT_MSG("Ignore.~n");
+            emqx_cli:print("Ignore.~n");
         {error, Error} ->
-            ?PRINT("Failed to remove the node from cluster: ~p~n", [Error])
+            emqx_cli:print("Failed to remove the node from cluster: ~p~n", [Error])
     end;
 
 cluster(["status"]) ->
-    ?PRINT("Cluster status: ~p~n", [ekka_cluster:status()]);
+    emqx_cli:print("Cluster status: ~p~n", [ekka_cluster:status()]);
 
 cluster(_) ->
-    ?USAGE([{"cluster join <Node>",       "Join the cluster"},
-            {"cluster leave",             "Leave the cluster"},
-            {"cluster force-leave <Node>","Force the node leave from cluster"},
-            {"cluster status",            "Cluster status"}]).
+    emqx_cli:usage([{"cluster join <Node>",       "Join the cluster"},
+                    {"cluster leave",             "Leave the cluster"},
+                    {"cluster force-leave <Node>","Force the node leave from cluster"},
+                    {"cluster status",            "Cluster status"}]).
 
 %%--------------------------------------------------------------------
 %% @doc Users usage
 
 users(Args) -> emqx_auth_username:cli(Args).
 
-acl(["reload"]) -> emqx_access_control:reload_acl();
-acl(_) -> ?USAGE([{"acl reload", "reload etc/acl.conf"}]).
+acl(["reload"]) ->
+    emqx_access_control:reload_acl();
+acl(_) ->
+    emqx_cli:usage([{"acl reload", "reload etc/acl.conf"}]).
 
 %%--------------------------------------------------------------------
 %% @doc Query clients
@@ -241,13 +239,13 @@ clients(["kick", ClientId]) ->
     if_client(ClientId, fun(#mqtt_client{client_pid = Pid}) -> emqx_client:kick(Pid) end);
 
 clients(_) ->
-    ?USAGE([{"clients list",            "List all clients"},
-            {"clients show <ClientId>", "Show a client"},
-            {"clients kick <ClientId>", "Kick out a client"}]).
+    emqx_cli:usage([{"clients list",            "List all clients"},
+                    {"clients show <ClientId>", "Show a client"},
+                    {"clients kick <ClientId>", "Kick out a client"}]).
 
 if_client(ClientId, Fun) ->
     case emqx_cm:lookup(bin(ClientId)) of
-        undefined -> ?PRINT_MSG("Not Found.~n");
+        undefined -> emqx_cli:print("Not Found.~n");
         Client    -> Fun(Client)
     end.
 
@@ -269,15 +267,15 @@ sessions(["list", "transient"]) ->
 
 sessions(["show", ClientId]) ->
     case ets:lookup(mqtt_local_session, bin(ClientId)) of
-        []         -> ?PRINT_MSG("Not Found.~n");
+        []         -> emqx_cli:print("Not Found.~n");
         [SessInfo] -> print(SessInfo)
     end;
 
 sessions(_) ->
-    ?USAGE([{"sessions list",            "List all sessions"},
-            {"sessions list persistent", "List all persistent sessions"},
-            {"sessions list transient",  "List all transient sessions"},
-            {"sessions show <ClientId>", "Show a session"}]).
+    emqx_cli:usage([{"sessions list",            "List all sessions"},
+                    {"sessions list persistent", "List all persistent sessions"},
+                    {"sessions list transient",  "List all transient sessions"},
+                    {"sessions show <ClientId>", "Show a session"}]).
 
 %%--------------------------------------------------------------------
 %% @doc Routes Command
@@ -292,21 +290,21 @@ routes(["show", Topic]) ->
     foreach(fun print/1, Routes);
 
 routes(_) ->
-    ?USAGE([{"routes list",         "List all routes"},
-            {"routes show <Topic>", "Show a route"}]).
+    emqx_cli:usage([{"routes list",         "List all routes"},
+                    {"routes show <Topic>", "Show a route"}]).
 
 %%--------------------------------------------------------------------
 %% @doc Topics Command
 
 topics(["list"]) ->
-    lists:foreach(fun(Topic) -> ?PRINT("~s~n", [Topic]) end, emqx:topics());
+    lists:foreach(fun(Topic) -> emqx_cli:print("~s~n", [Topic]) end, emqx:topics());
 
 topics(["show", Topic]) ->
     print(mnesia:dirty_read(mqtt_route, bin(Topic)));
 
 topics(_) ->
-    ?USAGE([{"topics list",         "List all topics"},
-            {"topics show <Topic>", "Show a topic"}]).
+    emqx_cli:usage([{"topics list",         "List all topics"},
+                    {"topics show <Topic>", "Show a topic"}]).
 
 subscriptions(["list"]) ->
     lists:foreach(fun(Subscription) ->
@@ -315,7 +313,7 @@ subscriptions(["list"]) ->
 
 subscriptions(["show", ClientId]) ->
     case emqx:subscriptions(bin(ClientId)) of
-        [] -> ?PRINT_MSG("Not Found.~n");
+        [] -> emqx_cli:print("Not Found.~n");
         Subscriptions ->
             [print(subscription, Sub) || Sub <- Subscriptions]
     end;
@@ -324,28 +322,28 @@ subscriptions(["add", ClientId, Topic, QoS]) ->
    if_valid_qos(QoS, fun(IntQos) ->
                         case emqx_sm:lookup_session(bin(ClientId)) of
                             undefined ->
-                                ?PRINT_MSG("Error: Session not found!");
+                                emqx_cli:print("Error: Session not found!");
                             #mqtt_session{sess_pid = SessPid} ->
                                 {Topic1, Options} = emqx_topic:parse(bin(Topic)),
                                 emqx_session:subscribe(SessPid, [{Topic1, [{qos, IntQos}|Options]}]),
-                                ?PRINT_MSG("ok~n")
+                                emqx_cli:print("ok~n")
                         end
                      end);
 
 subscriptions(["del", ClientId, Topic]) ->
     case emqx_sm:lookup_session(bin(ClientId)) of
         undefined ->
-            ?PRINT_MSG("Error: Session not found!");
+            emqx_cli:print("Error: Session not found!");
         #mqtt_session{sess_pid = SessPid} ->
             emqx_session:unsubscribe(SessPid, [emqx_topic:parse(bin(Topic))]),
-            ?PRINT_MSG("ok~n")
+            emqx_cli:print("ok~n")
     end;
 
 subscriptions(_) ->
-    ?USAGE([{"subscriptions list",                         "List all subscriptions"},
-            {"subscriptions show <ClientId>",              "Show subscriptions of a client"},
-            {"subscriptions add <ClientId> <Topic> <QoS>", "Add a static subscription manually"},
-            {"subscriptions del <ClientId> <Topic>",       "Delete a static subscription manually"}]).
+    emqx_cli:usage([{"subscriptions list",                         "List all subscriptions"},
+                    {"subscriptions show <ClientId>",              "Show subscriptions of a client"},
+                    {"subscriptions add <ClientId> <Topic> <QoS>", "Add a static subscription manually"},
+                    {"subscriptions del <ClientId> <Topic>",       "Delete a static subscription manually"}]).
 
 %if_could_print(Tab, Fun) ->
 %    case mnesia:table_info(Tab, size) of
@@ -359,9 +357,9 @@ subscriptions(_) ->
 if_valid_qos(QoS, Fun) ->
     try list_to_integer(QoS) of
         Int when ?IS_QOS(Int) -> Fun(Int);
-        _ -> ?PRINT_MSG("QoS should be 0, 1, 2~n")
+        _ -> emqx_cli:print("QoS should be 0, 1, 2~n")
     catch _:_ ->
-        ?PRINT_MSG("QoS should be 0, 1, 2~n")
+        emqx_cli:print("QoS should be 0, 1, 2~n")
     end.
 
 plugins(["list"]) ->
@@ -370,17 +368,17 @@ plugins(["list"]) ->
 plugins(["load", Name]) ->
     case emqx_plugins:load(list_to_atom(Name)) of
         {ok, StartedApps} ->
-            ?PRINT("Start apps: ~p~nPlugin ~s loaded successfully.~n", [StartedApps, Name]);
+            emqx_cli:print("Start apps: ~p~nPlugin ~s loaded successfully.~n", [StartedApps, Name]);
         {error, Reason}   ->
-            ?PRINT("load plugin error: ~p~n", [Reason])
+            emqx_cli:print("load plugin error: ~p~n", [Reason])
     end;
 
 plugins(["unload", Name]) ->
     case emqx_plugins:unload(list_to_atom(Name)) of
         ok ->
-            ?PRINT("Plugin ~s unloaded successfully.~n", [Name]);
+            emqx_cli:print("Plugin ~s unloaded successfully.~n", [Name]);
         {error, Reason} ->
-            ?PRINT("unload plugin error: ~p~n", [Reason])
+            emqx_cli:print("unload plugin error: ~p~n", [Reason])
     end;
 
 plugins(["add", Name]) ->
@@ -390,25 +388,25 @@ plugins(["add", Name]) ->
     Plugin = filename:basename(Dir, ".zip"),
     case emqx_plugins:load_expand_plugin(Path ++ Plugin) of
         ok ->
-            ?PRINT("Add plugin:~p successfully.~n", [Plugin]);
+            emqx_cli:print("Add plugin:~p successfully.~n", [Plugin]);
         {error, {already_loaded,_}} ->
-            ?PRINT("Already loaded plugin:~p ~n", [Plugin]);
+            emqx_cli:print("Already loaded plugin:~p ~n", [Plugin]);
         {error, Error} ->
-            ?PRINT("Add plugin:~p error: ~n", [Plugin, Error])
+            emqx_cli:print("Add plugin:~p error: ~n", [Plugin, Error])
     end;
 
 plugins(_) ->
-    ?USAGE([{"plugins list",            "Show loaded plugins"},
-            {"plugins load <Plugin>",   "Load plugin"},
-            {"plugins unload <Plugin>", "Unload plugin"},
-            {"plugins add <Plugin.zip>", "Add plugin"}]).
+    emqx_cli:usage([{"plugins list",            "Show loaded plugins"},
+                    {"plugins load <Plugin>",   "Load plugin"},
+                    {"plugins unload <Plugin>", "Unload plugin"},
+                    {"plugins add <Plugin.zip>", "Add plugin"}]).
 
 %%--------------------------------------------------------------------
 %% @doc Bridges command
 
 bridges(["list"]) ->
     foreach(fun({Node, Topic, _Pid}) ->
-                ?PRINT("bridge: ~s--~s-->~s~n", [node(), Topic, Node])
+                emqx_cli:print("bridge: ~s--~s-->~s~n", [node(), Topic, Node])
             end, emqx_bridge_sup_sup:bridges());
 
 bridges(["options"]) ->
@@ -440,11 +438,11 @@ bridges(["stop", SNode, Topic]) ->
     end;
 
 bridges(_) ->
-    ?USAGE([{"bridges list",                 "List bridges"},
-            {"bridges options",              "Bridge options"},
-            {"bridges start <Node> <Topic>", "Start a bridge"},
-            {"bridges start <Node> <Topic> <Options>", "Start a bridge with options"},
-            {"bridges stop <Node> <Topic>", "Stop a bridge"}]).
+    emqx_cli:usage([{"bridges list",                 "List bridges"},
+                    {"bridges options",              "Bridge options"},
+                    {"bridges start <Node> <Topic>", "Start a bridge"},
+                    {"bridges start <Node> <Topic> <Options>", "Start a bridge with options"},
+                    {"bridges stop <Node> <Topic>", "Stop a bridge"}]).
 
 parse_opts(Cmd, OptStr) ->
     Tokens = string:tokens(OptStr, ","),
@@ -493,12 +491,12 @@ vm(["ports"]) ->
             end, [{count, port_count}, {limit, port_limit}]);
 
 vm(_) ->
-    ?USAGE([{"vm all",     "Show info of Erlang VM"},
-            {"vm load",    "Show load of Erlang VM"},
-            {"vm memory",  "Show memory of Erlang VM"},
-            {"vm process", "Show process of Erlang VM"},
-            {"vm io",      "Show IO of Erlang VM"},
-            {"vm ports",   "Show Ports of Erlang VM"}]).
+    emqx_cli:usage([{"vm all",     "Show info of Erlang VM"},
+                    {"vm load",    "Show load of Erlang VM"},
+                    {"vm memory",  "Show memory of Erlang VM"},
+                    {"vm process", "Show process of Erlang VM"},
+                    {"vm io",      "Show IO of Erlang VM"},
+                    {"vm ports",   "Show Ports of Erlang VM"}]).
 
 %%--------------------------------------------------------------------
 %% @doc mnesia Command
@@ -530,26 +528,26 @@ trace(["topic", Topic, LogFile]) ->
     trace_on(topic, Topic, LogFile);
 
 trace(_) ->
-    ?USAGE([{"trace list",                       "List all traces"},
-            {"trace client <ClientId> <LogFile>","Trace a client"},
-            {"trace client <ClientId> off",      "Stop tracing a client"},
-            {"trace topic <Topic> <LogFile>",    "Trace a topic"},
-            {"trace topic <Topic> off",          "Stop tracing a Topic"}]).
+    emqx_cli:usage([{"trace list",                       "List all traces"},
+                    {"trace client <ClientId> <LogFile>","Trace a client"},
+                    {"trace client <ClientId> off",      "Stop tracing a client"},
+                    {"trace topic <Topic> <LogFile>",    "Trace a topic"},
+                    {"trace topic <Topic> off",          "Stop tracing a Topic"}]).
 
 trace_on(Who, Name, LogFile) ->
     case emqx_trace:start_trace({Who, iolist_to_binary(Name)}, LogFile) of
         ok ->
-            ?PRINT("trace ~s ~s successfully.~n", [Who, Name]);
+            emqx_cli:print("trace ~s ~s successfully.~n", [Who, Name]);
         {error, Error} ->
-            ?PRINT("trace ~s ~s error: ~p~n", [Who, Name, Error])
+            emqx_cli:print("trace ~s ~s error: ~p~n", [Who, Name, Error])
     end.
 
 trace_off(Who, Name) ->
     case emqx_trace:stop_trace({Who, iolist_to_binary(Name)}) of
-        ok -> 
-            ?PRINT("stop tracing ~s ~s successfully.~n", [Who, Name]);
+        ok ->
+            emqx_cli:print("stop tracing ~s ~s successfully.~n", [Who, Name]);
         {error, Error} ->
-            ?PRINT("stop tracing ~s ~s error: ~p.~n", [Who, Name, Error])
+            emqx_cli:print("stop tracing ~s ~s error: ~p.~n", [Who, Name, Error])
     end.
 
 %%--------------------------------------------------------------------
@@ -561,9 +559,9 @@ listeners([]) ->
                         {max_clients,    esockd:get_max_clients(Pid)},
                         {current_clients,esockd:get_current_clients(Pid)},
                         {shutdown_count, esockd:get_shutdown_count(Pid)}],
-                ?PRINT("listener on ~s:~s~n", [Protocol, esockd:to_string(ListenOn)]),
+                emqx_cli:print("listener on ~s:~s~n", [Protocol, esockd:to_string(ListenOn)]),
                 foreach(fun({Key, Val}) ->
-                            ?PRINT("  ~-16s: ~w~n", [Key, Val])
+                            emqx_cli:print("  ~-16s: ~w~n", [Key, Val])
                         end, Info)
             end, esockd:listeners());
 
@@ -592,29 +590,29 @@ listeners(["stop", Proto, ListenOn]) ->
     end;
 
 listeners(_) ->
-    ?USAGE([{"listeners",                        "List listeners"},
-            {"listeners restart <Proto> <Port>", "Restart a listener"},
-            {"listeners stop    <Proto> <Port>", "Stop a listener"}]).
+    emqx_cli:usage([{"listeners",                        "List listeners"},
+                    {"listeners restart <Proto> <Port>", "Restart a listener"},
+                    {"listeners stop    <Proto> <Port>", "Stop a listener"}]).
 
 %%--------------------------------------------------------------------
 %% @doc License Command
 
 license(["reload", File]) ->
     case emqx_license:reload(File) of
-        ok              -> ?PRINT_MSG("ok~n");
-        {error, Reason} -> ?PRINT("Error: ~p~n", [Reason])
+        ok              -> emqx_cli:print("ok~n");
+        {error, Reason} -> emqx_cli:print("Error: ~p~n", [Reason])
     end;
 
 license(["info"]) ->
     foreach(fun({K, V}) when is_binary(V); is_atom(V) ->
-                ?PRINT("~-12s: ~s~n", [K, V]);
+                emqx_cli:print("~-12s: ~s~n", [K, V]);
                ({K, V}) ->
-                ?PRINT("~-12s: ~w~n", [K, V])
+                emqx_cli:print("~-12s: ~w~n", [K, V])
             end, emqx_license:info());
 
 license(_) ->
-    ?USAGE([{"license info",          "Show license info"},
-            {"license reload <File>", "Load a new license file"}]).
+    emqx_cli:usage([{"license info",          "Show license info"},
+                    {"license reload <File>", "Load a new license file"}]).
 
 %%--------------------------------------------------------------------
 %% Dump ETS
@@ -638,7 +636,7 @@ print([]) ->
 
 print(Routes = [#mqtt_route{topic = Topic} | _]) ->
     Nodes = [atom_to_list(Node) || #mqtt_route{node = Node} <- Routes],
-    ?PRINT("~s -> ~s~n", [Topic, string:join(Nodes, ",")]);
+    emqx_cli:print("~s -> ~s~n", [Topic, string:join(Nodes, ",")]);
 
 %% print(Subscriptions = [#mqtt_subscription{subid = ClientId} | _]) ->
 %%    TopicTable = [io_lib:format("~s:~w", [Topic, Qos])
@@ -649,12 +647,12 @@ print(Routes = [#mqtt_route{topic = Topic} | _]) ->
 %%    foreach(fun print/1, Topics);
 
 print(#mqtt_plugin{name = Name, version = Ver, descr = Descr, active = Active}) ->
-    ?PRINT("Plugin(~s, version=~s, description=~s, active=~s)~n",
+    emqx_cli:print("Plugin(~s, version=~s, description=~s, active=~s)~n",
            [Name, Ver, Descr, Active]);
 
 print(#mqtt_client{client_id = ClientId, clean_sess = CleanSess, username = Username,
                    peername = Peername, connected_at = ConnectedAt}) ->
-    ?PRINT("Client(~s, clean_sess=~s, username=~s, peername=~s, connected_at=~p)~n",
+    emqx_cli:print("Client(~s, clean_sess=~s, username=~s, peername=~s, connected_at=~p)~n",
            [ClientId, CleanSess, Username, emqx_net:format(Peername),
             emqx_time:now_secs(ConnectedAt)]);
 
@@ -665,9 +663,9 @@ print({route, Routes}) ->
 print({local_route, Routes}) ->
     foreach(fun print/1, Routes);
 print(#mqtt_route{topic = Topic, node = Node}) ->
-    ?PRINT("~s -> ~s~n", [Topic, Node]);
+    emqx_cli:print("~s -> ~s~n", [Topic, Node]);
 print({Topic, Node}) ->
-    ?PRINT("~s -> ~s~n", [Topic, Node]);
+    emqx_cli:print("~s -> ~s~n", [Topic, Node]);
 
 print({ClientId, _ClientPid, _Persistent, SessInfo}) ->
     Data = lists:append(SessInfo, emqx_stats:get_session_stats(ClientId)),
@@ -681,29 +679,29 @@ print({ClientId, _ClientPid, _Persistent, SessInfo}) ->
                 deliver_msg,
                 enqueue_msg,
                 created_at],
-    ?PRINT("Session(~s, clean_sess=~s, subscriptions=~w, max_inflight=~w, inflight=~w, "
+    emqx_cli:print("Session(~s, clean_sess=~s, subscriptions=~w, max_inflight=~w, inflight=~w, "
            "mqueue_len=~w, mqueue_dropped=~w, awaiting_rel=~w, "
            "deliver_msg=~w, enqueue_msg=~w, created_at=~w)~n",
             [ClientId | [format(Key, get_value(Key, Data)) || Key <- InfoKeys]]).
 
 print(subscription, {Sub, {share, _Share, Topic}}) when is_pid(Sub) ->
-    ?PRINT("~p -> ~s~n", [Sub, Topic]);
+    emqx_cli:print("~p -> ~s~n", [Sub, Topic]);
 print(subscription, {Sub, Topic}) when is_pid(Sub) ->
-    ?PRINT("~p -> ~s~n", [Sub, Topic]);
+    emqx_cli:print("~p -> ~s~n", [Sub, Topic]);
 print(subscription, {{SubId, SubPid}, {share, _Share, Topic}})
     when is_binary(SubId), is_pid(SubPid) ->
-    ?PRINT("~s~p -> ~s~n", [SubId, SubPid, Topic]);
+    emqx_cli:print("~s~p -> ~s~n", [SubId, SubPid, Topic]);
 print(subscription, {{SubId, SubPid}, Topic})
     when is_binary(SubId), is_pid(SubPid) ->
-    ?PRINT("~s~p -> ~s~n", [SubId, SubPid, Topic]);
+    emqx_cli:print("~s~p -> ~s~n", [SubId, SubPid, Topic]);
 print(subscription, {Sub, Topic, Props}) ->
     print(subscription, {Sub, Topic}),
     lists:foreach(fun({K, V}) when is_binary(V) ->
-                      ?PRINT("  ~-8s: ~s~n", [K, V]);
+                      emqx_cli:print("  ~-8s: ~s~n", [K, V]);
                      ({K, V}) ->
-                      ?PRINT("  ~-8s: ~w~n", [K, V]);
+                      emqx_cli:print("  ~-8s: ~w~n", [K, V]);
                      (K) ->
-                      ?PRINT("  ~-8s: true~n", [K])
+                      emqx_cli:print("  ~-8s: true~n", [K])
                   end, Props).
 
 format(created_at, Val) ->
