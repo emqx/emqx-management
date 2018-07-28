@@ -114,11 +114,6 @@
   hidden
 ]}.
 
-{mapping, "management.listener.https.handshake_timeout", "emqx_management.listeners", [
-  {default, 15},
-  {datatype, integer}
-]}.
-
 {mapping, "management.listener.https.keyfile", "emqx_management.listeners", [
   {datatype, string}
 ]}.
@@ -142,8 +137,8 @@
 {translation, "emqx_management.listeners", fun(Conf) ->
   Filter = fun(Opts) -> [{K, V} || {K, V} <- Opts, V =/= undefined] end,
   Opts = fun(Prefix) ->
-             Filter([{acceptors,   cuttlefish:conf_get(Prefix ++ ".acceptors", Conf)},
-                     {max_clients, cuttlefish:conf_get(Prefix ++ ".max_clients", Conf)}])
+             Filter([{num_acceptors,   cuttlefish:conf_get(Prefix ++ ".acceptors", Conf)},
+                     {max_connections, cuttlefish:conf_get(Prefix ++ ".max_clients", Conf)}])
          end,
   TcpOpts = fun(Prefix) ->
                 Filter([{backlog, cuttlefish:conf_get(Prefix ++ ".backlog", Conf, undefined)},
@@ -155,8 +150,7 @@
                         {nodelay, cuttlefish:conf_get(Prefix ++ ".nodelay", Conf, true)}])
             end,
   SslOpts = fun(Prefix) ->
-                Filter([{handshake_timeout, cuttlefish:conf_get(Prefix ++ ".handshake_timeout", Conf) * 1000},
-                        {keyfile,    cuttlefish:conf_get(Prefix ++ ".keyfile", Conf, undefined)},
+                Filter([{keyfile,    cuttlefish:conf_get(Prefix ++ ".keyfile", Conf, undefined)},
                         {certfile,   cuttlefish:conf_get(Prefix ++ ".certfile", Conf, undefined)},
                         {cacertfile, cuttlefish:conf_get(Prefix ++ ".cacertfile", Conf, undefined)},
                         {verify,     cuttlefish:conf_get(Prefix ++ ".verify", Conf, undefined)},
@@ -168,8 +162,11 @@
           case cuttlefish:conf_get(Prefix, Conf, undefined) of
               undefined -> Acc;
               Port ->
-                  [{Proto, Port, [{sockopts, TcpOpts(Prefix)} | Opts(Prefix)]
-                    ++ case Proto of http -> []; https -> [{sslopts, SslOpts(Prefix)}] end} | Acc]
+                  [{Proto, Port, TcpOpts(Prefix) ++ Opts(Prefix)
+                    ++ case Proto of
+                         http -> [];
+                         https -> SslOpts(Prefix)
+                       end} | Acc]
           end
       end, [], [http, https])
 end}.
