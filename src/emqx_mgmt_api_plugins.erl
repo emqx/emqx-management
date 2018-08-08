@@ -57,7 +57,7 @@ unload(#{node := Node, plugin := Plugin}, _Params) ->
 format({Node, Plugins}) ->
     [{node, Node}, {plugins, [format(Plugin) || Plugin <- Plugins]}];
 
-format(#mqtt_plugin{name = Name, version = Ver, descr = Descr, active = Active}) ->
+format(#plugin{name = Name, version = Ver, descr = Descr, active = Active}) ->
     [{name, Name}, {version, iolist_to_binary(Ver)}, {description, iolist_to_binary(Descr)}, {active, Active}].
 
 return(ok) ->

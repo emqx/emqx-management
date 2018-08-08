@@ -14,4 +14,5 @@
 -define(ERROR12, 112). %% Client not online
 -define(ERROR13, 113). %% User already exist
 -define(ERROR14, 114). %% OldPassword error
+-define(ERROR15, 115). %% bad topic
 

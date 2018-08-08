@@ -10,7 +10,7 @@ dep_clique   = git https://github.com/emqx/clique
 LOCAL_DEPS = mnesia
 
 BUILD_DEPS = emqx cuttlefish
-dep_emqx = git https://github.com/emqtt/emqttd emqx30
+dep_emqx = git https://github.com/emqtt/emqttd emqx30-dev
 dep_cuttlefish = git https://github.com/emqtt/cuttlefish
 
 NO_AUTOPATCH = cuttlefish

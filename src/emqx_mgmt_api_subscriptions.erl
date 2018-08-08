@@ -47,7 +47,7 @@ list(Bindings, Params) when map_size(Bindings) == 0 ->
     list(#{node => node()}, Params);
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    {ok, emqx_mgmt_api:paginate(mqtt_subproperty, Params, fun format/1)};
+    {ok, emqx_mgmt_api:paginate(emqx_suboption, Params, fun format/1)};
 
 list(#{node := Node} = Bindings, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
@@ -66,12 +66,13 @@ format(Items) when is_list(Items) ->
 
 format({{Topic, Subscriber}, Options}) ->
     format({Subscriber, Topic, Options});
+
 format({Subscriber, Topic, Options}) ->
-    QoS = proplists:get_value(qos, Options),
+    QoS = maps:get(qos, Options),
     #{node => node(), topic => Topic, client_id => client_id(Subscriber), qos => QoS}.
 
 client_id(SubPid) when is_pid(SubPid) ->
     list_to_binary(pid_to_list(SubPid));
-client_id({SubId, _SubPid}) ->
+client_id({_SubPid, SubId}) ->
     SubId.
 

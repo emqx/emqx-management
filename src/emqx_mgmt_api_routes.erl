@@ -31,11 +31,11 @@
 -export([list/2, lookup/2]).
 
 list(Bindings, Params) when map_size(Bindings) == 0 ->
-    {ok, emqx_mgmt_api:paginate(mqtt_route, Params, fun format/1)}.
+    {ok, emqx_mgmt_api:paginate(emqx_route, Params, fun format/1)}.
 
 lookup(#{topic := Topic}, _Params) ->
     {ok, [format(R) || R <- emqx_mgmt:lookup_routes(Topic)]}.
 
-format(#mqtt_route{topic = Topic, node = Node}) ->
+format(#route{topic = Topic, dest = Node}) ->
     #{topic => Topic, node => Node}.
 

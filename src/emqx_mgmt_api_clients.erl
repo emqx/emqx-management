@@ -14,6 +14,7 @@
 
 -module(emqx_mgmt_api_clients).
 
+-include_lib("emqx/include/emqx_mqtt.hrl").
 -include_lib("emqx/include/emqx.hrl").
 
 -rest_api(#{name   => list_clients,
@@ -61,7 +62,7 @@ list(Bindings, Params) when map_size(Bindings) == 0 ->
     list(#{node => node()}, Params);
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    {ok, emqx_mgmt_api:paginate(mqtt_client, Params, fun format/1)};
+    {ok, emqx_mgmt_api:paginate(emqx_client, Params, fun format/1)};
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
@@ -70,8 +71,7 @@ list(Bindings = #{node := Node}, Params) ->
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    Clients = emqx_mgmt:lookup_client(Node, ClientId),
-    {ok, [format(Client) || Client <- Clients]};
+    {ok, format(emqx_mgmt:lookup_client(Node, ClientId))};
 
 lookup(#{clientid := ClientId}, _Params) ->
     {ok, format(emqx_mgmt:lookup_client(ClientId))}.
@@ -85,16 +85,23 @@ kickout(#{clientid := ClientId}, _Params) ->
 clean_acl_cache(#{clientid := ClientId, topic := Topic}, _Params) ->
     emqx_mgmt:clean_acl_cache(ClientId, Topic).
 
-format(Clients) when is_list(Clients) ->
-    [format(Client) || Client <- Clients];
+format({_, Pid}) ->
+    Client = emqx_connection:info(Pid),
+    format(maps:from_list(Client));
 
-format(#mqtt_client{client_id    = ClientId,
-                    peername     = {IpAddr, Port},
-                    username     = Username,
-                    clean_sess   = CleanSess,
-                    proto_ver    = ProtoVer,
-                    keepalive    = KeepAlvie,
-                    connected_at = ConnectedAt}) ->
+format(Clients) when is_list(Clients) ->
+    lists:map(fun({_, Pid}) ->
+        Client = emqx_connection:info(Pid),
+        format(maps:from_list(Client))
+    end, Clients);
+
+format(#{client_id    := ClientId,
+         peername     := {IpAddr, Port},
+         username     := Username,
+         clean_start  := CleanSess,
+         proto_ver    := ProtoVer,
+         keepalive    := KeepAlvie,
+         connected_at := ConnectedAt}) ->
     #{node         => node(),
       client_id    => ClientId,
       username     => Username,

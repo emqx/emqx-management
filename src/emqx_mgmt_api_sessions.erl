@@ -47,7 +47,7 @@ list(Bindings, Params) when map_size(Bindings) =:= 0 ->
     list(#{node => node()}, Params);
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    {ok, emqx_mgmt_api:paginate(mqtt_local_session, Params, fun format/1)};
+    {ok, emqx_mgmt_api:paginate(emqx_session, Params, fun format/1)};
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
@@ -61,12 +61,15 @@ lookup(#{node := Node, clientid := ClientId}, _Params) ->
 lookup(#{clientid := ClientId}, _Params) ->
     {ok, format(emqx_mgmt:lookup_session(ClientId))}.
 
-format(Item = {_ClientId, _Pid, _Persistent, _Properties}) ->
-    format(emqx_mgmt:item(session, Item));
-
+format([]) ->
+    [];
 format(Items) when is_list(Items) ->
     [format(Item) || Item <- Items];
 
+format(Key) when is_tuple(Key) ->
+    format(emqx_mgmt:item(session, Key));
+
 format(Item = #{created_at := CreatedAt}) ->
-    Item#{node => node(), created_at => iolist_to_binary(emqx_mgmt_util:strftime(CreatedAt))}.
+    Item1 = maps:remove(client_pid, Item),
+    Item1#{node => node(), created_at => iolist_to_binary(emqx_mgmt_util:strftime(CreatedAt))}.
 
