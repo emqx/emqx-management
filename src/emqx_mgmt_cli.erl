@@ -28,7 +28,7 @@
 
 -export([load/0]).
 
--export([status/1, broker/1, cluster/1, users/1, clients/1, sessions/1,
+-export([status/1, broker/1, cluster/1, clients/1, sessions/1,
          routes/1, topics/1, subscriptions/1, plugins/1, bridges/1,
          listeners/1, vm/1, mnesia/1, trace/1, acl/1, license/1, mgmt/1, configs/1]).
 
@@ -223,8 +223,6 @@ cluster(_) ->
 %%--------------------------------------------------------------------
 %% @doc Users usage
 
-users(Args) -> emqx_auth_username:cli(Args).
-
 acl(["reload"]) -> emqx_access_control:reload_acl();
 acl(_) -> ?USAGE([{"acl reload", "reload etc/acl.conf"}]).
 
@@ -394,7 +392,7 @@ plugins(["add", Name]) ->
         {error, {already_loaded,_}} ->
             ?PRINT("Already loaded plugin:~p ~n", [Plugin]);
         {error, Error} ->
-            ?PRINT("Add plugin:~p error: ~n", [Plugin, Error])
+            ?PRINT("Add plugin:~p error: ~p~n", [Plugin, Error])
     end;
 
 plugins(_) ->
