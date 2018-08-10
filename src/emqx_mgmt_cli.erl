@@ -33,7 +33,7 @@
 
 -export([status/1, broker/1, cluster/1, clients/1, sessions/1,
          routes/1, subscriptions/1, plugins/1, bridges/1,
-         listeners/1, vm/1, mnesia/1, trace/1, acl/1, license/1, mgmt/1, configs/1]).
+         listeners/1, vm/1, mnesia/1, trace/1, acl/1, license/1, mgmt/1]).
 
 -define(PROC_INFOKEYS, [status,
                         memory,
@@ -51,24 +51,16 @@
 -spec(load() -> ok).
 load() ->
     Cmds = [Fun || {Fun, _} <- ?MODULE:module_info(exports), is_cmd(Fun)],
-    lists:foreach(fun(Cmd) -> emqx_ctl:register_command(Cmd, {?MODULE, Cmd}, []) end, Cmds),
-    emqx_mgmt_cli_cfg:register_config().
+    lists:foreach(fun(Cmd) -> emqx_ctl:register_command(Cmd, {?MODULE, Cmd}, []) end, Cmds).
+    % emqx_mgmt_cli_cfg:register_config().
 
 is_cmd(Fun) ->
     not lists:member(Fun, [init, load, module_info]).
 mgmt(["add_app", AppId, Name, Desc, Status]) ->
     mgmt(["add_app", AppId, Name, Desc, Status, undefined]);
 
-mgmt(["add_app", AppId, Name, Desc, Status, Expired]) ->
-    Expired1 = case Expired of
-        undefined -> undefined;
-        _ -> list_to_integer(Expired)
-    end,
-    case emqx_mgmt_auth:add_app(list_to_binary(AppId),
-                                list_to_binary(Name),
-                                list_to_binary(Desc),
-                                list_to_atom(Status),
-                                Expired1) of
+mgmt(["add", AppId, Name]) ->
+    case emqx_mgmt_auth:add_app(list_to_binary(AppId), list_to_binary(Name)) of
         {ok, Secret} ->
             emqx_cli:print("AppSecret: ~s~n", [Secret]);
         {error, already_existed} ->
@@ -77,7 +69,7 @@ mgmt(["add_app", AppId, Name, Desc, Status, Expired]) ->
             emqx_cli:print("Error: ~p~n", [Reason])
     end;
 
-mgmt(["lookup_app", AppId]) ->
+mgmt(["lookup", AppId]) ->
     case emqx_mgmt_auth:lookup_app(list_to_binary(AppId)) of
         {AppId1, AppSecret, Name, Desc, Status, Expired} ->
             emqx_cli:print("app_id: ~s~nsecret: ~s~nname: ~s~ndesc: ~s~nstatus: ~s~nexpired: ~p~n",
@@ -86,19 +78,15 @@ mgmt(["lookup_app", AppId]) ->
             emqx_cli:print("Not Found.~n")
     end;
 
-mgmt(["update_app", AppId, Name, Desc, Status, Expired]) ->
-    case emqx_mgmt_auth:update_app(list_to_binary(AppId),
-                                   list_to_binary(Name),
-                                   list_to_binary(Desc),
-                                   list_to_atom(Status),
-                                   list_to_integer(Expired)) of
+mgmt(["update", AppId, Status]) ->
+    case emqx_mgmt_auth:update_app(list_to_binary(AppId), list_to_atom(Status)) of
         ok ->
             emqx_cli:print("update successfully.~n");
         {error, Reason} ->
             emqx_cli:print("Error: ~p~n", [Reason])
     end;
 
-mgmt(["del_app", AppId]) ->
+mgmt(["delete", AppId]) ->
     case emqx_mgmt_auth:del_app(list_to_binary(AppId)) of
         ok -> emqx_cli:print("ok~n");
         {error, not_found} ->
@@ -107,29 +95,29 @@ mgmt(["del_app", AppId]) ->
             emqx_cli:print("Error: ~p~n", [Reason])
     end;
 
-mgmt(["list_apps"]) ->
+mgmt(["list"]) ->
     lists:foreach(fun({AppId, AppSecret, Name, Desc, Status, Expired}) ->
         emqx_cli:print("app_id: ~s, secret: ~s, name: ~s, desc: ~s, status: ~s, expired: ~p~n",
                        [AppId, AppSecret, Name, Desc, Status, Expired])
     end, emqx_mgmt_auth:list_apps());
 
 mgmt(_) ->
-    emqx_cli:usage([{"mgmt add_app <AppId> <Name> <Desc> <status> <expired>", "Add Application of REST API"},
-                    {"mgmt lookup_app <AppId>", "Get Application of REST API"},
-                    {"mgmt update_app <AppId> <Name> <Desc> <status> <expired>", "Get Application of REST API"},
-                    {"mgmt del_app <AppId>", "Delete Application of REST API"},
-                    {"mgmt list_apps",       "List Applications"}]).
+    emqx_cli:usage([{"mgmt list",                   "List Applications"},
+                    {"mgmt insert <AppId> <Name>",   "Add Application of REST API"},
+                    {"mgmt update <AppId> <status>", "Update Application of REST API"},
+                    {"mgmt lookup <AppId>",          "Get Application of REST API"},
+                    {"mgmt delete <AppId>",          "Delete Application of REST API"}]).
 
-configs(["set"]) ->
-    emqx_mgmt_cli_cfg:set_usage(), ok;
+% configs(["set"]) ->
+%     emqx_mgmt_cli_cfg:set_usage(), ok;
 
-configs(Cmd) when length(Cmd) > 2 ->
-    emqx_mgmt_cli_cfg:run(["config" | Cmd]), ok;
+% configs(Cmd) when length(Cmd) > 2 ->
+%     emqx_mgmt_cli_cfg:run(["config" | Cmd]), ok;
 
-configs(_) ->
-    emqx_cli:usage([{"configs set",                           "Show All configs Item"},
-                    {"configs set <Key>=<Value> --app=<app>", "Set Config Item"},
-                    {"configs show <Key> --app=<app>",        "show Config Item"}]).
+% configs(_) ->
+%     emqx_cli:usage([{"configs set",                           "Show All configs Item"},
+%                     {"configs set <Key>=<Value> --app=<app>", "Set Config Item"},
+%                     {"configs show <Key> --app=<app>",        "show Config Item"}]).
 
 %%--------------------------------------------------------------------
 %% @doc Node status

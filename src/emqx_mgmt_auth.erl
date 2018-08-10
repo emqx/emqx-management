@@ -1,3 +1,4 @@
+%%--------------------------------------------------------------------
 %% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,6 +12,7 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
+%%--------------------------------------------------------------------
 
 -module(emqx_mgmt_auth).
 
@@ -20,7 +22,14 @@
 -copy_mnesia({mnesia, [copy]}).
 
 %% APP Management API
--export([add_app/5, lookup_app/1, get_appsecret/1, update_app/5, del_app/1, list_apps/0]).
+-export([add_app/2,
+         add_app/5,
+         lookup_app/1,
+         get_appsecret/1,
+         update_app/2,
+         update_app/5,
+         del_app/1,
+         list_apps/0]).
 
 %% APP Auth/ACL API
 -export([is_authorized/2]).
@@ -28,6 +37,7 @@
 -record(mqtt_app, {id, secret, name, desc, status, expired}).
 
 -type(appid() :: binary()).
+
 -type(appsecret() :: binary()).
 
 %%--------------------------------------------------------------------
@@ -46,6 +56,9 @@ mnesia(copy) ->
 %%--------------------------------------------------------------------
 %% Manage Apps
 %%--------------------------------------------------------------------
+-spec(add_app(appid(), binary()) -> {ok, appsecret()} | {error, term()}).
+add_app(AppId, Name) when is_binary(AppId) ->
+    add_app(AppId, Name, <<"Application user">>, true, undefined).
 
 -spec(add_app(appid(), binary(), binary(), boolean(), integer() | undefined) -> {ok, appsecret()} | {error, term()}).
 add_app(AppId, Name, Desc, Status, Expired) when is_binary(AppId) ->
@@ -84,6 +97,18 @@ lookup_app(AppId) when is_binary(AppId) ->
                    status = Status,
                    expired = Expired}] -> {AppId, AppSecret, Name, Desc, Status, Expired};
         [] -> undefined
+    end.
+
+-spec(update_app(appid(), boolean()) -> ok | {error, term()}).
+update_app(AppId, Status) ->
+    case mnesia:dirty_read(mqtt_app, AppId) of
+        [App = #mqtt_app{}] ->
+            case mnesia:transaction(fun() -> mnesia:write(App#mqtt_app{status = Status}) end) of
+                {atomic, ok} -> ok;
+                {aborted, Reason} -> {error, Reason}
+            end;
+        [] ->
+            {error, ont_found}
     end.
 
 -spec(update_app(appid(), binary(), binary(), boolean(), integer() | undefined) -> ok | {error, term()}).
