@@ -85,16 +85,22 @@ kickout(#{clientid := ClientId}, _Params) ->
 clean_acl_cache(#{clientid := ClientId, topic := Topic}, _Params) ->
     emqx_mgmt:clean_acl_cache(ClientId, Topic).
 
-format({_, Pid}) ->
-    Client = emqx_connection:info(Pid),
-    format(maps:from_list(Client));
+format({ClientId, Pid}) ->
+    case ets:lookup(emqx_client_attrs, {ClientId, Pid}) of
+        [{_, Val}] -> format(maps:from_list(Val));
+        _ -> []
+    end;
 
 format(Clients) when is_list(Clients) ->
-    lists:map(fun({_, Pid}) ->
-        Client = emqx_connection:info(Pid),
-        format(maps:from_list(Client))
+    lists:map(fun({ClientId, Pid}) ->
+        case ets:lookup(emqx_client_attrs, {ClientId, Pid}) of
+            [{_, Val}] -> format(maps:from_list(Val));
+            _ -> []
+        end
     end, Clients);
 
+format(#{}) ->
+    #{};
 format(#{client_id    := ClientId,
          peername     := {IpAddr, Port},
          username     := Username,
