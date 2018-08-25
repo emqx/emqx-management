@@ -40,6 +40,9 @@ list(Bindings, Params) when map_size(Bindings) == 0 ->
 lookup(#{topic := Topic}, _Params) ->
     {ok, [format(R) || R <- emqx_mgmt:lookup_routes(Topic)]}.
 
-format(#mqtt_route{topic = Topic, node = Node}) ->
+
+format(#mqtt_route{topic = Topic, dest = {_, Node}}) ->
+    #{topic => Topic, node => Node};
+format(#mqtt_route{topic = Topic, dest = Node}) ->
     #{topic => Topic, node => Node}.
 

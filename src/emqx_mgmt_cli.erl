@@ -287,8 +287,7 @@ routes(["list"]) ->
     foreach(fun print/1, Routes);
 
 routes(["show", Topic]) ->
-    Routes = lists:append(ets:lookup(mqtt_route, bin(Topic)),
-                          ets:lookup(mqtt_local_route, bin(Topic))),
+    Routes = lists:append(ets:lookup(mqtt_route, bin(Topic))),
     foreach(fun print/1, Routes);
 
 routes(_) ->
@@ -637,7 +636,12 @@ print([]) ->
     ok;
 
 print(Routes = [#mqtt_route{topic = Topic} | _]) ->
-    Nodes = [atom_to_list(Node) || #mqtt_route{node = Node} <- Routes],
+    Nodes = lists:map(
+        fun(#mqtt_route{dest = {_, Node}}) ->
+            atom_to_list(Node);
+        (#mqtt_route{dest = Node}) ->
+            atom_to_list(Node)
+    end, Routes),
     ?PRINT("~s -> ~s~n", [Topic, string:join(Nodes, ",")]);
 
 %% print(Subscriptions = [#mqtt_subscription{subid = ClientId} | _]) ->
@@ -662,9 +666,9 @@ print(#mqtt_client{client_id = ClientId, clean_sess = CleanSess, username = User
 %%    ?PRINT("~s: ~s~n", [Topic, string:join([atom_to_list(F) || F <- Flags], ",")]);
 print({route, Routes}) ->
     foreach(fun print/1, Routes);
-print({local_route, Routes}) ->
-    foreach(fun print/1, Routes);
-print(#mqtt_route{topic = Topic, node = Node}) ->
+print(#mqtt_route{topic = Topic, dest = {_, Node}}) ->
+    ?PRINT("~s -> ~s~n", [Topic, Node]);
+print(#mqtt_route{topic = Topic, dest = Node}) ->
     ?PRINT("~s -> ~s~n", [Topic, Node]);
 print({Topic, Node}) ->
     ?PRINT("~s -> ~s~n", [Topic, Node]);

@@ -405,7 +405,7 @@ tables(clients) -> [mqtt_client];
 
 tables(sessions) -> [mqtt_local_session];
 
-tables(routes) -> [mqtt_route, mqtt_local_route].
+tables(routes) -> [mqtt_route].
 
 item(session, {ClientId, _Pid, Persistent, Properties}) ->
     maps:from_list(
@@ -416,7 +416,9 @@ item(session, {ClientId, _Pid, Persistent, Properties}) ->
 item(subscription, {{Topic, ClientId}, Options}) ->
     #{topic => Topic, clientid => ClientId, options => Options};
 
-item(route, #mqtt_route{topic = Topic, node = Node}) ->
+item(route, #mqtt_route{topic = Topic, dest = {_, Node}}) ->
+    #{topic => Topic, node => Node};
+item(route, #mqtt_route{topic = Topic, dest = Node}) ->
     #{topic => Topic, node => Node};
 item(route, {Topic, Node}) ->
     #{topic => Topic, node => Node}.
