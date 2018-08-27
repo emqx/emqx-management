@@ -403,9 +403,14 @@ tables(sessions) -> [emqx_session];
 tables(routes) -> [emqx_route].
 
 item(session, Key) ->
-    [{_, Attrs}] = ets:lookup(emqx_session_attrs, Key),
-    [{_, Stats}] = ets:lookup(emqx_session_stats, Key),
-    maps:from_list(Attrs ++ Stats);
+    List = case ets:lookup(emqx_session_attrs, Key) of
+        [] -> [];
+        [{_, Attrs0}] -> Attrs0
+    end ++ case ets:lookup(emqx_session_stats, Key) of
+        [] -> [];
+        [{_, Stats0}] -> Stats0
+    end,
+    maps:from_list(List);
 
 item(subscription, {{Topic, ClientId}, Options}) ->
     #{topic => Topic, clientid => ClientId, options => Options};
