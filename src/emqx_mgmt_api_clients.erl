@@ -86,35 +86,32 @@ clean_acl_cache(#{clientid := ClientId, topic := Topic}, _Params) ->
     emqx_mgmt:clean_acl_cache(ClientId, Topic).
 
 format({ClientId, Pid}) ->
-    case ets:lookup(emqx_client_attrs, {ClientId, Pid}) of
-        [{_, Val}] -> format(maps:from_list(Val));
+    Data = case ets:lookup(emqx_client_attrs, {ClientId, Pid}) of
+        [{_, Val}] -> Val;
         _ -> []
-    end;
+    end ++ case ets:lookup(emqx_client_stats, {ClientId, Pid}) of
+        [{_, Val1}] -> Val1;
+        _ -> []
+    end,
+    format(maps:from_list(Data));
 
 format(Clients) when is_list(Clients) ->
-    lists:map(fun({ClientId, Pid}) ->
-        case ets:lookup(emqx_client_attrs, {ClientId, Pid}) of
-            [{_, Val}] -> format(maps:from_list(Val));
-            _ -> []
-        end
+        lists:map(fun({ClientId, Pid}) ->
+            Data = case ets:lookup(emqx_client_attrs, {ClientId, Pid}) of
+                [{_, Val}] -> Val;
+                _ -> []
+            end ++ case ets:lookup(emqx_client_stats, {ClientId, Pid}) of
+                [{_, Val1}] -> Val1;
+                _ -> []
+            end,
+            format(maps:from_list(Data))
     end, Clients);
 
-format(#{}) ->
-    #{};
-format(#{client_id    := ClientId,
-         peername     := {IpAddr, Port},
-         username     := Username,
-         clean_start  := CleanSess,
-         proto_ver    := ProtoVer,
-         keepalive    := KeepAlvie,
-         connected_at := ConnectedAt}) ->
-    #{node         => node(),
-      client_id    => ClientId,
-      username     => Username,
-      ipaddress    => iolist_to_binary(ntoa(IpAddr)),
-      port         => Port,
-      clean_sess   => CleanSess,
-      proto_ver    => ProtoVer,
-      keepalive    => KeepAlvie,
-      connected_at => iolist_to_binary(strftime(ConnectedAt))}.
+format(Maps) ->
+    {IpAddr, _Port} = maps:get(peername, Maps),
+    ConnectedAt = maps:get(connected_at, Maps),
+    maps:remove(peername, Maps#{node         => node(),
+                                ipaddress    => iolist_to_binary(ntoa(IpAddr)),
+                                connected_at => iolist_to_binary(strftime(ConnectedAt))}).
+
 
