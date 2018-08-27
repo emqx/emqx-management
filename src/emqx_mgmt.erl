@@ -303,14 +303,23 @@ list_listeners() ->
     [{Node, list_listeners(Node)} || Node <- ekka_mnesia:running_nodes()].
 
 list_listeners(Node) when Node =:= node() ->
-    lists:map(fun({{Protocol, ListenOn}, Pid}) ->
-                #{protocol        => Protocol,
-                  listen_on       => ListenOn,
-                  acceptors       => esockd:get_acceptors(Pid),
-                  max_clients     => esockd:get_max_clients(Pid),
-                  current_clients => esockd:get_current_clients(Pid),
-                  shutdown_count  => esockd:get_shutdown_count(Pid)}
-              end, esockd:listeners());
+    Tcp = lists:map(fun({{Protocol, ListenOn}, Pid}) ->
+        #{protocol        => Protocol,
+          listen_on       => ListenOn,
+          acceptors       => esockd:get_acceptors(Pid),
+          max_clients     => esockd:get_max_connections(Pid),
+          current_clients => esockd:get_current_connections(Pid),
+          shutdown_count  => esockd:get_shutdown_count(Pid)}
+    end, esockd:listeners()),
+    Http = lists:map(fun({Protocol, Opts}) ->
+        #{protocol        => Protocol,
+          listen_on       => proplists:get_value(port, Opts),
+          acceptors       => proplists:get_value(num_acceptors, Opts),
+          max_clients     => proplists:get_value(max_connections, Opts),
+          current_clients => proplists:get_value(all_connections, Opts),
+          shutdown_count  => []}
+    end, ranch:info()),
+    Tcp ++ Http;
 
 list_listeners(Node) ->
     rpc_call(Node, list_listeners, [Node]).
