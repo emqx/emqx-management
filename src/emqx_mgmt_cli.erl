@@ -51,8 +51,8 @@
 -spec(load() -> ok).
 load() ->
     Cmds = [Fun || {Fun, _} <- ?MODULE:module_info(exports), is_cmd(Fun)],
-    lists:foreach(fun(Cmd) -> emqx_ctl:register_command(Cmd, {?MODULE, Cmd}, []) end, Cmds).
-    % emqx_mgmt_cli_cfg:register_config().
+    lists:foreach(fun(Cmd) -> emqx_ctl:register_command(Cmd, {?MODULE, Cmd}, []) end, Cmds),
+    emqx_mgmt_cli_cfg:register_config().
 
 is_cmd(Fun) ->
     not lists:member(Fun, [init, load, module_info]).

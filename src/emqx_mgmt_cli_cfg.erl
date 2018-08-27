@@ -32,14 +32,14 @@ register_config() ->
     application:start(clique),
     F = fun() -> ekka_mnesia:running_nodes() end,
     clique:register_node_finder(F),
-    register_config_cli(),
+    % register_config_cli(),
     create_config_tab().
 
 create_config_tab() ->
     case ets:info(?TAB, name) of
         undefined ->
             ets:new(?TAB, [named_table, public]),
-            {ok, PluginsEtcDir} = emqx_config:get_env(plugins_etc_dir),
+            PluginsEtcDir = emqx_config:get_env(plugins_etc_dir),
             Files = filelib:wildcard("*.conf", PluginsEtcDir),
             lists:foreach(fun(File) ->
                 [FileName | _] = string:tokens(File, "."),
@@ -47,7 +47,7 @@ create_config_tab() ->
                 ets:insert(?TAB, {list_to_atom(FileName), Configs})
             end, Files),
             case emqx_config:get_env(expand_plugins_dir) of
-                {ok, Dir} ->
+                Dir ->
                     PluginsDir = filelib:wildcard("*", Dir),
                     lists:foreach(fun(PluginDir) ->
                         case filelib:is_dir(Dir ++ PluginDir) of
