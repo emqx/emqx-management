@@ -62,7 +62,7 @@ get_configs(#{node := Node}, _Params) ->
     {ok, format(emqx_mgmt:get_all_configs(Node))};
 
 get_configs(_Binding, _Params) ->
-    {ok, [{Node, format(Configs)} || {Node, Configs} <- emqx_mgmt:get_all_configs()]}.
+    {ok, [#{node => Node,  config => format(Configs)} || {Node, Configs} <- emqx_mgmt:get_all_configs()]}.
 
 update_config(#{node := Node, app := App}, Params) ->
     Key   = binary_to_list(get_value(<<"key">>, Params)),
@@ -115,4 +115,3 @@ format_plugin_config({Key, Value, Desc, Required}) ->
      {<<"value">>, list_to_binary(Value)},
      {<<"desc">>, list_to_binary(Desc)},
      {<<"required">>, Required}].
-
