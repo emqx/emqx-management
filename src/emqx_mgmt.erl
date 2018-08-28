@@ -27,8 +27,8 @@
 -export([get_metrics/0, get_metrics/1, get_stats/0, get_stats/1]).
 
 %% Clients, Sessions
--export([list_clients/1, lookup_client/1, lookup_client/2,
-         kickout_client/1, kickout_client/2, clean_acl_cache/2, clean_acl_cache/3]).
+-export([list_conns/1, lookup_conn/1, lookup_conn/2,
+         kickout_conn/1, kickout_conn/2, clean_acl_cache/2, clean_acl_cache/3]).
 
 -export([list_sessions/1, lookup_session/1, lookup_session/2]).
 
@@ -86,7 +86,7 @@ node_info(Node) when Node =:= node() ->
           process_available => erlang:system_info(process_limit),
           process_used      => erlang:system_info(process_count),
           max_fds           => get_value(max_fds, erlang:system_info(check_io)),
-          clients           => ets:info(emqx_conn, size),
+          connections       => ets:info(emqx_conn, size),
           node_status       => 'Running',
           uptime            => iolist_to_binary(proplists:get_value(uptime, BrokerInfo)),
           version           => iolist_to_binary(proplists:get_value(version, BrokerInfo))
@@ -138,43 +138,43 @@ get_stats(Node) ->
 %% Clients
 %%--------------------------------------------------------------------
 
-list_clients(Node) when Node =:= node() ->
+list_conns(Node) when Node =:= node() ->
     case check_row_limit([emqx_conn]) of
         ok -> ets:tab2list(emqx_conn);
         false -> throw(max_row_limit)
     end;
 
-list_clients(Node) ->
-    case rpc_call(Node, list_clients, [Node]) of
+list_conns(Node) ->
+    case rpc_call(Node, list_conns, [Node]) of
         max_row_limit -> throw(max_row_limit);
         Res -> Res
     end.
 
-lookup_client(ClientId) ->
-    lists:append([lookup_client(Node, ClientId) || Node <- ekka_mnesia:running_nodes()]).
+lookup_conn(ClientId) ->
+    lists:append([lookup_conn(Node, ClientId) || Node <- ekka_mnesia:running_nodes()]).
 
-lookup_client(Node, ClientId) when Node =:= node() ->
+lookup_conn(Node, ClientId) when Node =:= node() ->
     ets:lookup(emqx_conn, ClientId);
 
-lookup_client(Node, ClientId) ->
-    rpc_call(Node, lookup_client, [Node, ClientId]).
+lookup_conn(Node, ClientId) ->
+    rpc_call(Node, lookup_conn, [Node, ClientId]).
 
-kickout_client(ClientId) ->
-    Results = [kickout_client(Node, ClientId) || Node <- ekka_mnesia:running_nodes()],
+kickout_conn(ClientId) ->
+    Results = [kickout_conn(Node, ClientId) || Node <- ekka_mnesia:running_nodes()],
     case lists:any(fun(Item) -> Item =:= ok end, Results) of
         true  -> ok;
         false -> lists:last(Results)
     end.
 
-kickout_client(Node, ClientId) when Node =:= node() ->
-    case emqx_cm:lookup_client_pid(ClientId) of
+kickout_conn(Node, ClientId) when Node =:= node() ->
+    case emqx_cm:lookup_conn_pid(ClientId) of
         Pid when is_pid(Pid) ->
             emqx_connection:kick(Pid);
         _ -> {error, not_found}
     end;
 
-kickout_client(Node, ClientId) ->
-    rpc_call(Node, kickout_client, [Node, ClientId]).
+kickout_conn(Node, ClientId) ->
+    rpc_call(Node, kickout_conn, [Node, ClientId]).
 
 clean_acl_cache(ClientId, Topic) ->
     Results = [clean_acl_cache(Node, ClientId, Topic) || Node <- ekka_mnesia:running_nodes()],
@@ -184,7 +184,7 @@ clean_acl_cache(ClientId, Topic) ->
     end.
 
 clean_acl_cache(Node, ClientId, Topic) when Node =:= node() ->
-    case emqx_cm:lookup_client_pid(ClientId) of
+    case emqx_cm:lookup_conn_pid(ClientId) of
         Pid when is_pid(Pid) ->
             emqx_connection:clean_acl_cache(Pid, Topic);
         _ -> {error, not_found}
@@ -307,16 +307,16 @@ list_listeners(Node) when Node =:= node() ->
         #{protocol        => Protocol,
           listen_on       => ListenOn,
           acceptors       => esockd:get_acceptors(Pid),
-          max_clients     => esockd:get_max_connections(Pid),
-          current_clients => esockd:get_current_connections(Pid),
+          max_conns       => esockd:get_max_connections(Pid),
+          current_conns   => esockd:get_current_connections(Pid),
           shutdown_count  => esockd:get_shutdown_count(Pid)}
     end, esockd:listeners()),
     Http = lists:map(fun({Protocol, Opts}) ->
         #{protocol        => Protocol,
           listen_on       => proplists:get_value(port, Opts),
           acceptors       => proplists:get_value(num_acceptors, Opts),
-          max_clients     => proplists:get_value(max_connections, Opts),
-          current_clients => proplists:get_value(all_connections, Opts),
+          max_conns       => proplists:get_value(max_connections, Opts),
+          current_conns   => proplists:get_value(all_connections, Opts),
           shutdown_count  => []}
     end, ranch:info()),
     Tcp ++ Http;
@@ -381,7 +381,7 @@ update_plugin_configs(Node, PluginName, Terms) ->
 %% Common Table API
 %%--------------------------------------------------------------------
 
-count(clients) ->
+count(conns) ->
     table_size(emqx_conn);
 
 count(sessions) ->
@@ -393,7 +393,7 @@ count(subscriptions) ->
 count(routes) ->
     lists:sum([table_size(Tab) || Tab <- tables(routes)]).
 
-query_handle(clients) ->
+query_handle(conns) ->
     qlc:q([Client || Client <- ets:table(emqx_conn)]);
 
 query_handle(sessions) ->
@@ -405,7 +405,7 @@ query_handle(subscriptions) ->
 query_handle(routes) ->
     qlc:append([qlc:q([E || E <- ets:table(Tab)]) || Tab <- tables(routes)]).
 
-tables(clients) -> [emqx_conn];
+tables(conns) -> [emqx_conn];
 
 tables(sessions) -> [emqx_session];
 

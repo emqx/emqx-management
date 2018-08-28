@@ -541,8 +541,8 @@ trace_off(Who, Name) ->
 listeners([]) ->
     foreach(fun({{Protocol, ListenOn}, Pid}) ->
                 Info = [{acceptors,      esockd:get_acceptors(Pid)},
-                        {max_clients,    esockd:get_max_clients(Pid)},
-                        {current_clients,esockd:get_current_clients(Pid)},
+                        {max_conns,      esockd:get_max_connections(Pid)},
+                        {current_conn,   esockd:get_current_connections(Pid)},
                         {shutdown_count, esockd:get_shutdown_count(Pid)}],
                 emqx_cli:print("listener on ~s:~s~n", [Protocol, esockd:to_string(ListenOn)]),
                 foreach(fun({Key, Val}) ->
@@ -664,8 +664,9 @@ format(_, undefined) ->
 format(created_at, Val) ->
     emqx_time:now_secs(Val);
 
-format(peername, Val) ->
-    emqx_net:format(Val);
+format(peername, {IPAddr, Port}) ->
+    IPStr = emqx_mgmt_util:ntoa(IPAddr),
+    io_lib:format("~s:~p", [IPStr, Port]);
 
 format(_, Val) ->
     Val.

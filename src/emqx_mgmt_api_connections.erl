@@ -12,7 +12,7 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 
--module(emqx_mgmt_api_clients).
+-module(emqx_mgmt_api_connections).
 
 -include_lib("emqx/include/emqx_mqtt.hrl").
 -include_lib("emqx/include/emqx.hrl").
@@ -71,13 +71,13 @@ list(Bindings = #{node := Node}, Params) ->
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    {ok, format(emqx_mgmt:lookup_client(Node, ClientId))};
+    {ok, format(emqx_mgmt:lookup_conn(Node, ClientId))};
 
 lookup(#{clientid := ClientId}, _Params) ->
-    {ok, format(emqx_mgmt:lookup_client(ClientId))}.
+    {ok, format(emqx_mgmt:lookup_conn(ClientId))}.
 
 kickout(#{clientid := ClientId}, _Params) ->
-    case emqx_mgmt:kickout_client(ClientId) of
+    case emqx_mgmt:kickout_conn(ClientId) of
         ok -> ok;
         {error, Reason} -> {error, #{message => Reason}}
     end.
@@ -85,31 +85,28 @@ kickout(#{clientid := ClientId}, _Params) ->
 clean_acl_cache(#{clientid := ClientId, topic := Topic}, _Params) ->
     emqx_mgmt:clean_acl_cache(ClientId, Topic).
 
-format({ClientId, Pid}) ->
-    Data = case ets:lookup(emqx_conn_attrs, {ClientId, Pid}) of
+format(ClientList) when is_list(ClientList) ->
+    [format(Client) || Client <- ClientList];
+format(Client = {_ClientId, _Pid}) ->
+    Data = get_emqx_conn_attrs(Client) ++ get_emqx_conn_stats(Client),
+    adjust_format(maps:from_list(Data)).
+
+get_emqx_conn_attrs(TabKey) ->
+    case ets:lookup(emqx_conn_attrs, TabKey) of
         [{_, Val}] -> Val;
         _ -> []
-    end ++ case ets:lookup(emqx_conn_stats, {ClientId, Pid}) of
+    end.
+
+get_emqx_conn_stats(TabKey) ->
+    case ets:lookup(emqx_conn_stats, TabKey) of
         [{_, Val1}] -> Val1;
         _ -> []
-    end,
-    format(maps:from_list(Data));
+    end.
 
-format(Clients) when is_list(Clients) ->
-    lists:map(fun({ClientId, Pid}) ->
-        Data = case ets:lookup(emqx_conn_attrs, {ClientId, Pid}) of
-            [{_, Val}] -> Val;
-            _ -> []
-        end ++ case ets:lookup(emqx_conn_stats, {ClientId, Pid}) of
-            [{_, Val1}] -> Val1;
-            _ -> []
-        end,
-        format(maps:from_list(Data))
-    end, Clients);
-
-format(Maps) ->
-    {IpAddr, _Port} = maps:get(peername, Maps),
-    ConnectedAt = maps:get(connected_at, Maps),
-    maps:remove(peername, Maps#{node         => node(),
+adjust_format(Data) when is_map(Data)->
+    {IpAddr, Port} = maps:get(peername, Data),
+    ConnectedAt = maps:get(connected_at, Data),
+    maps:remove(peername, Data#{node         => node(),
                                 ipaddress    => iolist_to_binary(ntoa(IpAddr)),
+                                port         => Port,
                                 connected_at => iolist_to_binary(strftime(ConnectedAt))}).
