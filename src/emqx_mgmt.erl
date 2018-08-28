@@ -332,7 +332,7 @@ get_alarms() ->
     [{Node, get_alarms(Node)} || Node <- ekka_mnesia:running_nodes()].
 
 get_alarms(Node) when Node =:= node() ->
-    emqx_alarm:get_alarms();
+    emqx_alarm_mgr:get_alarms();
 get_alarms(Node) ->
     rpc_call(Node, get_alarms, [Node]).
 
