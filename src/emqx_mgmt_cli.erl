@@ -215,13 +215,13 @@ acl(_) ->
 %% @doc Query clients
 
 clients(["list"]) ->
-    dump(emqx_client);
+    dump(emqx_conn);
 
 clients(["show", ClientId]) ->
     if_client(ClientId, fun print/1);
 
 clients(["kick", ClientId]) ->
-    if_client(ClientId, fun({emqx_client, {_, Pid}}) -> emqx_connection:kick(Pid) end);
+    if_client(ClientId, fun({_, Pid}) -> emqx_connection:kick(Pid) end);
 
 clients(_) ->
     emqx_cli:usage([{"clients list",            "List all clients"},
@@ -229,9 +229,9 @@ clients(_) ->
                     {"clients kick <ClientId>", "Kick out a client"}]).
 
 if_client(ClientId, Fun) ->
-    case ets:lookup(emqx_client, (bin(ClientId))) of
+    case ets:lookup(emqx_conn, (bin(ClientId))) of
         [] -> emqx_cli:print("Not Found.~n");
-        [Client]    -> Fun({emqx_client, Client})
+        [Client]    -> Fun(Client)
     end.
 
 %%--------------------------------------------------------------------
@@ -619,14 +619,14 @@ dump(Table, Key) ->
 print({_, []}) ->
     ok;
 
-print({emqx_client, Key}) ->
-    [{_, Attrs}] = ets:lookup(emqx_client_attrs, Key),
+print({emqx_conn, Key}) ->
+    [{_, Attrs}] = ets:lookup(emqx_conn_attrs, Key),
     InfoKeys = [client_id,
                 clean_start,
                 username,
                 peername,
                 created_at],
-    emqx_cli:print("Client(~s, clean_sess=~s, username=~s, peername=~s, connected_at=~p)~n",
+    emqx_cli:print("Connection(~s, clean_sess=~s, username=~s, peername=~s, connected_at=~p)~n",
            [format(K, get_value(K, Attrs)) || K <- InfoKeys]);
 
 print({emqx_session, Key}) ->

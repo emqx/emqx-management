@@ -86,7 +86,7 @@ node_info(Node) when Node =:= node() ->
           process_available => erlang:system_info(process_limit),
           process_used      => erlang:system_info(process_count),
           max_fds           => get_value(max_fds, erlang:system_info(check_io)),
-          clients           => ets:info(emqx_client, size),
+          clients           => ets:info(emqx_conn, size),
           node_status       => 'Running',
           uptime            => iolist_to_binary(proplists:get_value(uptime, BrokerInfo)),
           version           => iolist_to_binary(proplists:get_value(version, BrokerInfo))
@@ -139,8 +139,8 @@ get_stats(Node) ->
 %%--------------------------------------------------------------------
 
 list_clients(Node) when Node =:= node() ->
-    case check_row_limit([emqx_client]) of
-        ok -> ets:tab2list(emqx_client);
+    case check_row_limit([emqx_conn]) of
+        ok -> ets:tab2list(emqx_conn);
         false -> throw(max_row_limit)
     end;
 
@@ -154,7 +154,7 @@ lookup_client(ClientId) ->
     lists:append([lookup_client(Node, ClientId) || Node <- ekka_mnesia:running_nodes()]).
 
 lookup_client(Node, ClientId) when Node =:= node() ->
-    ets:lookup(emqx_client, ClientId);
+    ets:lookup(emqx_conn, ClientId);
 
 lookup_client(Node, ClientId) ->
     rpc_call(Node, lookup_client, [Node, ClientId]).
@@ -169,7 +169,7 @@ kickout_client(ClientId) ->
 kickout_client(Node, ClientId) when Node =:= node() ->
     case emqx_cm:lookup_client_pid(ClientId) of
         Pid when is_pid(Pid) ->
-            emqx_client:kick(Pid);
+            emqx_connection:kick(Pid);
         _ -> {error, not_found}
     end;
 
@@ -186,7 +186,7 @@ clean_acl_cache(ClientId, Topic) ->
 clean_acl_cache(Node, ClientId, Topic) when Node =:= node() ->
     case emqx_cm:lookup_client_pid(ClientId) of
         Pid when is_pid(Pid) ->
-            emqx_client:clean_acl_cache(Pid, Topic);
+            emqx_connection:clean_acl_cache(Pid, Topic);
         _ -> {error, not_found}
     end;
 clean_acl_cache(Node, ClientId, Topic) ->
@@ -232,7 +232,7 @@ list_subscriptions(Node) ->
 
 lookup_subscriptions(Key) ->
     lists:append([lookup_subscriptions(Node, Key) || Node <- ekka_mnesia:running_nodes()]).
- 
+
 lookup_subscriptions(Node, Key) when Node =:= node() ->
     ets:match_object(emqx_suboption, {{'_', {'_', Key}}, '_'});
 
@@ -330,7 +330,7 @@ list_listeners(Node) ->
 
 get_alarms() ->
     [{Node, get_alarms(Node)} || Node <- ekka_mnesia:running_nodes()].
-   
+
 get_alarms(Node) when Node =:= node() ->
     emqx_alarm:get_alarms();
 get_alarms(Node) ->
@@ -382,7 +382,7 @@ update_plugin_configs(Node, PluginName, Terms) ->
 %%--------------------------------------------------------------------
 
 count(clients) ->
-    table_size(emqx_client);
+    table_size(emqx_conn);
 
 count(sessions) ->
     table_size(emqx_session);
@@ -394,7 +394,7 @@ count(routes) ->
     lists:sum([table_size(Tab) || Tab <- tables(routes)]).
 
 query_handle(clients) ->
-    qlc:q([Client || Client <- ets:table(emqx_client)]);
+    qlc:q([Client || Client <- ets:table(emqx_conn)]);
 
 query_handle(sessions) ->
     qlc:q([Session || Session <- ets:table(emqx_session)]);
@@ -405,7 +405,7 @@ query_handle(subscriptions) ->
 query_handle(routes) ->
     qlc:append([qlc:q([E || E <- ets:table(Tab)]) || Tab <- tables(routes)]).
 
-tables(clients) -> [emqx_client];
+tables(clients) -> [emqx_conn];
 
 tables(sessions) -> [emqx_session];
 
@@ -457,4 +457,3 @@ max_row_limit() ->
     application:get_env(?APP, max_row_limit, ?MAX_ROW_LIMIT).
 
 table_size(Tab) -> ets:info(Tab, size).
-

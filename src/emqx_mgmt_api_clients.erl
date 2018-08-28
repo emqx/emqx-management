@@ -62,7 +62,7 @@ list(Bindings, Params) when map_size(Bindings) == 0 ->
     list(#{node => node()}, Params);
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    {ok, emqx_mgmt_api:paginate(emqx_client, Params, fun format/1)};
+    {ok, emqx_mgmt_api:paginate(emqx_conn, Params, fun format/1)};
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
@@ -86,25 +86,25 @@ clean_acl_cache(#{clientid := ClientId, topic := Topic}, _Params) ->
     emqx_mgmt:clean_acl_cache(ClientId, Topic).
 
 format({ClientId, Pid}) ->
-    Data = case ets:lookup(emqx_client_attrs, {ClientId, Pid}) of
+    Data = case ets:lookup(emqx_conn_attrs, {ClientId, Pid}) of
         [{_, Val}] -> Val;
         _ -> []
-    end ++ case ets:lookup(emqx_client_stats, {ClientId, Pid}) of
+    end ++ case ets:lookup(emqx_conn_stats, {ClientId, Pid}) of
         [{_, Val1}] -> Val1;
         _ -> []
     end,
     format(maps:from_list(Data));
 
 format(Clients) when is_list(Clients) ->
-        lists:map(fun({ClientId, Pid}) ->
-            Data = case ets:lookup(emqx_client_attrs, {ClientId, Pid}) of
-                [{_, Val}] -> Val;
-                _ -> []
-            end ++ case ets:lookup(emqx_client_stats, {ClientId, Pid}) of
-                [{_, Val1}] -> Val1;
-                _ -> []
-            end,
-            format(maps:from_list(Data))
+    lists:map(fun({ClientId, Pid}) ->
+        Data = case ets:lookup(emqx_conn_attrs, {ClientId, Pid}) of
+            [{_, Val}] -> Val;
+            _ -> []
+        end ++ case ets:lookup(emqx_conn_stats, {ClientId, Pid}) of
+            [{_, Val1}] -> Val1;
+            _ -> []
+        end,
+        format(maps:from_list(Data))
     end, Clients);
 
 format(Maps) ->
@@ -113,5 +113,3 @@ format(Maps) ->
     maps:remove(peername, Maps#{node         => node(),
                                 ipaddress    => iolist_to_binary(ntoa(IpAddr)),
                                 connected_at => iolist_to_binary(strftime(ConnectedAt))}).
-
-

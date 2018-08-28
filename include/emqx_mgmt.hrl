@@ -1,4 +1,4 @@
-
+%% Return Codes
 -define(SUCCESS, 0).  %% Success
 -define(ERROR1, 101). %% badrpc
 -define(ERROR2, 102). %% Unknown error
@@ -15,4 +15,3 @@
 -define(ERROR13, 113). %% User already exist
 -define(ERROR14, 114). %% OldPassword error
 -define(ERROR15, 115). %% bad topic
-
