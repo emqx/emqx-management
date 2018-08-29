@@ -71,19 +71,19 @@ list(Bindings = #{node := Node}, Params) ->
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    {ok, format(emqx_mgmt:lookup_conn(Node, ClientId))};
+    {ok, format(emqx_mgmt:lookup_conn(Node, http_uri:decode(ClientId)))};
 
 lookup(#{clientid := ClientId}, _Params) ->
-    {ok, format(emqx_mgmt:lookup_conn(ClientId))}.
+    {ok, format(emqx_mgmt:lookup_conn(http_uri:decode(ClientId)))}.
 
 kickout(#{clientid := ClientId}, _Params) ->
-    case emqx_mgmt:kickout_conn(ClientId) of
+    case emqx_mgmt:kickout_conn(http_uri:decode(ClientId)) of
         ok -> ok;
         {error, Reason} -> {error, #{message => Reason}}
     end.
 
 clean_acl_cache(#{clientid := ClientId, topic := Topic}, _Params) ->
-    emqx_mgmt:clean_acl_cache(ClientId, Topic).
+    emqx_mgmt:clean_acl_cache(http_uri:decode(ClientId), Topic).
 
 format(ClientList) when is_list(ClientList) ->
     [format(Client) || Client <- ClientList];

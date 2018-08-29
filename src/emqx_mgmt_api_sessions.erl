@@ -56,10 +56,10 @@ list(Bindings = #{node := Node}, Params) ->
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    {ok, format(emqx_mgmt:lookup_session(Node, ClientId))};
+    {ok, format(emqx_mgmt:lookup_session(Node, http_uri:decode(ClientId)))};
 
 lookup(#{clientid := ClientId}, _Params) ->
-    {ok, format(emqx_mgmt:lookup_session(ClientId))}.
+    {ok, format(emqx_mgmt:lookup_session(http_uri:decode(ClientId)))}.
 
 format([]) ->
     [];
