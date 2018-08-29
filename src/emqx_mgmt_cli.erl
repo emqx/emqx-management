@@ -56,10 +56,8 @@ load() ->
 
 is_cmd(Fun) ->
     not lists:member(Fun, [init, load, module_info]).
-mgmt(["add_app", AppId, Name, Desc, Status]) ->
-    mgmt(["add_app", AppId, Name, Desc, Status, undefined]);
 
-mgmt(["add", AppId, Name]) ->
+mgmt(["insert", AppId, Name]) ->
     case emqx_mgmt_auth:add_app(list_to_binary(AppId), list_to_binary(Name)) of
         {ok, Secret} ->
             emqx_cli:print("AppSecret: ~s~n", [Secret]);
