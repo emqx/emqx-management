@@ -47,7 +47,7 @@ start_listener({Proto, Port, Options}) when Proto == https ->
     minirest:start_https(listener_name(Proto), [{port, Port}] ++ Options, Dispatch).
 
 stop_listener({Proto, Port, _}) ->
-    minirest:stop_http(listener_name(Proto), Port).
+    minirest:stop_http(listener_name(Proto)).
 
 listeners() ->
     application:get_env(?APP, listeners, []).
