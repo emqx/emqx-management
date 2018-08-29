@@ -85,7 +85,7 @@ node_info(Node) when Node =:= node() ->
           memory_used       => get_value(used, Memory),
           process_available => erlang:system_info(process_limit),
           process_used      => erlang:system_info(process_count),
-          max_fds           => get_value(max_fds, erlang:system_info(check_io)),
+          max_fds           => get_value(max_fds, lists:usort(lists:flatten(erlang:system_info(check_io)))),
           connections       => ets:info(emqx_conn, size),
           node_status       => 'Running',
           uptime            => iolist_to_binary(proplists:get_value(uptime, BrokerInfo)),
