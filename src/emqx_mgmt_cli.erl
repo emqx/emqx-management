@@ -33,7 +33,7 @@
 
 -export([status/1, broker/1, cluster/1, clients/1, sessions/1,
          routes/1, subscriptions/1, plugins/1, bridges/1,
-         listeners/1, vm/1, mnesia/1, trace/1, acl/1, license/1, mgmt/1]).
+         listeners/1, vm/1, mnesia/1, trace/1, acl/1, mgmt/1]).
 
 -define(PROC_INFOKEYS, [status,
                         memory,
@@ -231,7 +231,7 @@ clients(_) ->
 if_client(ClientId, Fun) ->
     case ets:lookup(emqx_conn, (bin(ClientId))) of
         [] -> emqx_cli:print("Not Found.~n");
-        [Client]    -> Fun(Client)
+        [Client]    -> Fun({emqx_conn, Client})
     end.
 
 %%--------------------------------------------------------------------
@@ -351,25 +351,26 @@ plugins(["unload", Name]) ->
             emqx_cli:print("unload plugin error: ~p~n", [Reason])
     end;
 
-plugins(["add", Name]) ->
-    {ok, Path} = emqx:env(expand_plugins_dir),
-    Dir = Path ++ Name,
-    zip:unzip(Dir, [{cwd, Path}]),
-    Plugin = filename:basename(Dir, ".zip"),
-    case emqx_plugins:load_expand_plugin(Path ++ Plugin) of
-        ok ->
-            emqx_cli:print("Add plugin:~p successfully.~n", [Plugin]);
-        {error, {already_loaded,_}} ->
-            emqx_cli:print("Already loaded plugin:~p ~n", [Plugin]);
-        {error, Error} ->
-            emqx_cli:print("Add plugin:~p error: ~n", [Plugin, Error])
-    end;
+% plugins(["add", Name]) ->
+%     {ok, Path} = emqx:env(expand_plugins_dir),
+%     Dir = Path ++ Name,
+%     zip:unzip(Dir, [{cwd, Path}]),
+%     Plugin = filename:basename(Dir, ".zip"),
+%     case emqx_plugins:load_expand_plugin(Path ++ Plugin) of
+%         ok ->
+%             emqx_cli:print("Add plugin:~p successfully.~n", [Plugin]);
+%         {error, {already_loaded,_}} ->
+%             emqx_cli:print("Already loaded plugin:~p ~n", [Plugin]);
+%         {error, Error} ->
+%             emqx_cli:print("Add plugin:~p error: ~n", [Plugin, Error])
+%     end;
 
 plugins(_) ->
     emqx_cli:usage([{"plugins list",            "Show loaded plugins"},
                     {"plugins load <Plugin>",   "Load plugin"},
-                    {"plugins unload <Plugin>", "Unload plugin"},
-                    {"plugins add <Plugin.zip>", "Add plugin"}]).
+                    {"plugins unload <Plugin>", "Unload plugin"}
+                    % {"plugins add <Plugin.zip>", "Add plugin"}
+                    ]).
 
 %%--------------------------------------------------------------------
 %% @doc Bridges command
@@ -582,22 +583,22 @@ listeners(_) ->
 %%--------------------------------------------------------------------
 %% @doc License Command
 
-license(["reload", File]) ->
-    case emqx_license:reload(File) of
-        ok              -> emqx_cli:print("ok~n");
-        {error, Reason} -> emqx_cli:print("Error: ~p~n", [Reason])
-    end;
+% license(["reload", File]) ->
+%     case emqx_license:reload(File) of
+%         ok              -> emqx_cli:print("ok~n");
+%         {error, Reason} -> emqx_cli:print("Error: ~p~n", [Reason])
+%     end;
 
-license(["info"]) ->
-    foreach(fun({K, V}) when is_binary(V); is_atom(V) ->
-                emqx_cli:print("~-12s: ~s~n", [K, V]);
-               ({K, V}) ->
-                emqx_cli:print("~-12s: ~w~n", [K, V])
-            end, emqx_license:info());
+% license(["info"]) ->
+%     foreach(fun({K, V}) when is_binary(V); is_atom(V) ->
+%                 emqx_cli:print("~-12s: ~s~n", [K, V]);
+%                ({K, V}) ->
+%                 emqx_cli:print("~-12s: ~w~n", [K, V])
+%             end, emqx_license:info());
 
-license(_) ->
-    emqx_cli:usage([{"license info",          "Show license info"},
-                    {"license reload <File>", "Load a new license file"}]).
+% license(_) ->
+%     emqx_cli:usage([{"license info",          "Show license info"},
+%                     {"license reload <File>", "Load a new license file"}]).
 
 %%--------------------------------------------------------------------
 %% Dump ETS
