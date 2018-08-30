@@ -38,12 +38,12 @@ stop_listeners() ->
 
 start_listener({Proto, Port, Options}) when Proto == http ->
     Dispatch = [{"/status", emqx_mgmt_http, []},
-                {"/api/v2/[...]", minirest, http_handlers()}],
+                {"/api/v3/[...]", minirest, http_handlers()}],
     minirest:start_http(listener_name(Proto), [{port, Port}] ++ Options, Dispatch);
 
 start_listener({Proto, Port, Options}) when Proto == https ->
     Dispatch = [{"/status", emqx_mgmt_http, []},
-                {"/api/v2/[...]", minirest, http_handlers()}],
+                {"/api/v3/[...]", minirest, http_handlers()}],
     minirest:start_https(listener_name(Proto), [{port, Port}] ++ Options, Dispatch).
 
 stop_listener({Proto, _Port, _}) ->
@@ -56,7 +56,7 @@ listener_name(Proto) ->
     list_to_atom(atom_to_list(Proto) ++ ":management").
 
 http_handlers() ->
-    [{"/api/v2", minirest:handler(#{apps => [?APP], except => ?EXCEPT }),
+    [{"/api/v3", minirest:handler(#{apps => [?APP], except => ?EXCEPT }),
                  [{authorization, fun authorize_appid/1}]}].
 
 %%--------------------------------------------------------------------

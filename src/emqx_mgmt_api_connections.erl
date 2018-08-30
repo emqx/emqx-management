@@ -17,41 +17,41 @@
 -include_lib("emqx/include/emqx_mqtt.hrl").
 -include_lib("emqx/include/emqx.hrl").
 
--rest_api(#{name   => list_clients,
+-rest_api(#{name   => list_connections,
             method => 'GET',
-            path   => "/clients/",
+            path   => "/connections/",
             func   => list,
-            descr  => "A list of clients in the cluster"}).
+            descr  => "A list of connections in the cluster"}).
 
--rest_api(#{name   => list_node_clients,
+-rest_api(#{name   => list_node_connections,
             method => 'GET',
-            path   => "nodes/:atom:node/clients/",
+            path   => "nodes/:atom:node/connections/",
             func   => list,
-            descr  => "A list of clients on a node"}).
+            descr  => "A list of connections on a node"}).
 
--rest_api(#{name   => lookup_node_client,
+-rest_api(#{name   => lookup_node_connections,
             method => 'GET',
-            path   => "nodes/:atom:node/clients/:bin:clientid",
+            path   => "nodes/:atom:node/connections/:bin:clientid",
             func   => lookup,
-            descr  => "Lookup a client on node"}).
+            descr  => "Lookup a connection on node"}).
 
--rest_api(#{name   => lookup_client,
+-rest_api(#{name   => lookup_connections,
             method => 'GET',
-            path   => "/clients/:bin:clientid",
+            path   => "/connections/:bin:clientid",
             func   => lookup,
-            descr  => "Lookup a client in the cluster"}).
+            descr  => "Lookup a connection in the cluster"}).
 
--rest_api(#{name   => kickout_client,
+-rest_api(#{name   => kickout_connection,
             method => 'DELETE',
-            path   => "/clients/:bin:clientid",
+            path   => "/connections/:bin:clientid",
             func   => kickout,
-            descr  => "Kick out a client"}).
+            descr  => "Kick out a connection"}).
 
 -rest_api(#{name   => clean_acl_cache,
             method => 'DELETE',
-            path   => "/clients/:bin:clientid/acl/:bin:topic",
+            path   => "/connections/:bin:clientid/acl/:bin:topic",
             func   => clean_acl_cache,
-            descr  => "Clean ACL cache of a client"}).
+            descr  => "Clean ACL cache of a connection"}).
 
 -import(emqx_mgmt_util, [ntoa/1, strftime/1]).
 
