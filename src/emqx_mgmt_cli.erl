@@ -547,18 +547,36 @@ listeners([]) ->
                 foreach(fun({Key, Val}) ->
                             emqx_cli:print("  ~-16s: ~w~n", [Key, Val])
                         end, Info)
-            end, esockd:listeners());
+            end, esockd:listeners()),
+    foreach(fun({Protocol, Opts}) ->
+                Info = [{acceptors,      proplists:get_value(num_acceptors, Opts)},
+                        {max_conns,      proplists:get_value(max_connections, Opts)},
+                        {current_conn,   proplists:get_value(all_connections, Opts)},
+                        {shutdown_count, []}],
+                emqx_cli:print("listener on ~s:~p~n", [Protocol, proplists:get_value(port, Opts)]),
+                foreach(fun({Key, Val}) ->
+                            emqx_cli:print("  ~-16s: ~w~n", [Key, Val])
+                        end, Info)
+            end, ranch:info());
 
-listeners(["restart", Proto, ListenOn]) ->
-    ListenOn1 = case string:tokens(ListenOn, ":") of
-        [Port]     -> list_to_integer(Port);
-        [IP, Port] -> {IP, list_to_integer(Port)}
-    end,
-    case emqx_listeners:restart_listener({list_to_atom(Proto), ListenOn1, []}) of
+% listeners(["restart", Proto, ListenOn]) ->
+%     ListenOn1 = case string:tokens(ListenOn, ":") of
+%         [Port]     -> list_to_integer(Port);
+%         [IP, Port] -> {IP, list_to_integer(Port)}
+%     end,
+%     case emqx_listeners:restart_listener({list_to_atom(Proto), ListenOn1, []}) of
+%         ok ->
+%             io:format("Restart ~s listener on ~s successfully.~n", [Proto, ListenOn]);
+%         {error, Error} ->
+%             io:format("Failed to restart ~s listener on ~s, error:~p~n", [Proto, ListenOn, Error])
+%     end;
+
+listeners(["stop",  Name = "http" ++ _N, ListenOn]) ->
+    case minirest:stop_http(list_to_atom(Name)) of
         ok ->
-            io:format("Restart ~s listener on ~s successfully.~n", [Proto, ListenOn]);
+            io:format("Stop ~s listener on ~s successfully.~n", [Name, ListenOn]);
         {error, Error} ->
-            io:format("Failed to restart ~s listener on ~s, error:~p~n", [Proto, ListenOn, Error])
+            io:format("Failed to stop ~s listener on ~s, error:~p~n", [Name, ListenOn, Error])
     end;
 
 listeners(["stop", Proto, ListenOn]) ->
@@ -575,7 +593,7 @@ listeners(["stop", Proto, ListenOn]) ->
 
 listeners(_) ->
     emqx_cli:usage([{"listeners",                        "List listeners"},
-                    {"listeners restart <Proto> <Port>", "Restart a listener"},
+                    % {"listeners restart <Proto> <Port>", "Restart a listener"},
                     {"listeners stop    <Proto> <Port>", "Stop a listener"}]).
 
 %%--------------------------------------------------------------------
