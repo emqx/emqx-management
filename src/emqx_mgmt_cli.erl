@@ -431,13 +431,13 @@ plugins(_) ->
 bridges(["list"]) ->
     foreach(fun({Name, State}) ->
                 emqx_cli:print("name: ~s     status: ~s~n", [Name, State])
-            end, emqx_bridge1_sup:bridges());
+            end, emqx_bridge_sup:bridges());
 
 bridges(["start", Name]) ->
-    ?PRINT("~s.~n", [emqx_bridge1:start_bridge(list_to_atom(Name))]);
+    ?PRINT("~s.~n", [emqx_bridge_sup:start_bridge(list_to_atom(Name))]);
 
 bridges(["stop", Name]) ->
-    ?PRINT("~s.~n", [emqx_bridge1:stop_bridge(list_to_atom(Name))]);
+    ?PRINT("~s.~n", [emqx_bridge_sup:stop_bridge(list_to_atom(Name))]);
 
 bridges(_) ->
     emqx_cli:usage([{"bridges list",          "List bridges"},
