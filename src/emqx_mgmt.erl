@@ -56,6 +56,11 @@
          get_plugin_configs/1, get_plugin_configs/2,
          update_plugin_configs/2, update_plugin_configs/3]).
 
+%% Banned
+-export([create_banned/1,
+         delete_banned/1
+        ]).
+
 %% Common Table API
 -export([count/1, tables/1, query_handle/1, item/2, max_row_limit/0]).
 
@@ -376,6 +381,16 @@ update_plugin_configs(PluginName, Terms) ->
 
 update_plugin_configs(Node, PluginName, Terms) ->
     rpc_call(Node, update_plugin_configs, [PluginName, Terms]).
+
+%%--------------------------------------------------------------------
+%% Banned API
+%%--------------------------------------------------------------------
+
+create_banned(Banned) ->
+    emqx_banned:add(Banned).
+
+delete_banned(Key) ->
+    emqx_banned:del(Key).
 
 %%--------------------------------------------------------------------
 %% Common Table API
