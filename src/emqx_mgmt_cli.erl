@@ -291,7 +291,7 @@ subscriptions(["add", ClientId, Topic, QoS]) ->
                         case emqx_sm:lookup_session_pid(bin(ClientId)) of
                             Pid when is_pid(Pid) ->
                                 {Topic1, Options} = emqx_topic:parse(bin(Topic)),
-                                emqx_session:subscribe(Pid, [{Topic1, [{qos, IntQos}|Options]}]),
+                                emqx_session:subscribe(Pid, [{Topic1, Options#{qos => IntQos}}]),
                                 emqx_cli:print("ok~n");
                             _ ->
                                 emqx_cli:print("Error: Session not found!")
