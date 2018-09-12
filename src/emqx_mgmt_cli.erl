@@ -665,6 +665,8 @@ print({emqx_session, Key}) ->
            "deliver_msg=~w, enqueue_msg=~w, created_at=~w)~n",
             [format(K, get_value(K, Attrs++Stats)) || K <- InfoKeys]);
 
+print({emqx_route, #route{topic = Topic, dest = {_, Node}}}) ->
+    emqx_cli:print("~s -> ~s~n", [Topic, Node]);
 print({emqx_route, #route{topic = Topic, dest = Node}}) ->
     emqx_cli:print("~s -> ~s~n", [Topic, Node]);
 
