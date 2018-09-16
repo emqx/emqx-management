@@ -439,10 +439,50 @@ bridges(["start", Name]) ->
 bridges(["stop", Name]) ->
     ?PRINT("~s.~n", [emqx_bridge:stop_bridge(list_to_atom(Name))]);
 
+bridges(["forwards", Name]) ->
+    foreach(fun(Topic) ->
+        ?PRINT("topic:   ~s~n", [Topic])
+    end, emqx_bridge:show_forwards(list_to_atom(Name)));
+
+bridges(["add-forward", Name, Topic]) ->
+    case emqx_bridge:add_forward(list_to_atom(Name), iolist_to_binary(Topic)) of
+        ok -> emqx_cli:print("Add-forward topic successfully.~n");
+        fail -> emqx_cli:print("Add-forward topic failed.~n")
+    end;
+
+bridges(["del-forward", Name, Topic]) ->
+    case emqx_bridge:del_forward(list_to_atom(Name), iolist_to_binary(Topic)) of
+        ok -> emqx_cli:print("Del-forward topic successfully.~n");
+        fail -> emqx_cli:print("Del-forward topic failed.~n")
+    end;
+
+bridges(["subscriptions", Name]) ->
+    foreach(fun({Topic, Qos}) ->
+        ?PRINT("topic: ~s, qos: ~p~n", [Topic, Qos])
+    end, emqx_bridge:show_subscriptions(list_to_atom(Name)));
+
+bridges(["add-subscription", Name, Topic, Qos]) ->
+    case emqx_bridge:add_subscription(list_to_atom(Name), iolist_to_binary(Topic), list_to_integer(Qos)) of
+        ok -> emqx_cli:print("Add-subscription topic successfully.~n");
+        fail -> emqx_cli:print("Add-subscription topic failed.~n")
+    end;
+
+bridges(["del-subscription", Name, Topic]) ->
+    case emqx_bridge:del_subscription(list_to_atom(Name), iolist_to_binary(Topic)) of
+        ok -> emqx_cli:print("Del-subscription topic successfully.~n");
+        fail -> emqx_cli:print("Del-subscription topic failed.~n")
+    end;
+
 bridges(_) ->
-    emqx_cli:usage([{"bridges list",          "List bridges"},
-                    {"bridges start <Name>",  "Start a bridge"},
-                    {"bridges stop <Name>",   "Stop a bridge"}]).
+    emqx_cli:usage([{"bridges list",           "List bridges"},
+                    {"bridges start <Name>",   "Start a bridge"},
+                    {"bridges stop <Name>",    "Stop a bridge"},
+                    {"bridges forwards <Name>", "Show a bridge forward topic"},
+                    {"bridges add-forward <Name> <Topic>", "Add bridge forward topic"},
+                    {"bridges del-forward <Name> <Topic>", "Delete bridge forward topic"},
+                    {"bridges subscriptions <Name>", "Show a bridge subscriptions topic"},
+                    {"bridges add-subscription <Name> <Topic> <Qos>", "Add bridge subscriptions topic"},
+                    {"bridges del-subscription <Name> <Topic>", "Delete bridge subscriptions topic"}]).
 %%--------------------------------------------------------------------
 %% @doc vm command
 
