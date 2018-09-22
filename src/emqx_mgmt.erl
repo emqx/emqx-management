@@ -264,7 +264,7 @@ lookup_routes(Topic) ->
 subscribe(ClientId, TopicTable) ->
     case emqx_sm:lookup_session_pid(ClientId) of
         Pid when is_pid(Pid) ->
-            emqx_session:subscribe(Pid, {undefined, #{}, TopicTable});
+            emqx_session:subscribe(Pid, TopicTable);
         _ -> {error, session_not_found}
     end.
 
