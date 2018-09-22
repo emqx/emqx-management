@@ -430,14 +430,14 @@ plugins(_) ->
 
 bridges(["list"]) ->
     foreach(fun({Name, State}) ->
-                emqx_cli:print("name: ~s     status: ~s~n", [Name, State])
+                emqx_cli:print("name: ~s     status: ~s~n", [Name, maps:get(status, State)])
             end, emqx_bridge_sup:bridges());
 
 bridges(["start", Name]) ->
-    ?PRINT("~s.~n", [emqx_bridge:start_bridge(list_to_atom(Name))]);
+    ?PRINT("~s.~n", [maps:get(msg, emqx_bridge:start_bridge(list_to_atom(Name)))]);
 
 bridges(["stop", Name]) ->
-    ?PRINT("~s.~n", [emqx_bridge:stop_bridge(list_to_atom(Name))]);
+    ?PRINT("~s.~n", [maps:get(msg, emqx_bridge:stop_bridge(list_to_atom(Name)))]);
 
 bridges(["forwards", Name]) ->
     foreach(fun(Topic) ->
@@ -447,15 +447,13 @@ bridges(["forwards", Name]) ->
 bridges(["add-forward", Name, Topic]) ->
     case emqx_bridge:add_forward(list_to_atom(Name), iolist_to_binary(Topic)) of
         ok -> emqx_cli:print("Add-forward topic successfully.~n");
-        validate_fail -> emqx_cli:print("Add-forward validate topic failed.~n");
-        fail -> emqx_cli:print("Add-forward topic failed.~n")
+        {error, Reason} -> emqx_cli:print("Add-forward failed reason: ~p.~n", [Reason])
     end;
 
 bridges(["del-forward", Name, Topic]) ->
     case emqx_bridge:del_forward(list_to_atom(Name), iolist_to_binary(Topic)) of
         ok -> emqx_cli:print("Del-forward topic successfully.~n");
-        validate_fail -> emqx_cli:print("Del-forward validate topic failed.~n");
-        fail -> emqx_cli:print("Del-forward topic failed.~n")
+        {error, Reason} -> emqx_cli:print("Del-forward failed reason: ~p.~n", [Reason])
     end;
 
 bridges(["subscriptions", Name]) ->
@@ -466,15 +464,13 @@ bridges(["subscriptions", Name]) ->
 bridges(["add-subscription", Name, Topic, Qos]) ->
     case emqx_bridge:add_subscription(list_to_atom(Name), iolist_to_binary(Topic), list_to_integer(Qos)) of
         ok -> emqx_cli:print("Add-subscription topic successfully.~n");
-        validate_fail -> emqx_cli:print("Add-subscription validate topic failed.~n");
-        fail -> emqx_cli:print("Add-subscription topic failed.~n")
+        {error, Reason} -> emqx_cli:print("Add-subscription failed reason: ~p.~n", [Reason])
     end;
 
 bridges(["del-subscription", Name, Topic]) ->
     case emqx_bridge:del_subscription(list_to_atom(Name), iolist_to_binary(Topic)) of
         ok -> emqx_cli:print("Del-subscription topic successfully.~n");
-        validate_fail -> emqx_cli:print("Del-subscription validate topic failed.~n");
-        fail -> emqx_cli:print("Del-subscription topic failed.~n")
+        {error, Reason} -> emqx_cli:print("Del-subscription failed reason: ~p.~n", [Reason])
     end;
 
 bridges(_) ->
