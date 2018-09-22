@@ -447,12 +447,14 @@ bridges(["forwards", Name]) ->
 bridges(["add-forward", Name, Topic]) ->
     case emqx_bridge:add_forward(list_to_atom(Name), iolist_to_binary(Topic)) of
         ok -> emqx_cli:print("Add-forward topic successfully.~n");
+        validate_fail -> emqx_cli:print("Add-forward validate topic failed.~n");
         fail -> emqx_cli:print("Add-forward topic failed.~n")
     end;
 
 bridges(["del-forward", Name, Topic]) ->
     case emqx_bridge:del_forward(list_to_atom(Name), iolist_to_binary(Topic)) of
         ok -> emqx_cli:print("Del-forward topic successfully.~n");
+        validate_fail -> emqx_cli:print("Del-forward validate topic failed.~n");
         fail -> emqx_cli:print("Del-forward topic failed.~n")
     end;
 
@@ -464,12 +466,14 @@ bridges(["subscriptions", Name]) ->
 bridges(["add-subscription", Name, Topic, Qos]) ->
     case emqx_bridge:add_subscription(list_to_atom(Name), iolist_to_binary(Topic), list_to_integer(Qos)) of
         ok -> emqx_cli:print("Add-subscription topic successfully.~n");
+        validate_fail -> emqx_cli:print("Add-subscription validate topic failed.~n");
         fail -> emqx_cli:print("Add-subscription topic failed.~n")
     end;
 
 bridges(["del-subscription", Name, Topic]) ->
     case emqx_bridge:del_subscription(list_to_atom(Name), iolist_to_binary(Topic)) of
         ok -> emqx_cli:print("Del-subscription topic successfully.~n");
+        validate_fail -> emqx_cli:print("Del-subscription validate topic failed.~n");
         fail -> emqx_cli:print("Del-subscription topic failed.~n")
     end;
 
