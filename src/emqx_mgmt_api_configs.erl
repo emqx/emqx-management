@@ -83,7 +83,7 @@ update_plugin_configs(#{node := Node, plugin := Plugin}, Params) ->
         ok  ->
             ensure_reload_plugin(Plugin);
         Error ->
-            lager:error("MGMT update_plugin_configs error:~p~n", [Error]),
+            logger:error("MGMT update_plugin_configs error:~p~n", [Error]),
             {error, [{code, ?ERROR2}]}
     end.
 
