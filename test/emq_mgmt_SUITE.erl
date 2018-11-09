@@ -38,17 +38,20 @@ groups() ->
 
 init_per_suite(Config) ->
     ekka_mnesia:start(),
+    emqx_mgmt_auth:mnesia(boot),
     Config.
 
 end_per_suite(_Config) ->
     application:stop(mnesia).
 
 t_add_app(_Config) ->
-    emqx_mgmt_auth:add_app(id, <<"secret">>),
-    ?assert(emqx_mgmt_auth:check_app(id, <<"secret">>)),
-    ?assertEqual(<<"secret">>, emqx_mgmt_auth:get_appsecret(id)),
-    ?assertEqual([{id, <<"secret">>}], emqx_mgmt_auth:list_apps()),
-    emqx_mgmt_auth:del_app(id),
+    {ok, _} = emqx_mgmt_auth:add_app(<<"id">>, <<"secret">>),
+    ct:pal("ets: ~p", [ets:info(mqtt_app)]),
+    ?assertNotEqual(undefined, emqx_mgmt_auth:lookup_app(<<"id">>)),
+    ?assertNotEqual(0, erlang:iolist_size(emqx_mgmt_auth:get_appsecret(<<"id">>))),
+    ?assertEqual(1, length(emqx_mgmt_auth:list_apps())),
+    emqx_mgmt_auth:del_app(<<"id">>),
+    ?assertEqual(0, length(emqx_mgmt_auth:list_apps())),
     ok.
 
 t_del_app(_Config) ->
