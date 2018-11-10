@@ -41,7 +41,7 @@
 -export([subscribe/2, publish/2, unsubscribe/2]).
 
 subscribe(_Bindings, Params) ->
-    lager:debug("API subscribe Params:~p", [Params]),
+    logger:debug("API subscribe Params:~p", [Params]),
     ClientId = get_value(<<"client_id">>, Params),
     Topics   = topics(filter, get_value(<<"topic">>, Params), get_value(<<"topics">>, Params, <<"">>)),
     QoS      = get_value(<<"qos">>, Params, 0),
@@ -57,7 +57,7 @@ subscribe(_Bindings, Params) ->
     end.
 
 publish(_Bindings, Params) ->
-    lager:debug("API publish Params:~p", [Params]),
+    logger:debug("API publish Params:~p", [Params]),
     Topics   = topics(name, get_value(<<"topic">>, Params), get_value(<<"topics">>, Params, <<"">>)),
     ClientId = get_value(<<"client_id">>, Params),
     Payload  = get_value(<<"payload">>, Params, <<>>),
@@ -75,7 +75,7 @@ publish(_Bindings, Params) ->
     end.
 
 unsubscribe(_Bindings, Params) ->
-    lager:debug("API unsubscribe Params:~p", [Params]),
+    logger:debug("API unsubscribe Params:~p", [Params]),
     ClientId = get_value(<<"client_id">>, Params),
     Topic    = get_value(<<"topic">>, Params),
     case validate_by_filter(Topic) of

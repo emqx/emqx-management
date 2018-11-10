@@ -540,10 +540,10 @@ trace(["list"]) ->
             end, emqx_tracer:lookup_traces());
 
 trace(["client", ClientId, "off"]) ->
-    trace_off(client, ClientId);
+    trace_off(client_id, ClientId);
 
 trace(["client", ClientId, LogFile]) ->
-    trace_on(client, ClientId, LogFile);
+    trace_on(client_id, ClientId, LogFile);
 
 trace(["topic", Topic, "off"]) ->
     trace_off(topic, Topic);
@@ -553,8 +553,8 @@ trace(["topic", Topic, LogFile]) ->
 
 trace(_) ->
     emqx_cli:usage([{"trace list",                       "List all traces"},
-                    {"trace client <ClientId> <LogFile>","Trace a client"},
-                    {"trace client <ClientId> off",      "Stop tracing a client"},
+                    {"trace client <ClientId> <LogFile>","Trace a client by client_id"},
+                    {"trace client <ClientId> off",      "Stop tracing a client by client_id"},
                     {"trace topic <Topic> <LogFile>",    "Trace a topic"},
                     {"trace topic <Topic> off",          "Stop tracing a Topic"}]).
 
