@@ -3,12 +3,13 @@ PROJECT_DESCRIPTION = EMQ X Management API and CLI
 PROJECT_VERSION = 3.0
 PROJECT_MOD = emqx_mgmt_app
 
-DEPS = minirest clique
+DEPS = clique minirest
 
-BUILD_DEPS = emqx minirest
+BUILD_DEPS = emqx cuttlefish
 dep_emqx     = git https://github.com/emqx/emqx emqx30
 dep_minirest = git https://github.com/emqx/minirest emqx30
 dep_clique   = git https://github.com/emqx/clique
+dep_cuttlefish = git https://github.com/emqx/cuttlefish
 
 LOCAL_DEPS = mnesia
 
