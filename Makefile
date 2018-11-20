@@ -3,9 +3,14 @@ PROJECT_DESCRIPTION = EMQ X Management API and CLI
 PROJECT_VERSION = 3.0
 PROJECT_MOD = emqx_mgmt_app
 
+DEPS = minirest clique
+
 BUILD_DEPS = emqx minirest
 dep_emqx     = git https://github.com/emqx/emqx emqx30
 dep_minirest = git https://github.com/emqx/minirest emqx30
+dep_clique   = git https://github.com/emqx/clique
+
+LOCAL_DEPS = mnesia
 
 NO_AUTOPATCH = cuttlefish
 
@@ -51,7 +56,7 @@ comma = ,
 quote = \"
 curly_l = "{"
 curly_r = "}"
-dep-versions = [$(foreach dep,$(DEPS) $(BUILD_DEPS),$(curly_l)$(dep),$(quote)$(word 3,$(dep_$(dep)))$(quote)$(curly_r)$(comma))[]]
+dep-versions = [$(foreach dep,$(DEPS) $(BUILD_DEPS),$(curly_l),$(quote)$(word 3,$(dep_$(dep)))$(quote)$(curly_r)$(comma))[]]
 
 .PHONY: dep-vsn-check
 dep-vsn-check:
