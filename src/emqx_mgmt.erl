@@ -27,7 +27,7 @@
 -export([get_metrics/0, get_metrics/1, get_stats/0, get_stats/1]).
 
 %% Clients, Sessions
--export([list_conns/1, lookup_conn/1, lookup_conn/2,
+-export([list_conns/1, lookup_conn/2, lookup_conn/3,
          kickout_conn/1, kickout_conn/2, clean_acl_cache/2, clean_acl_cache/3]).
 
 -export([list_sessions/1, lookup_session/1, lookup_session/2]).
@@ -155,14 +155,14 @@ list_conns(Node) ->
         Res -> Res
     end.
 
-lookup_conn(ClientId) ->
-    lists:append([lookup_conn(Node, ClientId) || Node <- ekka_mnesia:running_nodes()]).
+lookup_conn(ClientId, FormatFun) ->
+    lists:append([lookup_conn(Node, ClientId, FormatFun) || Node <- ekka_mnesia:running_nodes()]).
 
-lookup_conn(Node, ClientId) when Node =:= node() ->
-    ets:lookup(emqx_conn, ClientId);
+lookup_conn(Node, ClientId, FormatFun) when Node =:= node() ->
+    FormatFun(ets:lookup(emqx_conn, ClientId));
 
-lookup_conn(Node, ClientId) ->
-    rpc_call(Node, lookup_conn, [Node, ClientId]).
+lookup_conn(Node, ClientId, FormatFun) ->
+    rpc_call(Node, lookup_conn, [Node, ClientId, FormatFun]).
 
 kickout_conn(ClientId) ->
     Results = [kickout_conn(Node, ClientId) || Node <- ekka_mnesia:running_nodes()],
