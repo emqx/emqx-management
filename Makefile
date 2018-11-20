@@ -4,12 +4,12 @@ PROJECT_VERSION = 3.0
 PROJECT_MOD = emqx_mgmt_app
 
 DEPS = clique minirest
+dep_minirest = git https://github.com/emqx/minirest emqx30
+dep_clique   = git https://github.com/emqx/clique develop
 
 BUILD_DEPS = emqx cuttlefish
 dep_emqx     = git https://github.com/emqx/emqx emqx30
-dep_minirest = git https://github.com/emqx/minirest emqx30
-dep_clique   = git https://github.com/emqx/clique
-dep_cuttlefish = git https://github.com/emqx/cuttlefish
+dep_cuttlefish = git https://github.com/emqx/cuttlefish v2.1.0
 
 LOCAL_DEPS = mnesia
 
@@ -57,10 +57,11 @@ comma = ,
 quote = \"
 curly_l = "{"
 curly_r = "}"
-dep-versions = [$(foreach dep,$(DEPS) $(BUILD_DEPS),$(curly_l),$(quote)$(word 3,$(dep_$(dep)))$(quote)$(curly_r)$(comma))[]]
+dep-versions = [$(foreach dep,$(DEPS) $(BUILD_DEPS),$(curly_l)$(dep),$(quote)$(word 3,$(dep_$(dep)))$(quote)$(curly_r)$(comma))[]]
 
 .PHONY: dep-vsn-check
 dep-vsn-check:
+	echo $(dep-versions)
 	$(verbose) erl -noshell -eval \
 		"MkVsns = lists:sort(lists:flatten($(dep-versions))), \
 		{ok, Conf} = file:consult('rebar.config'), \

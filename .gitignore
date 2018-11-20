@@ -16,4 +16,5 @@ log/
 _build/
 rebar.lock
 rebar3.crashdump
+Mnesia.nonode@nohost/
 
