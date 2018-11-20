@@ -4,9 +4,7 @@
               {modules,[]},
               {registered,[]},
               {applications, [kernel, stdlib, emqx]},
-              {mod,{emqx_auth_username_app, []}},
               {env,[]},
-              {mod, {emqx_auth_username_app, []}},
               {licenses, ["Apache-2.0"]},
               {links, ["Github", "https://github.com/emqx/emqx-management"]}
              ]}.
