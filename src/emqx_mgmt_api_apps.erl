@@ -14,7 +14,7 @@
 
 -module(emqx_mgmt_api_apps).
 
--import(proplists, [get_value/2, get_value/3]).
+-import(proplists, [get_value/2]).
 
 -rest_api(#{name   => add_app,
             method => 'POST',

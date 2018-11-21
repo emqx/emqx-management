@@ -21,7 +21,5 @@ COVER = true
 
 include erlang.mk
 
-app:: rebar.config
-
 app.config::
 	./deps/cuttlefish/cuttlefish -l info -e etc/ -c etc/emqx_management.conf -i priv/emqx_management.schema -d data

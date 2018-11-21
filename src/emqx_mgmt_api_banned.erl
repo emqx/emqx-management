@@ -18,7 +18,7 @@
 
 -include("emqx_mgmt.hrl").
 
--import(proplists, [get_value/2, get_value/3]).
+-import(proplists, [get_value/2]).
 
 -rest_api(#{name   => list_banned,
             method => 'GET',

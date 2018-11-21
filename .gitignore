@@ -13,3 +13,6 @@ emqx_management.d
 ebin/*
 data/
 log/
+_build/
+rebar.lock
+rebar3.crashdump

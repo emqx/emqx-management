@@ -18,7 +18,7 @@
 
 -include_lib("emqx/include/emqx.hrl").
 
--import(proplists, [get_value/2, get_value/3]).
+-import(proplists, [get_value/2]).
 
 -rest_api(#{name   => get_all_configs,
             method => 'GET',
