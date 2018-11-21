@@ -3,15 +3,14 @@ PROJECT_DESCRIPTION = EMQ X Management API and CLI
 PROJECT_VERSION = 3.0
 PROJECT_MOD = emqx_mgmt_app
 
-DEPS = clique minirest
+DEPS = minirest
 dep_minirest = git https://github.com/emqx/minirest emqx30
-dep_clique   = git https://github.com/emqx/clique develop
+
+LOCAL_DEPS = mnesia
 
 BUILD_DEPS = emqx cuttlefish
 dep_emqx       = git https://github.com/emqx/emqx emqx30
 dep_cuttlefish = git https://github.com/emqx/cuttlefish v2.1.0
-
-LOCAL_DEPS = mnesia
 
 NO_AUTOPATCH = cuttlefish
 
@@ -61,7 +60,6 @@ dep-versions = [$(foreach dep,$(DEPS) $(BUILD_DEPS),$(curly_l)$(dep),$(quote)$(w
 
 .PHONY: dep-vsn-check
 dep-vsn-check:
-	echo $(dep-versions)
 	$(verbose) erl -noshell -eval \
 		"MkVsns = lists:sort(lists:flatten($(dep-versions))), \
 		{ok, Conf} = file:consult('rebar.config'), \
