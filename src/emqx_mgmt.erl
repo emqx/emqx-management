@@ -18,7 +18,7 @@
 -include_lib("emqx/include/emqx.hrl").
 -include_lib("emqx/include/emqx_mqtt.hrl").
 
--import(proplists, [get_value/2, get_value/3]).
+-import(proplists, [get_value/2]).
 
 %% Nodes and Brokers API
 -export([list_nodes/0, lookup_node/1, list_brokers/0, lookup_broker/1, node_info/1, broker_info/1]).

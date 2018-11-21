@@ -1,5 +1,5 @@
 {application,emqx_management,
-             [{description,"EMQ X Management API"},
+             [{description,"EMQ X Management API and CLI"},
               {vsn,"git"},
               {modules,[]},
               {registered,[]},

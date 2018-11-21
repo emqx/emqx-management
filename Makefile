@@ -8,7 +8,7 @@ dep_minirest = git https://github.com/emqx/minirest emqx30
 dep_clique   = git https://github.com/emqx/clique develop
 
 BUILD_DEPS = emqx cuttlefish
-dep_emqx     = git https://github.com/emqx/emqx emqx30
+dep_emqx       = git https://github.com/emqx/emqx emqx30
 dep_cuttlefish = git https://github.com/emqx/cuttlefish v2.1.0
 
 LOCAL_DEPS = mnesia
