@@ -560,9 +560,9 @@ trace(["start", "topic", Topic, Level, LogFile]) ->
 trace(_) ->
     emqx_cli:usage([{"trace list", "List all traces started"},
                     {"trace start client <ClientId> [<Level>] <File>", "Trace logs related to a client_id"},
-                    {"trace stop client  <ClientId>", "Stop tracing a client by client_id"},
-                    {"trace start topic  <Topic> [<Level>] <File>", "Trace logs related to a topic"},
-                    {"trace stop topic   <Topic> ", "Stop tracing for a topic"}]).
+                    {"trace stop  client <ClientId>", "Stop tracing a client by client_id"},
+                    {"trace start topic  <Topic>    [<Level>] <File>", "Trace logs related to a topic"},
+                    {"trace stop  topic  <Topic> ", "Stop tracing for a topic"}]).
 
 trace_on(Who, Name, Level, LogFile) ->
     case emqx_tracer:start_trace({Who, iolist_to_binary(Name)}, Level, LogFile) of
