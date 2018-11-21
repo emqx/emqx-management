@@ -71,10 +71,10 @@ list(Bindings = #{node := Node}, Params) ->
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    {ok, format(emqx_mgmt:lookup_conn(Node, http_uri:decode(ClientId)))};
+    {ok, emqx_mgmt:lookup_conn(Node, http_uri:decode(ClientId), fun format/1)};
 
 lookup(#{clientid := ClientId}, _Params) ->
-    {ok, format(emqx_mgmt:lookup_conn(http_uri:decode(ClientId)))}.
+    {ok, emqx_mgmt:lookup_conn(http_uri:decode(ClientId), fun format/1)}.
 
 kickout(#{clientid := ClientId}, _Params) ->
     case emqx_mgmt:kickout_conn(http_uri:decode(ClientId)) of
