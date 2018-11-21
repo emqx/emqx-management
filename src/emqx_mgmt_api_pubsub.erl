@@ -92,8 +92,7 @@ make_publish(Params) ->
     AppId    = get_value(<<"app_id">>, Params, <<"DMP">>),
     TaskId   = get_value(<<"task_id">>, Params),
     DataType = get_value(<<"data_type">>, Params, 1),
-    DeviceType = get_value(<<"device_type">>, Params, 1),
-    Topic    = mountpoint(Params, DeviceType),
+    Topic    = mountpoint(Params),
     Msg      = emqx_message:make(AppId, Qos, Topic, Payload, [{<<"url">>, Url},
                                                               {<<"task_id">>, TaskId},
                                                               {<<"return_filed">>,[<<"task_id">>]},
@@ -144,7 +143,7 @@ required_lwm2m_params() ->
    <<"callback">>].
 
 
-mountpoint(Params, DeviceType) ->
+mountpoint(Params) ->
     Topic     = get_value(<<"topic">>, Params),
     Protocol  = get_value(<<"protocol">>, Params),
     TenantID  = get_value(<<"tenantID">>, Params),
@@ -153,11 +152,7 @@ mountpoint(Params, DeviceType) ->
         undefined -> get_value(<<"deviceID">>, Params);
         GroupID -> GroupID
     end,
-    List = case DeviceType of
-        1 -> [<<"dn">>, Protocol, TenantID, ProductID, GroupIDOrDeviceID];
-        2 -> [<<"dn">>, Protocol, TenantID, GroupIDOrDeviceID]
-    end,
-    emqx_topic:encode(Topic, List).
+    emqx_topic:encode(Topic, [<<"dn">>, Protocol, TenantID, ProductID, GroupIDOrDeviceID]).
 
 publish_lwm2m(_Bindings, Params) ->
     lager:debug("DM Publish lwm2m API:~p~n", [Params]),
