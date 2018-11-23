@@ -535,43 +535,49 @@ mnesia(_) ->
 %% @doc Trace Command
 
 trace(["list"]) ->
-    foreach(fun({{Who, Name}, LogFile}) ->
-                ?PRINT("trace ~s ~s -> ~s~n", [Who, Name, LogFile])
+    foreach(fun({{Who, Name}, {Level, LogFile}}) ->
+                ?PRINT("Trace(~s=~s, level=~s, destination=~p)~n", [Who, Name, Level, LogFile])
             end, emqx_tracer:lookup_traces());
 
-trace(["client", ClientId, "off"]) ->
+trace(["stop", "client", ClientId]) ->
     trace_off(client_id, ClientId);
 
-trace(["client", ClientId, LogFile]) ->
-    trace_on(client_id, ClientId, LogFile);
+trace(["start", "client", ClientId, LogFile]) ->
+    trace_on(client_id, ClientId, all, LogFile);
 
-trace(["topic", Topic, "off"]) ->
+trace(["start", "client", ClientId, LogFile, Level]) ->
+    trace_on(client_id, ClientId, list_to_atom(Level), LogFile);
+
+trace(["stop", "topic", Topic]) ->
     trace_off(topic, Topic);
 
-trace(["topic", Topic, LogFile]) ->
-    trace_on(topic, Topic, LogFile);
+trace(["start", "topic", Topic, LogFile]) ->
+    trace_on(topic, Topic, all, LogFile);
+
+trace(["start", "topic", Topic, LogFile, Level]) ->
+    trace_on(topic, Topic, list_to_atom(Level), LogFile);
 
 trace(_) ->
-    emqx_cli:usage([{"trace list",                       "List all traces"},
-                    {"trace client <ClientId> <LogFile>","Trace a client by client_id"},
-                    {"trace client <ClientId> off",      "Stop tracing a client by client_id"},
-                    {"trace topic <Topic> <LogFile>",    "Trace a topic"},
-                    {"trace topic <Topic> off",          "Stop tracing a Topic"}]).
+    emqx_cli:usage([{"trace list", "List all traces started"},
+                    {"trace start client <ClientId> <File> [<Level>]", "Traces for a client"},
+                    {"trace stop  client <ClientId>", "Stop tracing for a client"},
+                    {"trace start topic  <Topic>    <File> [<Level>] ", "Traces for a topic"},
+                    {"trace stop  topic  <Topic> ", "Stop tracing for a topic"}]).
 
-trace_on(Who, Name, LogFile) ->
-    case emqx_tracer:start_trace({Who, iolist_to_binary(Name)}, LogFile) of
+trace_on(Who, Name, Level, LogFile) ->
+    case emqx_tracer:start_trace({Who, iolist_to_binary(Name)}, Level, LogFile) of
         ok ->
-            emqx_cli:print("trace ~s ~s successfully.~n", [Who, Name]);
+            emqx_cli:print("trace ~s ~s successfully~n", [Who, Name]);
         {error, Error} ->
-            emqx_cli:print("trace ~s ~s error: ~p~n", [Who, Name, Error])
+            emqx_cli:print("[error] trace ~s ~s: ~p~n", [Who, Name, Error])
     end.
 
 trace_off(Who, Name) ->
     case emqx_tracer:stop_trace({Who, iolist_to_binary(Name)}) of
         ok ->
-            emqx_cli:print("stop tracing ~s ~s successfully.~n", [Who, Name]);
+            emqx_cli:print("stop tracing ~s ~s successfully~n", [Who, Name]);
         {error, Error} ->
-            emqx_cli:print("stop tracing ~s ~s error: ~p.~n", [Who, Name, Error])
+            emqx_cli:print("[error] stop tracing ~s ~s: ~p~n", [Who, Name, Error])
     end.
 
 %%--------------------------------------------------------------------
