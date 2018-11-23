@@ -33,7 +33,7 @@
 
 -export([status/1, broker/1, cluster/1, clients/1, sessions/1,
          routes/1, subscriptions/1, plugins/1, bridges/1,
-         listeners/1, vm/1, mnesia/1, trace/1, acl/1, mgmt/1]).
+         listeners/1, vm/1, mnesia/1, trace/1, log/1, acl/1, mgmt/1]).
 
 -define(PROC_INFOKEYS, [status,
                         memory,
@@ -531,6 +531,36 @@ mnesia([]) ->
 mnesia(_) ->
     ?PRINT_CMD("mnesia", "Mnesia system info").
 
+%%--------------------------------------------------------------------
+%% @doc Logger Command
+
+log(["primary-level"]) ->
+    Level = emqx_logger:get_primary_log_level(),
+    emqx_cli:print("~s~n", [Level]);
+
+log(["primary-level", Level]) ->
+    emqx_logger:set_primary_log_level(list_to_atom(Level)),
+    emqx_cli:print("~s~n", [emqx_logger:get_primary_log_level()]);
+
+log(["handlers", "list"]) ->
+    [emqx_cli:print("LogHandler(id=~s, level=~s, destination=~s)~n", [Id, Level, Dst])
+        || {Id, Level, Dst} <- emqx_logger:get_log_handlers()],
+    ok;
+
+log(["handlers", "set-level", HandlerId, Level]) ->
+    case emqx_logger:set_log_handler_level(list_to_atom(HandlerId), list_to_atom(Level)) of
+        ok ->
+            {_Id, NewLevel, _Dst} = emqx_logger:get_log_handler(list_to_atom(HandlerId)),
+            emqx_cli:print("~s~n", [NewLevel]);
+        {error, Error} ->
+            emqx_cli:print("[error] ~p~n", [Error])
+    end;
+
+log(_) ->
+    emqx_cli:usage([{"log primary-level", "Show the primary log level now"},
+                    {"log primary-level <Level>","Set the primary log level"},
+                    {"log handlers list", "Show log handlers"},
+                    {"log handlers set-level <HandlerId> <Level>", "Set log level of a log handler"}]).
 %%--------------------------------------------------------------------
 %% @doc Trace Command
 
