@@ -545,8 +545,8 @@ trace(["stop", "client", ClientId]) ->
 trace(["start", "client", ClientId, LogFile]) ->
     trace_on(client_id, ClientId, all, LogFile);
 
-trace(["start", "client", ClientId, Level, LogFile]) ->
-    trace_on(client_id, ClientId, Level, LogFile);
+trace(["start", "client", ClientId, LogFile, Level]) ->
+    trace_on(client_id, ClientId, list_to_atom(Level), LogFile);
 
 trace(["stop", "topic", Topic]) ->
     trace_off(topic, Topic);
@@ -554,30 +554,30 @@ trace(["stop", "topic", Topic]) ->
 trace(["start", "topic", Topic, LogFile]) ->
     trace_on(topic, Topic, all, LogFile);
 
-trace(["start", "topic", Topic, Level, LogFile]) ->
-    trace_on(topic, Topic, Level, LogFile);
+trace(["start", "topic", Topic, LogFile, Level]) ->
+    trace_on(topic, Topic, list_to_atom(Level), LogFile);
 
 trace(_) ->
     emqx_cli:usage([{"trace list", "List all traces started"},
-                    {"trace start client <ClientId> [<Level>] <File>", "Trace logs related to a client_id"},
-                    {"trace stop  client <ClientId>", "Stop tracing a client by client_id"},
-                    {"trace start topic  <Topic>    [<Level>] <File>", "Trace logs related to a topic"},
+                    {"trace start client <ClientId> <File> [<Level>]", "Traces for a client"},
+                    {"trace stop  client <ClientId>", "Stop tracing for a client"},
+                    {"trace start topic  <Topic>    <File> [<Level>] ", "Traces for a topic"},
                     {"trace stop  topic  <Topic> ", "Stop tracing for a topic"}]).
 
 trace_on(Who, Name, Level, LogFile) ->
     case emqx_tracer:start_trace({Who, iolist_to_binary(Name)}, Level, LogFile) of
         ok ->
-            emqx_cli:print("trace ~s ~s successfully.~n", [Who, Name]);
+            emqx_cli:print("trace ~s ~s successfully~n", [Who, Name]);
         {error, Error} ->
-            emqx_cli:print("trace ~s ~s error: ~p~n", [Who, Name, Error])
+            emqx_cli:print("[error] trace ~s ~s: ~p~n", [Who, Name, Error])
     end.
 
 trace_off(Who, Name) ->
     case emqx_tracer:stop_trace({Who, iolist_to_binary(Name)}) of
         ok ->
-            emqx_cli:print("stop tracing ~s ~s successfully.~n", [Who, Name]);
+            emqx_cli:print("stop tracing ~s ~s successfully~n", [Who, Name]);
         {error, Error} ->
-            emqx_cli:print("stop tracing ~s ~s error: ~p.~n", [Who, Name, Error])
+            emqx_cli:print("[error] stop tracing ~s ~s: ~p~n", [Who, Name, Error])
     end.
 
 %%--------------------------------------------------------------------
