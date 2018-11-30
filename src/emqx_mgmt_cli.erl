@@ -219,7 +219,7 @@ clients(["show", ClientId]) ->
     if_client(ClientId, fun print/1);
 
 clients(["kick", ClientId]) ->
-    if_client(ClientId, fun({_, Pid}) -> emqx_connection:kick(Pid) end);
+    if_client(ClientId, fun({_, {_ClientId, Pid}}) -> emqx_connection:kick(Pid) end);
 
 clients(_) ->
     emqx_cli:usage([{"clients list",            "List all clients"},
@@ -718,7 +718,7 @@ print({emqx_conn, Key}) ->
                 clean_start,
                 username,
                 peername,
-                created_at],
+                connected_at],
     emqx_cli:print("Connection(~s, clean_sess=~s, username=~s, peername=~s, connected_at=~p)~n",
            [format(K, get_value(K, Attrs)) || K <- InfoKeys]);
 
@@ -756,7 +756,8 @@ print({emqx_suboption, {{Topic, {Sub, ClientId}}, _Options}}) when is_pid(Sub) -
 format(_, undefined) ->
     undefined;
 
-format(created_at, Val) ->
+format(CreatedAt, Val) when CreatedAt =:= created_at;
+                            CreatedAt =:= connected_at ->
     emqx_time:now_secs(Val);
 
 format(peername, {IPAddr, Port}) ->
