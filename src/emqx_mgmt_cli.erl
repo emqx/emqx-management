@@ -556,9 +556,28 @@ log(["handlers", "set-level", HandlerId, Level]) ->
             emqx_cli:print("[error] ~p~n", [Error])
     end;
 
+log(["set-level"]) ->
+        CurrentLevel = emqx_logger:get_primary_log_level(),
+        emqx_cli:print("The current log level is ~s~n", [CurrentLevel]),
+     [emqx_cli:print("LogHandler(id=~s, level=~s, destination=~s)~n", [Id, Level, Dst])
+        || {Id, Level, Dst} <- emqx_logger:get_log_handlers()],
+    ok;
+
+log(["set-level", HandlerId, Level]) ->
+    emqx_logger:set_primary_log_level(list_to_atom(Level)),
+    case emqx_logger:set_log_handler_level(list_to_atom(HandlerId), list_to_atom(Level)) of
+            ok ->
+                {_Id, NewLevel, _Dst} = emqx_logger:get_log_handler(list_to_atom(HandlerId)),
+                emqx_cli:print("~s~n", [NewLevel]);
+            {error, Error} ->
+                emqx_cli:print("[error] ~p~n", [Error])
+        end;
+
 log(_) ->
     emqx_cli:usage([{"log primary-level", "Show the primary log level now"},
                     {"log primary-level <Level>","Set the primary log level"},
+                    {"log set-level", "Show the set log level now and show log handlers"},
+                    {"log set-level <Handlers> <Level>", "Set the log level and set log level of a handler"},
                     {"log handlers list", "Show log handlers"},
                     {"log handlers set-level <HandlerId> <Level>", "Set log level of a log handler"}]).
 %%--------------------------------------------------------------------
