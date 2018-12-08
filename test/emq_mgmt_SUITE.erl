@@ -53,7 +53,8 @@ groups() ->
        t_router_cmd,
        t_plugins_cmd,
        t_bridges_cmd,
-       t_subscriptions_cmd]}].
+       t_subscriptions_cmd,
+       t_mnesia_cmd]}].
 
 init_per_suite(Config) ->
     ekka_mnesia:start(),
@@ -176,11 +177,25 @@ t_trace_cmd(_) ->
     {username, <<"testuser2">>},
     {password, <<"pass2">>}]),
     emqx_client:connect(T3),
+    emqx_client:subscribe(T3, <<"a/b/c">>),
+    emqx_mgmt_cli:trace(["start", "client", "client2", "log/clientid_trace.log"]),
+    emqx_mgmt_cli:trace(["stop", "client", "client2"]),
+    emqx_mgmt_cli:trace(["start", "client", "client2", "log/clientid_trace.log", "error"]),
+    emqx_mgmt_cli:trace(["stop", "client", "client2"]),
+    emqx_mgmt_cli:trace(["start", "topic", "a/b/c"]),
+    emqx_mgmt_cli:trace(["start", "topic", "a/b/c", "error"]),
+    emqx_mgmt_cli:trace(["stop", "topic", "a/b/c"]),
     emqx_mgmt_cli:trace(["list"]).
-    % emqx_mgmt_cli:trace([""]).
 
 t_router_cmd(_) ->
     ct:pal("start test router"),
+    {ok, T3} = emqx_client:start_link([{host, "localhost"},
+    {client_id, <<"client2">>},
+    {username, <<"testuser2">>},
+    {password, <<"pass2">>}]),
+    emqx_client:connect(T3),
+    emqx_client:subscribe(T3, <<"a/b/c">>),
+    emqx_mgmt_cli:routes(["show", "a/b/c"]),
     emqx_mgmt_cli:routes(["list"]).
 
 t_plugins_cmd(_) ->
@@ -192,14 +207,21 @@ t_bridges_cmd(_) ->
     ct:pal("start test bridges cli"),
     emqx_mgmt_cli:bridges(["list"]).
 
+t_mnesia_cmd(_) ->
+    ct:pal("start test mnesia cli"),
+    emqx_mgmt_cli:mnesia([]).
+
 t_subscriptions_cmd(_) ->
      ct:pal("start test subscriptions cli"),
      {ok, T4} = emqx_client:start_link([{host, "localhost"},
-     {client_id, <<"client2">>},
-     {username, <<"testuser2">>},
-     {password, <<"pass2">>}]),
+     {client_id, <<"client4">>},
+     {username, <<"testuser4">>},
+     {password, <<"pass4">>}]),
      emqx_client:connect(T4),
-     emqx_mgmt_cli:subscriptions(["add", "test1", "/b/b/c", "0"]).
+     emqx_client:subscribe(T4, <<"/b/b/c">>),
+     emqx_mgmt_cli:subscriptions(["add", "client4", "/b/b/c", "0"]),
+     emqx_mgmt_cli:subscriptions(["show", "client4"]),
+     emqx_mgmt_cli:subscriptions(["del", "client4", "/b/b/c"]).
 
 run_setup_steps(App) ->
     NewConfig = generate_config(App),
