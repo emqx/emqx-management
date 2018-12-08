@@ -46,10 +46,14 @@ groups() ->
        [t_log_cmd,
        t_mgmt_cmd,
        t_status_cmd,
-    %    t_clients_cmd,
-    %    t_sessions_cmd,
+       t_clients_cmd,
+       t_sessions_cmd,
        t_vm_cmd,
-       t_trace_cmd]}].
+       t_trace_cmd,
+       t_router_cmd,
+       t_plugins_cmd,
+       t_bridges_cmd,
+       t_subscriptions_cmd]}].
 
 init_per_suite(Config) ->
     ekka_mnesia:start(),
@@ -118,34 +122,84 @@ t_broker_cmd(_) ->
     emqx_mgmt_cli:broker(["stats"]),
     emqx_mgmt_cli:broker(["metrics"]).
 
-% t_clients_cmd(_) ->
-%     ct:pal("start test case client cli"),
-%     {ok, T1} = emqx_client:start_link([{host, "localhost"},
-%     {client_id, <<"client1">>},
-%     {username, <<"testuser1">>},
-%     {password, <<"pass1">>}]),
-%     {ok, _} = emqx_client:connect(T1),
-%     emqx_mgmt_cli:clients(["list"]),
-%     emqx_mgmt_cli:clients(["show", "simpleClient"]).
+t_clients_cmd(_) ->
+    ct:pal("start test case client cli"),
+    process_flag(trap_exit, true),
+    {ok, T1} = emqx_client:start_link([{host, "localhost"},
+    {client_id, <<"client12">>},
+    {username, <<"testuser1">>},
+    {password, <<"pass1">>}]),
+    {ok, _} = emqx_client:connect(T1),
+    emqx_mgmt_cli:clients(["list"]),
+    emqx_mgmt_cli:clients(["show", "client12"]),
+    emqx_mgmt_cli:clients(["kick", "client12"]),
+    receive
+        {'EXIT', T1, Reason} ->
+            ct:pal("Connection closed: ~p~n", [Reason])
+    after
+        500 ->
+            erlang:error("Client is not kick")
+    end.
 
-% t_sessions_cmd(_) ->d
-%     ct:pal("start test case session"),
-%     emqx_mgmt_cli:sessions(["list"]),
-%     emqx_mgmt_cli:sessions(["list", "persisent"]),
-%     emqx_mgmt_cli:sessions(["list", "transient"]).
+t_sessions_cmd(_) ->
+    ct:pal("start test case session"),
+    {ok, T1} = emqx_client:start_link([{host, "localhost"},
+    {client_id, <<"client1">>},
+    {username, <<"testuser1">>},
+    {password, <<"pass1">>},
+    {clean_start, false}]),
+    {ok, _} = emqx_client:connect(T1), 
+    {ok, T2} = emqx_client:start_link([{host, "localhost"},
+    {client_id, <<"client2">>},
+    {username, <<"testuser2">>},
+    {password, <<"pass2">>},
+    {clean_start, true}]),
+    {ok, _} = emqx_client:connect(T2),
+    emqx_mgmt_cli:sessions(["list"]),
+    emqx_mgmt_cli:sessions(["list", "persistent"]),
+    emqx_mgmt_cli:sessions(["list", "transient"]),
+    emqx_mgmt_cli:sessions(["show", "client2"]).
 
 t_vm_cmd(_) ->
-    {ok, Client} = emqx_client:start_link(),
-    {ok, _} = emqx_client:connect(Client),
     ct:pal("start test vm"),
     emqx_mgmt_cli:vm(["all"]),
     emqx_mgmt_cli:vm(["load"]),
     emqx_mgmt_cli:vm(["memory"]),
-    emqx_mgmt_cli:vm(["process"]).
+    emqx_mgmt_cli:vm(["process"]),
+    emqx_mgmt_cli:vm(["io"]),
+    emqx_mgmt_cli:vm(["port"]).
 
 t_trace_cmd(_) ->
     ct:pal("start test trace"),
+    {ok, T3} = emqx_client:start_link([{host, "localhost"},
+    {client_id, <<"client2">>},
+    {username, <<"testuser2">>},
+    {password, <<"pass2">>}]),
+    emqx_client:connect(T3),
     emqx_mgmt_cli:trace(["list"]).
+    % emqx_mgmt_cli:trace([""]).
+
+t_router_cmd(_) ->
+    ct:pal("start test router"),
+    emqx_mgmt_cli:routes(["list"]).
+
+t_plugins_cmd(_) ->
+    ct:pal("start test plugins"),
+    emqx_mgmt_cli:plugins(["list", "emqx_auth_redis"]),
+    emqx_mgmt_cli:plugins(["list"]).
+
+t_bridges_cmd(_) ->
+    ct:pal("start test bridges cli"),
+    emqx_mgmt_cli:bridges(["list"]).
+
+t_subscriptions_cmd(_) ->
+     ct:pal("start test subscriptions cli"),
+     {ok, T4} = emqx_client:start_link([{host, "localhost"},
+     {client_id, <<"client2">>},
+     {username, <<"testuser2">>},
+     {password, <<"pass2">>}]),
+     emqx_client:connect(T4),
+     emqx_mgmt_cli:subscriptions(["add", "test1", "/b/b/c", "0"]).
 
 run_setup_steps(App) ->
     NewConfig = generate_config(App),
@@ -178,9 +232,9 @@ local_path(Components) ->
 
 set_app_env({App, Lists}) ->
     lists:foreach(fun({acl_file, _Var}) ->
-                 application:set_env(App, acl_file, local_path(["deps", "emqx", "etc", "acl.conf"]));
-                     ({plugins_loaded_file, _Var}) ->
-                      application:set_env(App, plugins_loaded_file, local_path(["deps","emqx", "test", "emqx_SUITE_data", "loaded_plugins"]));
+             application:set_env(App, acl_file, local_path(["deps", "emqx", "etc", "acl.conf"]));
+                ({plugins_loaded_file, _Var}) ->
+                    application:set_env(App, plugins_loaded_file, local_path(["deps","emqx", "test", "emqx_SUITE_data", "loaded_plugins"]));
                      ({Par, Var}) ->
                       application:set_env(App, Par, Var)
-                  end, Lists).
+                 end, Lists).
