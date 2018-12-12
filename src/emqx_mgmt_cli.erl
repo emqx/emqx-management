@@ -18,7 +18,7 @@
 -include_lib("emqx/include/emqx_mqtt.hrl").
 
 -ifdef(TEST).
--define(PRINT_MSG(Msg), io_lib:format(Msg)).
+-define(PRINT_MSG(Msg), io_lib:format("~s", [Msg])).
 -else.
 -define(PRINT_MSG(Msg), io:format(Msg)).
 -endif.
@@ -54,7 +54,6 @@
 -define(MAX_LIMIT, 10000).
 
 -define(APP, emqx).
-
 
 -spec(load() -> ok).
 load() ->
@@ -284,7 +283,7 @@ routes(_) ->
 
 subscriptions(["list"]) ->
     lists:foreach(fun(Suboption) ->
-                      print({emqx_suboption, Suboption})
+                        print({emqx_suboption, Suboption})
                   end, ets:tab2list(emqx_suboption));
 
 subscriptions(["show", ClientId]) ->
@@ -491,6 +490,7 @@ bridges(_) ->
                     {"bridges subscriptions <Name>", "Show a bridge subscriptions topic"},
                     {"bridges add-subscription <Name> <Topic> <Qos>", "Add bridge subscriptions topic"},
                     {"bridges del-subscription <Name> <Topic>", "Delete bridge subscriptions topic"}]).
+
 %%--------------------------------------------------------------------
 %% @doc vm command
 
@@ -552,8 +552,7 @@ log(["primary-level", Level]) ->
 
 log(["handlers", "list"]) ->
     [?PRINT("LogHandler(id=~s, level=~s, destination=~s)~n", [Id, Level, Dst])
-        || {Id, Level, Dst} <- emqx_logger:get_log_handlers()],
-    ok;
+        || {Id, Level, Dst} <- emqx_logger:get_log_handlers()];
 
 log(["handlers", "set-level", HandlerId, Level]) ->
     case emqx_logger:set_log_handler_level(list_to_atom(HandlerId), list_to_atom(Level)) of
