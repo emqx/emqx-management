@@ -161,7 +161,7 @@ t_vm_cmd(_) ->
     [?assertMatch({match, _}, re:run(Result, "memory"))|| Result <- emqx_mgmt_cli:vm(["memory"])],
     io:format(emqx_mgmt_cli:vm(["process"])),
     io:format(emqx_mgmt_cli:vm(["io"])),
-    io:format(emqx_mgmt_cli:vm(["port"])).
+    io:format(emqx_mgmt_cli:vm(["ports"])).
 
 t_trace_cmd(_) ->
     ct:pal("start test trace"),
