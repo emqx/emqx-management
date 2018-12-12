@@ -45,14 +45,27 @@ end_per_suite(_Config) ->
     application:stop(mnesia).
 
 t_add_app(_Config) ->
-    {ok, AppSecret} = emqx_mgmt_auth:add_app(<<"app_id">>, <<"app_name">>),
-    ?assert(emqx_mgmt_auth:is_authorized(<<"app_id">>, AppSecret)),
-    ?assertEqual(AppSecret, emqx_mgmt_auth:get_appsecret(<<"app_id">>)),
-    ?assertEqual([{<<"app_id">>, AppSecret,
-                   <<"app_name">>, <<"Application user">>, 
-                   true, undefined}], 
+    {ok, AppSecretManual} = emqx_mgmt_auth:add_app(<<"app_id">>, <<"app_name">>, <<"manual_password">>),
+    ?assert(emqx_mgmt_auth:is_authorized(<<"app_id">>, <<"manual_password">>)),
+    ?assertEqual(AppSecretManual, <<"manual_password">>),
+    ?assertEqual(AppSecretManual, emqx_mgmt_auth:get_appsecret(<<"app_id">>)),
+    ?assertEqual([{<<"app_id">>, AppSecretManual,
+                   <<"app_name">>, <<"Application user">>,
+                   true, undefined}],
                  emqx_mgmt_auth:list_apps()),
     emqx_mgmt_auth:del_app(<<"app_id">>),
+
+    {ok, AppSecretGenerated} = emqx_mgmt_auth:add_app(<<"app_id">>, <<"app_name">>, undefined),
+    ?assert(emqx_mgmt_auth:is_authorized(<<"app_id">>, AppSecretGenerated)),
+    ?assertNotEqual(undefined, emqx_mgmt_auth:get_appsecret(<<"app_id">>)),
+    ?assertEqual(string:length(AppSecretGenerated), 47),
+    ?assertEqual(AppSecretGenerated, emqx_mgmt_auth:get_appsecret(<<"app_id">>)),
+    ?assertEqual([{<<"app_id">>, AppSecretGenerated,
+                   <<"app_name">>, <<"Application user">>,
+                   true, undefined}],
+                 emqx_mgmt_auth:list_apps()),
+    emqx_mgmt_auth:del_app(<<"app_id">>),
+
     ok.
 
 t_del_app(_Config) ->

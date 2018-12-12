@@ -58,7 +58,17 @@ is_cmd(Fun) ->
     not lists:member(Fun, [init, load, module_info]).
 
 mgmt(["insert", AppId, Name]) ->
-    case emqx_mgmt_auth:add_app(list_to_binary(AppId), list_to_binary(Name)) of
+    case emqx_mgmt_auth:add_app(list_to_binary(AppId), list_to_binary(Name), undefined) of
+        {ok, Secret} ->
+            emqx_cli:print("AppSecret: ~s~n", [Secret]);
+        {error, already_existed} ->
+            emqx_cli:print("Error: already existed~n");
+        {error, Reason} ->
+            emqx_cli:print("Error: ~p~n", [Reason])
+    end;
+
+mgmt(["insert", AppId, Name, Secret]) ->
+    case emqx_mgmt_auth:add_app(list_to_binary(AppId), list_to_binary(Name), list_to_binary(Secret)) of
         {ok, Secret} ->
             emqx_cli:print("AppSecret: ~s~n", [Secret]);
         {error, already_existed} ->
@@ -101,7 +111,7 @@ mgmt(["list"]) ->
 
 mgmt(_) ->
     emqx_cli:usage([{"mgmt list",                   "List Applications"},
-                    {"mgmt insert <AppId> <Name>",   "Add Application of REST API"},
+                    {"mgmt insert <AppId> <Name> [<Secret>]",   "Add Application of REST API"},
                     {"mgmt update <AppId> <status>", "Update Application of REST API"},
                     {"mgmt lookup <AppId>",          "Get Application of REST API"},
                     {"mgmt delete <AppId>",          "Delete Application of REST API"}]).
