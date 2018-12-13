@@ -561,7 +561,7 @@ log(["set-level", Level]) ->
     case lists:all( fun({ID, _Lev, _Dst}) ->
                         case emqx_logger:set_log_handler_level(ID, list_to_atom(Level)) of
                             ok -> true;
-                            {error, _Error} -> {error, _Error}
+                            {error, Error} -> {error, Error}
                         end            
                     end, emqx_logger:get_log_handlers()) of
         true -> emqx_cli:print("~s~n", [ok]);
