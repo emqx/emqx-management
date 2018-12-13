@@ -93,7 +93,7 @@ return(ok) ->
 return({ok, _}) ->
     ok;
 return({error, Reason}) ->
-    {error, #{message => Reason}}.
+    {error, [#{message => Reason}]}.
 
 
 

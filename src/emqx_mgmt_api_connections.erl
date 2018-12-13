@@ -47,15 +47,9 @@
             func   => kickout,
             descr  => "Kick out a connection"}).
 
--rest_api(#{name   => clean_acl_cache,
-            method => 'DELETE',
-            path   => "/connections/:bin:clientid/acl/:bin:topic",
-            func   => clean_acl_cache,
-            descr  => "Clean ACL cache of a connection"}).
-
 -import(emqx_mgmt_util, [ntoa/1, strftime/1]).
 
--export([list/2, lookup/2, kickout/2, clean_acl_cache/2]).
+-export([list/2, lookup/2, kickout/2]).
 
 list(Bindings, Params) when map_size(Bindings) == 0 ->
     %%TODO: across nodes?
@@ -81,9 +75,6 @@ kickout(#{clientid := ClientId}, _Params) ->
         ok -> ok;
         {error, Reason} -> {error, #{message => Reason}}
     end.
-
-clean_acl_cache(#{clientid := ClientId, topic := Topic}, _Params) ->
-    emqx_mgmt:clean_acl_cache(http_uri:decode(ClientId), Topic).
 
 format(ClientList) when is_list(ClientList) ->
     [format(Client) || Client <- ClientList];
