@@ -557,17 +557,10 @@ log(["handlers", "set-level", HandlerId, Level]) ->
     end;
 
 log(["set-level", Level]) ->
-    emqx_logger:set_primary_log_level(list_to_atom(Level)),
-    case lists:all( fun({ID, _Lev, _Dst}) ->
-                        case emqx_logger:set_log_handler_level(ID, list_to_atom(Level)) of
-                            ok -> true;
-                            {error, Error} -> {error, Error}
-                        end            
-                    end, emqx_logger:get_log_handlers()) of
-        true -> emqx_cli:print("~s~n", [ok]);
-        {error, Error} -> emqx_cli:print("[error] ~p~n", [Error]) 
-    end,
-    ok;
+    case emqx_logger:set_primary_log_level(list_to_atom(Level)) of
+        ok -> tran_set_level(emqx_logger:get_log_handlers(), Level, []);
+        {error, Error} -> emqx_cli:print("[error] ~p~n", [Error])
+    end;
 
 log(_) ->
     emqx_cli:usage([{"log set-level <Level>", "Set the overall log level"},
@@ -575,6 +568,23 @@ log(_) ->
                     {"log primary-level <Level>","Set the primary log level"},
                     {"log handlers list", "Show log handlers"},
                     {"log handlers set-level <HandlerId> <Level>", "Set log level of a log handler"}]).
+
+tran_set_level([{ID, Lev, Dst} | List], Level, OldHanlder) -> 
+    case emqx_logger:set_log_handler_level(ID, list_to_atom(Level)) of
+        ok -> tran_set_level(List, Level, [{ID, Lev, Dst} | OldHanlder]);
+        {error, Error} -> 
+            rollback(OldHanlder, ID, Error)
+    end;
+    tran_set_level([], _Level, _NewHanlder) ->
+    emqx_cli:print("~s~n", [ok]).
+
+rollback([{ID, Lev, _Dst} | List], EId, Error) ->
+    case emqx_logger:set_log_handler_level(ID, list_to_atom(Lev)) of
+        ok -> rollback(List, EId, Error);
+        {error, Error} -> emqx_cli:print("[error] ~p~n", [Error])
+    end;
+rollback([], EId, Error) ->
+    emqx_cli:print("[error] ~s ~p~n", [EId, Error]).
 
 %%--------------------------------------------------------------------
 %% @doc Trace Command
