@@ -558,22 +558,15 @@ log(["handlers", "set-level", HandlerId, Level]) ->
 
 log(["set-level", Level]) ->
     emqx_logger:set_primary_log_level(list_to_atom(Level)),
-    case lists:all(fun({ID, _Lev, _Dst}) ->
-        case emqx_logger:set_log_handler_level(ID, list_to_atom(Level)) of
-            ok -> true;
-            {error, _Error} -> false
-        end            
-    end ,emqx_logger:get_log_handlers()) of
-    true -> emqx_cli:print("~s~n", [ok]);
-    false -> emqx_cli:print("~s~n", [false]) 
+    case lists:all( fun({ID, _Lev, _Dst}) ->
+                        case emqx_logger:set_log_handler_level(ID, list_to_atom(Level)) of
+                            ok -> true;
+                            {error, _Error} -> false
+                        end            
+                    end, emqx_logger:get_log_handlers()) of
+        true -> emqx_cli:print("~s~n", [ok]);
+        false -> emqx_cli:print("~s~n", [false]) 
     end,
-    % [case emqx_logger:set_log_handler_level(ID, list_to_atom(Level)) of
-    %     ok ->
-    %         {Id, NewLevel, Dst} =emqx_logger:get_log_handler(ID),
-    %         emqx_cli:print("~s level=~s,~n", [Id, NewLevel, Dst]);
-    %     {error, Error} ->
-    %         emqx_cli:print("[error] ~p~n", [Error])
-    % end || {ID, _Lev, _Dst} <- emqx_logger:get_log_handlers()],
     ok;
 
 log(_) ->
