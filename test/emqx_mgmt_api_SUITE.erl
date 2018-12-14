@@ -9,7 +9,7 @@
 
 -define(CONTENT_TYPE, "application/x-www-form-urlencoded").
 
--define(HOST, "http://127.0.0.1:18083/").
+-define(HOST, "http://127.0.0.1:8080/").
 
 -define(API_VERSION, "v3").
 
@@ -41,16 +41,15 @@ init_per_suite(Config) ->
                        local_path("deps/emqx/etc/emqx.conf")},
                 {emqx_management, local_path("priv/emqx_management.schema"),
                                   local_path("etc/emqx_management.conf")},
-                {emqx_dashboard, local_path("deps/emqx_dashboard/priv/emqx_dashboard.schema"),
-                                 local_path("deps/emqx_dashboard/etc/emqx_dashboard.conf")},
                 {emqx_retainer, local_path("deps/emqx_retainer/priv/emqx_retainer.schema"),
                                   local_path("deps/emqx_retainer/etc/emqx_retainer.conf")}]],
     ekka_mnesia:start(),
     emqx_mgmt_auth:mnesia(boot),
+    emqx_mgmt_auth:add_app(<<"myappid">>, <<"test">>),
     Config.
 
 end_per_suite(_Config) ->
-    [application:stop(App) || App <- [emqx_retainer, emqx_dashboard, emqx_management, emqx]],
+    [application:stop(App) || App <- [emqx_retainer, emqx_management, emqx]],
     ekka_mnesia:ensure_stopped().
 
 get_base_dir() ->
@@ -110,70 +109,72 @@ alarms(_) ->
     emqx_alarm_mgr:set_alarm(AlarmTest),
     [Alarm] = emqx_alarm_mgr:get_alarms(),
     ?assertEqual(error, Alarm#alarm.severity),
-    {ok, _} = request_dashbaord(get, api_path(["alarms"]), auth_header_()),
-    {ok, _} = request_dashbaord(get, api_path(["alarms", erlang:atom_to_list(node())]), auth_header_()).
+    {ok, _} = request_api(get, api_path(["alarms"]), auth_header_()),
+    {ok, _} = request_api(get, api_path(["alarms", erlang:atom_to_list(node())]), auth_header_()).
 
 apps(_) ->
     AppId = <<"123456">>,
-    {ok, _} = request_dashbaord(post, api_path(["apps"]), [], 
-                                auth_header_(), [{<<"app_id">>, AppId},
-                                                 {<<"name">>,   <<"test">>},
-                                                 {<<"status">>, true}]),
+    {ok, _} = request_api(post, api_path(["apps"]), [], 
+                          auth_header_(), [{<<"app_id">>, AppId},
+                                           {<<"name">>,   <<"test">>},
+                                           {<<"status">>, true}]),
 
-    {ok, _} = request_dashbaord(get, api_path(["apps"]), auth_header_()),
-    {ok, _} = request_dashbaord(get, api_path(["apps", erlang:binary_to_list(AppId)]), auth_header_()),
-    {ok, _} = request_dashbaord(put, api_path(["apps", erlang:binary_to_list(AppId)]), [],
-                                auth_header_(), [{<<"name">>, <<"test 2">>},
-                                                 {<<"status">>, true}]),
-    {ok, AppInfo} = request_dashbaord(get, api_path(["apps", erlang:binary_to_list(AppId)]), auth_header_()),
+    {ok, _} = request_api(get, api_path(["apps"]), auth_header_()),
+    {ok, _} = request_api(get, api_path(["apps", erlang:binary_to_list(AppId)]), auth_header_()),
+    {ok, _} = request_api(put, api_path(["apps", erlang:binary_to_list(AppId)]), [],
+                          auth_header_(), [{<<"name">>, <<"test 2">>},
+                                           {<<"status">>, true}]),
+    {ok, AppInfo} = request_api(get, api_path(["apps", erlang:binary_to_list(AppId)]), auth_header_()),
     ?assertEqual(<<"test 2">>, proplists:get_value(<<"name">>, jsx:decode(list_to_binary(AppInfo)))),
-    {ok, _} = request_dashbaord(delete, api_path(["apps", erlang:binary_to_list(AppId)]), auth_header_()),
-    {ok, "[]"} = request_dashbaord(get, api_path(["apps"]), auth_header_()).
+    {ok, _} = request_api(delete, api_path(["apps", erlang:binary_to_list(AppId)]), auth_header_()),
+    {ok, Result} = request_api(get, api_path(["apps"]), auth_header_()),
+    [App] = jsx:decode(list_to_binary(Result)),
+    ?assertEqual(<<"myappid">>, proplists:get_value(<<"app_id">>, App)).
 
 banned(_) ->
     Who = <<"myclient">>,    
-    {ok, _} = request_dashbaord(post, api_path(["banned"]), [], 
-                                auth_header_(), [{<<"who">>, Who},
-                                                 {<<"as">>, <<"client_id">>},
-                                                 {<<"reason">>, <<"test">>},
-                                                 {<<"by">>, <<"dashboard">>},
-                                                 {<<"desc">>, <<"hello world">>},
-                                                 {<<"until">>, erlang:system_time(second) + 10}]),
+    {ok, _} = request_api(post, api_path(["banned"]), [], 
+                          auth_header_(), [{<<"who">>, Who},
+                                           {<<"as">>, <<"client_id">>},
+                                           {<<"reason">>, <<"test">>},
+                                           {<<"by">>, <<"dashboard">>},
+                                           {<<"desc">>, <<"hello world">>},
+                                           {<<"until">>, erlang:system_time(second) + 10}]),
 
-    {ok, Result} = request_dashbaord(get, api_path(["banned"]), auth_header_()),
+    {ok, Result} = request_api(get, api_path(["banned"]), auth_header_()),
     [Banned] = proplists:get_value(<<"items">>, jsx:decode(list_to_binary(Result))),
     ?assertEqual(Who, proplists:get_value(<<"who">>, Banned)),
 
-    {ok, _} = request_dashbaord(delete, api_path(["banned", erlang:binary_to_list(Who)]), [], 
-                                auth_header_(), [{<<"as">>, <<"client_id">>}]),
+    {ok, _} = request_api(delete, api_path(["banned", erlang:binary_to_list(Who)]), [], 
+                          auth_header_(), [{<<"as">>, <<"client_id">>}]),
 
-    {ok, Result2} = request_dashbaord(get, api_path(["banned"]), auth_header_()),
+    {ok, Result2} = request_api(get, api_path(["banned"]), auth_header_()),
     ?assertEqual([], proplists:get_value(<<"items">>, jsx:decode(list_to_binary(Result2)))).
 
 brokers(_) ->
-    {ok, _} = request_dashbaord(get, api_path(["brokers"]), auth_header_()),
-    {ok, _} = request_dashbaord(get, api_path(["brokers", erlang:atom_to_list(node())]), auth_header_()).
+    {ok, _} = request_api(get, api_path(["brokers"]), auth_header_()),
+    {ok, _} = request_api(get, api_path(["brokers", erlang:atom_to_list(node())]), auth_header_()).
 
 configs(_) ->
-    {ok, _} = request_dashbaord(get, api_path(["configs"]), auth_header_()),
+    {ok, _} = request_api(get, api_path(["configs"]), auth_header_()),
 
-    {ok, _} = request_dashbaord(get, api_path(["nodes",
-                                               erlang:atom_to_list(node()),
-                                               "configs"]), auth_header_()),
+    {ok, _} = request_api(get, api_path(["nodes",
+                                         erlang:atom_to_list(node()),
+                                         "configs"]), auth_header_()),
 
-    {ok, _} = request_dashbaord(put, api_path(["nodes", 
-                                               erlang:atom_to_list(node()),
-                                               "plugin_configs",
-                                               erlang:atom_to_list(emqx_retainer)]), [], 
-                                auth_header_(), [{<<"retainer.expiry_interval">>, <<"100">>},
-                                                 {<<"retainer.max_payload_size">>, <<"2MB">>},
-                                                 {<<"retainer.max_retained_messages">>, <<"100">>},
-                                                 {<<"retainer.storage_type">>, <<"ram">>}]),
+    {ok, _} = request_api(put, api_path(["nodes", 
+                                         erlang:atom_to_list(node()),
+                                         "plugin_configs",
+                                         erlang:atom_to_list(emqx_retainer)]), [], 
+                          auth_header_(), [{<<"retainer.expiry_interval">>, <<"100">>},
+                                           {<<"retainer.max_payload_size">>, <<"2MB">>},
+                                           {<<"retainer.max_retained_messages">>, <<"100">>},
+                                           {<<"retainer.storage_type">>, <<"ram">>}]),
 
-    {ok, Result} = request_dashbaord(get, api_path(["nodes",
-                                                    erlang:atom_to_list(node()),
-                                                    "plugin_configs",
-                                                    erlang:atom_to_list(emqx_retainer)]), auth_header_()),
+    {ok, Result} = request_api(get, api_path(["nodes",
+                                              erlang:atom_to_list(node()),
+                                              "plugin_configs",
+                                              erlang:atom_to_list(emqx_retainer)]), auth_header_()),
     ?assert(lists:any(fun(Elem) -> 
                           case proplists:get_value(<<"key">>, Elem) of
                               <<"retainer.max_retained_messages">> -> 
@@ -195,127 +196,127 @@ connections_and_sessions(_) ->
                         {ok, Data} = gen_tcp:recv(Sock, 0),
                         {ok, ?CONNACK_PACKET(?RC_SUCCESS, 0), _} = raw_recv_parse(Data, ?MQTT_PROTO_V5),
 
-                        {ok, Conns} = request_dashbaord(get, 
-                                                        api_path(["connections"]), 
-                                                        "_limit=100&_page=1", 
-                                                        auth_header_()),
+                        {ok, Conns} = request_api(get, 
+                                                  api_path(["connections"]), 
+                                                  "_limit=100&_page=1", 
+                                                  auth_header_()),
 
                         ?assertEqual(1, proplists:get_value(<<"count">>, 
                                                             proplists:get_value(<<"meta">>, 
                                                                                 jsx:decode(list_to_binary(Conns))))),
-                        {ok, Conns} = request_dashbaord(get, 
-                                                        api_path(["nodes", 
-                                                                  erlang:atom_to_list(node()), 
-                                                                  "connections"]), 
-                                                        "_limit=100&_page=1", 
-                                                        auth_header_()),
+                        {ok, Conns} = request_api(get, 
+                                                  api_path(["nodes", 
+                                                            erlang:atom_to_list(node()), 
+                                                            "connections"]), 
+                                                  "_limit=100&_page=1", 
+                                                  auth_header_()),
 
-                        {ok, Result} = request_dashbaord(get, 
-                                                         api_path(["nodes", 
-                                                                   erlang:atom_to_list(node()), 
-                                                                   "connections", 
-                                                                   erlang:binary_to_list(ClientId)]), 
-                                                         auth_header_()),
+                        {ok, Result} = request_api(get, 
+                                                   api_path(["nodes", 
+                                                             erlang:atom_to_list(node()), 
+                                                             "connections", 
+                                                             erlang:binary_to_list(ClientId)]), 
+                                                   auth_header_()),
                         [Conn] = jsx:decode(list_to_binary(Result)),
                         ?assertEqual(ClientId, proplists:get_value(<<"client_id">>, Conn)),
 
-                        {ok, Result} = request_dashbaord(get, 
-                                                         api_path(["connections", 
-                                                                   erlang:binary_to_list(ClientId)]), 
-                                                         auth_header_()),
+                        {ok, Result} = request_api(get, 
+                                                   api_path(["connections", 
+                                                             erlang:binary_to_list(ClientId)]), 
+                                                   auth_header_()),
 
-                        {ok, Result2} = request_dashbaord(get, 
-                                                          api_path(["sessions"]),
-                                                          auth_header_()),
+                        {ok, Result2} = request_api(get, 
+                                                    api_path(["sessions"]),
+                                                    auth_header_()),
                         [Session] = proplists:get_value(<<"items">>, jsx:decode(list_to_binary(Result2))),
                         ?assertEqual(ClientId, proplists:get_value(<<"client_id">>, Session)),
 
-                        {ok, Result2} = request_dashbaord(get, 
-                                                          api_path(["nodes", 
-                                                                    erlang:atom_to_list(node()),
-                                                                    "sessions"]),
-                                                          auth_header_()),
+                        {ok, Result2} = request_api(get, 
+                                                    api_path(["nodes", 
+                                                              erlang:atom_to_list(node()),
+                                                              "sessions"]),
+                                                    auth_header_()),
                         
-                        {ok, Result3} = request_dashbaord(get, 
-                                                          api_path(["sessions", 
-                                                                    erlang:binary_to_list(ClientId)]),
-                                                          auth_header_()),
+                        {ok, Result3} = request_api(get, 
+                                                    api_path(["sessions", 
+                                                              erlang:binary_to_list(ClientId)]),
+                                                    auth_header_()),
                         [Session] = jsx:decode(list_to_binary(Result3)),
 
-                        {ok, Result3} = request_dashbaord(get, 
-                                                          api_path(["nodes", 
-                                                                    erlang:atom_to_list(node()),
-                                                                    "sessions",
-                                                                    erlang:binary_to_list(ClientId)]),
-                                                          auth_header_()),
-
-                        {ok, _} = request_dashbaord(delete, 
-                                                    api_path(["connections", 
-                                                              erlang:binary_to_list(ClientId)]), 
+                        {ok, Result3} = request_api(get, 
+                                                    api_path(["nodes", 
+                                                              erlang:atom_to_list(node()),
+                                                              "sessions",
+                                                              erlang:binary_to_list(ClientId)]),
                                                     auth_header_()),
 
-                        {ok, NonConn} = request_dashbaord(get, 
-                                                          api_path(["connections"]), 
-                                                          "_limit=100&_page=1", 
-                                                          auth_header_()),
+                        {ok, _} = request_api(delete, 
+                                              api_path(["connections", 
+                                                        erlang:binary_to_list(ClientId)]), 
+                                              auth_header_()),
+
+                        {ok, NonConn} = request_api(get, 
+                                                    api_path(["connections"]), 
+                                                    "_limit=100&_page=1", 
+                                                    auth_header_()),
 
                         ?assertEqual([], proplists:get_value(<<"items">>, jsx:decode(list_to_binary(NonConn)))),
 
-                        {ok, NonSession} = request_dashbaord(get, 
-                                                             api_path(["sessions"]),
-                                                             auth_header_()),
+                        {ok, NonSession} = request_api(get, 
+                                                       api_path(["sessions"]),
+                                                       auth_header_()),
                         ?assertEqual([], proplists:get_value(<<"items">>, jsx:decode(list_to_binary(NonSession))))
                     end).
 
 listeners(_) ->
-    {ok, _} = request_dashbaord(get, api_path(["listeners"]), auth_header_()),
-    {ok, _} = request_dashbaord(get, api_path(["nodes", erlang:atom_to_list(node()), "listeners"]), auth_header_()).
+    {ok, _} = request_api(get, api_path(["listeners"]), auth_header_()),
+    {ok, _} = request_api(get, api_path(["nodes", erlang:atom_to_list(node()), "listeners"]), auth_header_()).
 
 metrics(_) ->
-    {ok, _} = request_dashbaord(get, api_path(["metrics"]), auth_header_()),
-    {ok, _} = request_dashbaord(get, api_path(["nodes", erlang:atom_to_list(node()), "metrics"]), auth_header_()).
+    {ok, _} = request_api(get, api_path(["metrics"]), auth_header_()),
+    {ok, _} = request_api(get, api_path(["nodes", erlang:atom_to_list(node()), "metrics"]), auth_header_()).
 
 nodes(_) ->
-    {ok, _} = request_dashbaord(get, api_path(["nodes"]), auth_header_()),
-    {ok, _} = request_dashbaord(get, api_path(["nodes", erlang:atom_to_list(node())]), auth_header_()).
+    {ok, _} = request_api(get, api_path(["nodes"]), auth_header_()),
+    {ok, _} = request_api(get, api_path(["nodes", erlang:atom_to_list(node())]), auth_header_()).
 
 plugins(_) ->
-    {ok, _} = request_dashbaord(put, 
+    {ok, _} = request_api(put, 
+                          api_path(["nodes",
+                                    erlang:atom_to_list(node()),
+                                    "plugins",
+                                    erlang:atom_to_list(emqx_retainer),
+                                    "unload"]), 
+                          auth_header_()),
+
+    {ok, Result3} = request_api(get, 
                                 api_path(["nodes",
                                           erlang:atom_to_list(node()),
-                                          "plugins",
-                                          erlang:atom_to_list(emqx_retainer),
-                                          "unload"]), 
+                                          "plugins"]),
                                 auth_header_()),
-
-    {ok, Result3} = request_dashbaord(get, 
-                                      api_path(["nodes",
-                                                erlang:atom_to_list(node()),
-                                                "plugins"]),
-                                      auth_header_()),
     [Plugin3] = jsx:decode(list_to_binary(Result3)),
     ?assertEqual(<<"emqx_retainer">>, proplists:get_value(<<"name">>, Plugin3)),
     ?assertNot(proplists:get_value(<<"active">>, Plugin3)),
 
-    {ok, _} = request_dashbaord(put, 
-                                api_path(["nodes",
-                                          erlang:atom_to_list(node()),
-                                          "plugins",
-                                          erlang:atom_to_list(emqx_retainer),
-                                          "load"]), 
-                                auth_header_()),
+    {ok, _} = request_api(put, 
+                          api_path(["nodes",
+                                    erlang:atom_to_list(node()),
+                                    "plugins",
+                                    erlang:atom_to_list(emqx_retainer),
+                                    "load"]), 
+                          auth_header_()),
     
-    {ok, Result} = request_dashbaord(get, api_path(["plugins"]), auth_header_()),
+    {ok, Result} = request_api(get, api_path(["plugins"]), auth_header_()),
     [Plugins] = jsx:decode(list_to_binary(Result)),
     [Plugin] = proplists:get_value(<<"plugins">>, Plugins),
     ?assertEqual(<<"emqx_retainer">>, proplists:get_value(<<"name">>, Plugin)),
     ?assert(proplists:get_value(<<"active">>, Plugin)),
 
-    {ok, Result2} = request_dashbaord(get, 
-                                      api_path(["nodes",
-                                                erlang:atom_to_list(node()),
-                                                "plugins"]),
-                                      auth_header_()),
+    {ok, Result2} = request_api(get, 
+                                api_path(["nodes",
+                                          erlang:atom_to_list(node()),
+                                          "plugins"]),
+                                auth_header_()),
     [Plugin] = jsx:decode(list_to_binary(Result2)).
 
     
@@ -344,38 +345,38 @@ pubsub(_) ->
                         {ok, SubData} = gen_tcp:recv(Sock, 0),
                         {ok, ?SUBACK_PACKET(1, #{}, [2]), _} = raw_recv_parse(SubData, ?MQTT_PROTO_V5),
 
-                        {ok, Code} = request_dashbaord(post, 
-                                                       api_path(["mqtt/subscribe"]), 
-                                                       [], 
-                                                       auth_header_(),
-                                                       [{<<"client_id">>, ClientId},
-                                                        {<<"topic">>, Topic},
-                                                        {<<"qos">>, 2}]),
+                        {ok, Code} = request_api(post, 
+                                                 api_path(["mqtt/subscribe"]), 
+                                                 [], 
+                                                 auth_header_(),
+                                                 [{<<"client_id">>, ClientId},
+                                                  {<<"topic">>, Topic},
+                                                  {<<"qos">>, 2}]),
                         ?assertEqual(0, proplists:get_value(<<"code">>, jsx:decode(list_to_binary(Code)))),
 
-                        {ok, Code} = request_dashbaord(post, 
-                                                       api_path(["mqtt/publish"]), 
-                                                       [], 
-                                                       auth_header_(),
-                                                       [{<<"client_id">>, ClientId},
-                                                        {<<"topic">>, <<"mytopic">>},
-                                                        {<<"qos">>, 1},
-                                                        {<<"payload">>, <<"hello">>}]),
+                        {ok, Code} = request_api(post, 
+                                                 api_path(["mqtt/publish"]), 
+                                                 [], 
+                                                 auth_header_(),
+                                                 [{<<"client_id">>, ClientId},
+                                                  {<<"topic">>, <<"mytopic">>},
+                                                  {<<"qos">>, 1},
+                                                  {<<"payload">>, <<"hello">>}]),
 
                         {ok, PubData} = gen_tcp:recv(Sock, 0),
                         {ok, ?PUBLISH_PACKET(?QOS_1, Topic, _, <<"hello">>), _} = raw_recv_parse(PubData, ?MQTT_PROTO_V5),
 
-                        {ok, Code} = request_dashbaord(post, 
-                                                       api_path(["mqtt/unsubscribe"]), 
-                                                       [], 
-                                                       auth_header_(),
-                                                       [{<<"client_id">>, ClientId},
-                                                        {<<"topic">>, Topic}])
+                        {ok, Code} = request_api(post, 
+                                                 api_path(["mqtt/unsubscribe"]), 
+                                                 [], 
+                                                 auth_header_(),
+                                                 [{<<"client_id">>, ClientId},
+                                                  {<<"topic">>, Topic}])
                     end).
 
 routes_and_subscriptions(_) ->
     with_connection(fun([Sock]) ->
-                        {ok, NonRoute} = request_dashbaord(get, api_path(["routes"]), auth_header_()),
+                        {ok, NonRoute} = request_api(get, api_path(["routes"]), auth_header_()),
                         ?assertEqual([], proplists:get_value(<<"items">>, jsx:decode(list_to_binary(NonRoute)))),
 
                         ClientId = <<"myclient">>,
@@ -400,43 +401,43 @@ routes_and_subscriptions(_) ->
                         {ok, SubData} = gen_tcp:recv(Sock, 0),
                         {ok, ?SUBACK_PACKET(1, #{}, [2]), _} = raw_recv_parse(SubData, ?MQTT_PROTO_V5),
 
-                        {ok, Result} = request_dashbaord(get, api_path(["routes"]), auth_header_()),
+                        {ok, Result} = request_api(get, api_path(["routes"]), auth_header_()),
                         [Route] = proplists:get_value(<<"items">>, jsx:decode(list_to_binary(Result))),
                         ?assertEqual(Topic, proplists:get_value(<<"topic">>, Route)),
                         
-                        {ok, Result2} = request_dashbaord(get, api_path(["routes", erlang:binary_to_list(Topic)]), auth_header_()),
+                        {ok, Result2} = request_api(get, api_path(["routes", erlang:binary_to_list(Topic)]), auth_header_()),
                         [Route] = jsx:decode(list_to_binary(Result2)),
 
-                        {ok, Result3} = request_dashbaord(get, api_path(["subscriptions"]), auth_header_()),
+                        {ok, Result3} = request_api(get, api_path(["subscriptions"]), auth_header_()),
                         [Subscription] = proplists:get_value(<<"items">>, jsx:decode(list_to_binary(Result3))),
                         ?assertEqual(Topic, proplists:get_value(<<"topic">>, Subscription)),
                         ?assertEqual(ClientId, proplists:get_value(<<"client_id">>, Subscription)),
 
-                        {ok, Result3} = request_dashbaord(get, api_path(["nodes",
-                                                                         erlang:atom_to_list(node()),
-                                                                         "subscriptions"]), auth_header_()),
+                        {ok, Result3} = request_api(get, api_path(["nodes",
+                                                                   erlang:atom_to_list(node()),
+                                                                   "subscriptions"]), auth_header_()),
 
-                        {ok, Result4} = request_dashbaord(get, api_path(["subscriptions",
+                        {ok, Result4} = request_api(get, api_path(["subscriptions",
                                                                          erlang:binary_to_list(ClientId)]), auth_header_()),
                         [Subscription] = jsx:decode(list_to_binary(Result4)),
 
-                        {ok, Result4} = request_dashbaord(get, api_path(["nodes",
-                                                                         erlang:atom_to_list(node()),
-                                                                         "subscriptions",
-                                                                         erlang:binary_to_list(ClientId)]), auth_header_())
+                        {ok, Result4} = request_api(get, api_path(["nodes",
+                                                                   erlang:atom_to_list(node()),
+                                                                   "subscriptions",
+                                                                   erlang:binary_to_list(ClientId)]), auth_header_())
                     end).
 
 stats(_) ->
-    {ok, _} = request_dashbaord(get, api_path(["stats"]), auth_header_()),
-    {ok, _} = request_dashbaord(get, api_path(["nodes", erlang:atom_to_list(node()), "stats"]), auth_header_()).
+    {ok, _} = request_api(get, api_path(["stats"]), auth_header_()),
+    {ok, _} = request_api(get, api_path(["nodes", erlang:atom_to_list(node()), "stats"]), auth_header_()).
 
-request_dashbaord(Method, Url, Auth) ->
-    request_dashbaord(Method, Url, [], Auth, []).
+request_api(Method, Url, Auth) ->
+    request_api(Method, Url, [], Auth, []).
 
-request_dashbaord(Method, Url, QueryParams, Auth) ->
-    request_dashbaord(Method, Url, QueryParams, Auth, []).
+request_api(Method, Url, QueryParams, Auth) ->
+    request_api(Method, Url, QueryParams, Auth, []).
 
-request_dashbaord(Method, Url, QueryParams, Auth, Body) ->
+request_api(Method, Url, QueryParams, Auth, Body) ->
     NewUrl = case QueryParams of
                  [] ->
                      Url;
@@ -449,9 +450,9 @@ request_dashbaord(Method, Url, QueryParams, Auth, Body) ->
                   _ ->
                       {NewUrl, [Auth], "application/json", emqx_json:encode(Body)}
               end,
-    do_request_dashbaord(Method, Request).
+    do_request_api(Method, Request).
 
-do_request_dashbaord(Method, Request)->
+do_request_api(Method, Request)->
     ct:pal("Method: ~p, Request: ~p", [Method, Request]),
     case httpc:request(Method, Request, [], []) of
         {error, socket_closed_remotely} ->
@@ -464,7 +465,9 @@ do_request_dashbaord(Method, Request)->
     end.
 
 auth_header_() ->
-    auth_header_("admin", "public").
+    AppId = <<"myappid">>,
+    AppSecret = emqx_mgmt_auth:get_appsecret(AppId),
+    auth_header_(erlang:binary_to_list(AppId), erlang:binary_to_list(AppSecret)).
 
 auth_header_(User, Pass) ->
     Encoded = base64:encode_to_string(lists:append([User,":",Pass])),

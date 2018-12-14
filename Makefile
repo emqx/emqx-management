@@ -13,8 +13,7 @@ BUILD_DEPS = emqx cuttlefish
 dep_emqx = git-emqx https://github.com/emqx/emqx emqx30
 dep_cuttlefish = git-emqx https://github.com/emqx/cuttlefish emqx30
 
-TEST_DEPS = emqx_dashboard emqx_retainer
-dep_emqx_dashboard = git-emqx https://github.com/emqx/emqx-dashboard emqx30
+TEST_DEPS = emqx_retainer
 dep_emqx_retainer = git-emqx https://github.com/emqx/emqx-retainer emqx30
 
 NO_AUTOPATCH = cuttlefish
