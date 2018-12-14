@@ -534,6 +534,12 @@ mnesia(_) ->
 %%--------------------------------------------------------------------
 %% @doc Logger Command
 
+log(["set-level", Level]) ->
+    case emqx_logger:set_primary_log_level(list_to_atom(Level)) of
+        ok -> set_handlers_level(emqx_logger:get_log_handlers(), Level);
+        {error, Error} -> emqx_cli:print("[error] set primary log level failed: ~p~n", [Error])
+    end;
+
 log(["primary-level"]) ->
     Level = emqx_logger:get_primary_log_level(),
     emqx_cli:print("~s~n", [Level]);
@@ -557,10 +563,30 @@ log(["handlers", "set-level", HandlerId, Level]) ->
     end;
 
 log(_) ->
-    emqx_cli:usage([{"log primary-level", "Show the primary log level now"},
+    emqx_cli:usage([{"log set-level <Level>", "Set the overall log level"},
+                    {"log primary-level", "Show the primary log level now"},
                     {"log primary-level <Level>","Set the primary log level"},
                     {"log handlers list", "Show log handlers"},
                     {"log handlers set-level <HandlerId> <Level>", "Set log level of a log handler"}]).
+
+set_handlers_level([{ID, Level, _Dst} | List], NewLevel) ->
+    set_handlers_level([{ID, Level, _Dst} | List], NewLevel, []).
+
+set_handlers_level([{ID, Level, _Dst} | List], NewLevel, ChangeHistory) ->
+    case emqx_logger:set_log_handler_level(ID, list_to_atom(NewLevel)) of
+        ok -> set_handlers_level(List, NewLevel, [{ID, Level} | ChangeHistory]);
+        {error, Error} ->
+            emqx_cli:print("[error] set level for handler ~p failed: ~p~n", [ID, Error]),
+            rollback(ChangeHistory)
+    end;
+set_handlers_level([], _NewLevel, _NewHanlder) ->
+    emqx_cli:print("~s~n", [ok]).
+
+rollback([{ID, Level} | List]) ->
+    emqx_logger:set_log_handler_level(ID, list_to_atom(Level)),
+    rollback(List);
+rollback([]) -> ok.
+
 %%--------------------------------------------------------------------
 %% @doc Trace Command
 
