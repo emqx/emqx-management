@@ -44,15 +44,15 @@ groups() ->
       ]},
       {check_cli, [sequence],
        [t_log_cmd,
-       t_mgmt_cmd,
-       t_status_cmd,
-       t_clients_cmd,
-       t_sessions_cmd,
-       t_vm_cmd,
-       t_trace_cmd,
-       t_router_cmd,
-       t_subscriptions_cmd,
-       t_mnesia_cmd]}].
+        t_mgmt_cmd,
+        t_status_cmd,
+        t_clients_cmd,
+        t_sessions_cmd,
+        t_vm_cmd,
+        t_trace_cmd,
+        t_router_cmd,
+        t_subscriptions_cmd
+       ]}].
 
 init_per_suite(Config) ->
     ekka_mnesia:start(),
@@ -69,8 +69,8 @@ t_add_app(_Config) ->
     ?assert(emqx_mgmt_auth:is_authorized(<<"app_id">>, AppSecret)),
     ?assertEqual(AppSecret, emqx_mgmt_auth:get_appsecret(<<"app_id">>)),
     ?assertEqual([{<<"app_id">>, AppSecret,
-                   <<"app_name">>, <<"Application user">>, 
-                   true, undefined}], 
+                   <<"app_name">>, <<"Application user">>,
+                   true, undefined}],
                  emqx_mgmt_auth:list_apps()),
     emqx_mgmt_auth:del_app(<<"app_id">>),
     ok.
@@ -86,17 +86,16 @@ t_check_app_acl(_Config) ->
 
 t_log_cmd(_) ->
     ct:pal("start test set primary-level log level"),
-    ?assertMatch({match, _}, re:run("LogHandler(id=s, level=error, destination=ere)~n", "error", [])),
     foreach(fun(LogValues) ->
-    emqx_mgmt_cli:log(["primary-level",atom_to_list(LogValues)]),  
-    ?assertEqual(LogValues, emqx_logger:get_primary_log_level())
-    end, ?LOG_NAMES),
+                emqx_mgmt_cli:log(["primary-level",atom_to_list(LogValues)]),
+                ?assertEqual(LogValues, emqx_logger:get_primary_log_level())
+            end, ?LOG_NAMES),
     ct:pal("start test set-level log level "),
     [
-    foreach(fun(LOG_NAME) ->
-            Result = emqx_mgmt_cli:log(["hasndlers","set-level",atom_to_list(Id), atom_to_list(LOG_NAME)]),
-            io:format("~s",[Result])
-        end,?LOG_NAMES)
+        foreach(fun(LOG_NAME) ->
+                    Result = emqx_mgmt_cli:log(["hasndlers","set-level",atom_to_list(Id), atom_to_list(LOG_NAME)]),
+                    io:format("~s",[Result])
+                end,?LOG_NAMES)
         || {Id, _Level, _Dst} <- emqx_logger:get_log_handlers()].
 
 t_mgmt_cmd(_) ->
@@ -112,16 +111,16 @@ t_status_cmd(_) ->
 
 t_broker_cmd(_) ->
     ct:pal("start test  case broker cli"),
-    emqx_mgmt_cli:broker(["stats"]),
-    emqx_mgmt_cli:broker(["metrics"]).
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["stats"]), "_")),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["metrice"]), "_")).
 
 t_clients_cmd(_) ->
     ct:pal("start test case client cli"),
     process_flag(trap_exit, true),
     {ok, T1} = emqx_client:start_link([{host, "localhost"},
-        {client_id, <<"client12">>},
-        {username, <<"testuser1">>},
-        {password, <<"pass1">>}]),  
+                                       {client_id, <<"client12">>},
+                                       {username, <<"testuser1">>},
+                                       {password, <<"pass1">>}]),
     {ok, _} = emqx_client:connect(T1),
     emqx_mgmt_cli:clients(["list"]),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:clients(["show", "client12"]), "client12")),
@@ -138,37 +137,37 @@ t_clients_cmd(_) ->
 t_sessions_cmd(_) ->
     ct:pal("start test case session"),
     {ok, T1} = emqx_client:start_link([{host, "localhost"},
-        {client_id, <<"client1">>},
-        {username, <<"testuser1">>},
-        {password, <<"pass1">>},
-        {clean_start, false}]),
-    {ok, _} = emqx_client:connect(T1), 
+                                       {client_id, <<"client1">>},
+                                       {username, <<"testuser1">>},
+                                       {password, <<"pass1">>},
+                                       {clean_start, false}]),
+    {ok, _} = emqx_client:connect(T1),
     {ok, T2} = emqx_client:start_link([{host, "localhost"},
-        {client_id, <<"client2">>},
-        {username, <<"testuser2">>},
-        {password, <<"pass2">>},
-        {clean_start, true}]),
+                                       {client_id, <<"client2">>},
+                                       {username, <<"testuser2">>},
+                                       {password, <<"pass2">>},
+                                       {clean_start, true}]),
     {ok, _} = emqx_client:connect(T2),
     emqx_mgmt_cli:sessions(["list"]),
-    emqx_mgmt_cli:sessions(["list", "persistent"]),
-    emqx_mgmt_cli:sessions(["list", "transient"]),
+    [?assertMatch({match, _}, re:run(Result, "client1")) || Result <-emqx_mgmt_cli:sessions(["list", "persistent"])],
+    [?assertMatch({match, _}, re:run(Result, "client2")) || Result <-emqx_mgmt_cli:sessions(["list", "transient"])],
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["show", "client2"]), "client2")).
 
 t_vm_cmd(_) ->
     ct:pal("start test vm"),
-    emqx_mgmt_cli:vm(["all"]),
+    [[?assertMatch({match, _}, re:run(Result, Name)) || Result <- emqx_mgmt_cli:vm([Name])] || Name <- ["load", "memory", "process", "io", "ports"]],
     [?assertMatch({match, _}, re:run(Result, "load")) || Result <- emqx_mgmt_cli:vm(["load"])],
     [?assertMatch({match, _}, re:run(Result, "memory"))|| Result <- emqx_mgmt_cli:vm(["memory"])],
-    io:format(emqx_mgmt_cli:vm(["process"])),
-    io:format(emqx_mgmt_cli:vm(["io"])),
-    io:format(emqx_mgmt_cli:vm(["ports"])).
+    [?assertMatch({match, _}, re:run(Result, "process")) || Result <- emqx_mgmt_cli:vm(["process"])],
+    [?assertMatch({match, _}, re:run(Result, "io")) || Result <- emqx_mgmt_cli:vm(["io"])],
+    [?assertMatch({match, _}, re:run(Result, "ports")) || Result <- emqx_mgmt_cli:vm(["ports"])].
 
 t_trace_cmd(_) ->
     ct:pal("start test trace"),
     {ok, T3} = emqx_client:start_link([{host, "localhost"},
-        {client_id, <<"client2">>},
-        {username, <<"testuser2">>},
-        {password, <<"pass2">>}]),
+                                       {client_id, <<"client2">>},
+                                       {username, <<"testuser2">>},
+                                       {password, <<"pass2">>}]),
     emqx_client:connect(T3),
     emqx_client:subscribe(T3, <<"a/b/c">>),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:trace(["start", "client", "client2", "log/clientid_trace.log"]), "successfully")),
@@ -182,24 +181,21 @@ t_trace_cmd(_) ->
 t_router_cmd(_) ->
     ct:pal("start test router"),
     {ok, T3} = emqx_client:start_link([{host, "localhost"},
-        {client_id, <<"client2">>},
-        {username, <<"testuser2">>},
-        {password, <<"pass2">>}]),
+                                       {client_id, <<"client2">>},
+                                       {username, <<"testuser2">>},
+                                       {password, <<"pass2">>}]),
     emqx_client:connect(T3),
     emqx_client:subscribe(T3, <<"a/b/c">>),
-    io:format(emqx_mgmt_cli:routes(["show", "a/b/c"])),
-    emqx_mgmt_cli:routes(["list"]).
-
-t_mnesia_cmd(_) ->
-    ct:pal("start test mnesia cli"),
-    emqx_mgmt_cli:mnesia([]).
+    emqx_mgmt_cli:routes(["show", "a/b/c"]),
+    emqx_mgmt_cli:routes(["list"]),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:routes(["show", "a/b/c"]), "a/b/c")).
 
 t_subscriptions_cmd(_) ->
     ct:pal("start test subscriptions cli"),
     {ok, T4} = emqx_client:start_link([{host, "localhost"},
-    {client_id, <<"client4">>},
-    {username, <<"testuser4">>},
-    {password, <<"pass4">>}]),
+                                       {client_id, <<"client4">>},
+                                       {username, <<"testuser4">>},
+                                       {password, <<"pass4">>}]),
     emqx_client:connect(T4),
     emqx_client:subscribe(T4, <<"/b/b/c">>),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:subscriptions(["add", "client4", "/b/b/c", "0"]), "ok")),
@@ -208,18 +204,18 @@ t_subscriptions_cmd(_) ->
 run_setup_steps(App) ->
     NewConfig = generate_config(App),
     lists:foreach(fun set_app_env/1, NewConfig),
-        application:ensure_all_started(App),
-        ct:log("Applications: ~p", [application:loaded_applications()]).
+                    application:ensure_all_started(App),
+                    ct:log("Applications: ~p", [application:loaded_applications()]).
 
 generate_config(emqx) ->
     Schema = cuttlefish_schema:files([local_path(["deps", "emqx", "priv", "emqx.schema"])]),
-        Conf = conf_parse:file([local_path(["deps", "emqx", "etc", "emqx.conf"])]),
-        cuttlefish_generator:map(Schema, Conf);
+    Conf = conf_parse:file([local_path(["deps", "emqx", "etc", "emqx.conf"])]),
+    cuttlefish_generator:map(Schema, Conf);
 
 generate_config(emqx_management) ->
     Schema = cuttlefish_schema:files([local_path(["priv", "emqx_management.schema"])]),
-        Conf = conf_parse:file([local_path(["etc", "emqx_management.conf"])]),
-        cuttlefish_generator:map(Schema, Conf).
+    Conf = conf_parse:file([local_path(["etc", "emqx_management.conf"])]),
+    cuttlefish_generator:map(Schema, Conf).
 
 local_path(Components, Module) ->
     filename:join([get_base_dir(Module) | Components]).
@@ -236,9 +232,9 @@ local_path(Components) ->
 
 set_app_env({App, Lists}) ->
     lists:foreach(fun({acl_file, _Var}) ->
-             application:set_env(App, acl_file, local_path(["deps", "emqx", "etc", "acl.conf"]));
-                ({plugins_loaded_file, _Var}) ->
-                    application:set_env(App, plugins_loaded_file, local_path(["deps","emqx", "test", "emqx_SUITE_data", "loaded_plugins"]));
-                     ({Par, Var}) ->
-                      application:set_env(App, Par, Var)
-                 end, Lists).
+                      application:set_env(App, acl_file, local_path(["deps", "emqx", "etc", "acl.conf"]));
+                      ({plugins_loaded_file, _Var}) ->
+                          application:set_env(App, plugins_loaded_file, local_path(["deps","emqx", "test", "emqx_SUITE_data", "loaded_plugins"]));
+                      ({Par, Var}) ->
+                          application:set_env(App, Par, Var)
+                  end, Lists).

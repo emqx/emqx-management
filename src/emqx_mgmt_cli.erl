@@ -96,7 +96,7 @@ mgmt(["delete", AppId]) ->
         ok -> ?PRINT_MSG("ok~n");
         {error, not_found} ->
             ?PRINT_MSG("Error: app not found~n");
-        {error, Reason} -> 
+        {error, Reason} ->
             ?PRINT("Error: ~p~n", [Reason])
     end;
 
@@ -144,19 +144,13 @@ status(_) ->
 
 broker([]) ->
     Funs = [sysdescr, version, uptime, datetime],
-    foreach(fun(Fun) ->
-                ?PRINT("~-10s: ~s~n", [Fun, emqx_sys:Fun()])
-            end, Funs);
+    [?PRINT("~-10s: ~s~n", [Fun, emqx_sys:Fun()]) || Fun <- Funs];
 
 broker(["stats"]) ->
-    foreach(fun({Stat, Val}) ->
-                ?PRINT("~-20s: ~w~n", [Stat, Val])
-            end, emqx_stats:getstats());
+    [?PRINT("~-20s: ~w~n", [Stat, Val]) || {Stat, Val} <- emqx_stats:getstats()];
 
 broker(["metrics"]) ->
-    foreach(fun({Metric, Val}) ->
-                ?PRINT("~-24s: ~w~n", [Metric, Val])
-            end, lists:sort(emqx_metrics:all()));
+    [?PRINT("~-24s: ~w~n", [Metric, Val]) || {Metric, Val} <- list:sort(emqx_metrics:all())];
 
 broker(_) ->
     emqx_cli:usage([{"broker",         "Show broker version, uptime and description"},
@@ -248,12 +242,12 @@ sessions(["list"]) ->
 %% performance issue?
 
 sessions(["list", "persistent"]) ->
-    lists:foreach(fun print/1, ets:match_object(emqx_session, {'_', '_', false, '_'}));
+    [print(Print) || Print <- ets:match_object(emqx_session, {'_', '_', false, '_'})];
 
 %% performance issue?
 
 sessions(["list", "transient"]) ->
-    lists:foreach(fun print/1, ets:match_object(emqx_session, {'_', '_', true, '_'}));
+    [print(Print) || Print <- ets:match_object(emqx_session, {'_', '_', ture, '_'})];
 
 sessions(["show", ClientId]) ->
     case ets:lookup(emqx_session, bin(ClientId)) of
@@ -275,7 +269,7 @@ routes(["list"]) ->
 
 routes(["show", Topic]) ->
     Routes = ets:lookup(emqx_route, bin(Topic)),
-    foreach(fun print/1, [{emqx_route, Route} || Route <- Routes]);
+    [print({emqx_route, Route}) || Route <- Routes];
 
 routes(_) ->
     emqx_cli:usage([{"routes list",         "List all routes"},
@@ -507,20 +501,14 @@ vm(["memory"]) ->
     [?PRINT("memory/~-17s: ~w~n", [Cat, Val]) || {Cat, Val} <- erlang:memory()];
 
 vm(["process"]) ->
-    foreach(fun({Name, Key}) ->
-                ?PRINT("process/~-16s: ~w~n", [Name, erlang:system_info(Key)])
-            end, [{limit, process_limit}, {count, process_count}]);
+    [?PRINT("process/~-16s: ~w~n", [Name, erlang:system_info(Key)]) || {Name, Key} <- [{limit, process_limit}, {count, process_count}]];
 
 vm(["io"]) ->
     IoInfo = erlang:system_info(check_io),
-    foreach(fun(Key) ->
-                ?PRINT("io/~-21s: ~w~n", [Key, get_value(Key, IoInfo)])
-            end, [max_fds, active_fds]);
+    [?PRINT("io/~-21s: ~w~n", [Key, get_value(Key, IoInfo)]) || Key <- [max_fds, active_fds]];
 
 vm(["ports"]) ->
-    foreach(fun({Name, Key}) ->
-                ?PRINT("ports/~-16s: ~w~n", [Name, erlang:system_info(Key)])
-            end, [{count, port_count}, {limit, port_limit}]);
+    [?PRINT("ports/~-16s: ~w~n", [Name, erlang:system_info(Key)]) || {Name, Key} <- [{count, port_count}, {limit, port_limit}]];
 
 vm(_) ->
     emqx_cli:usage([{"vm all",     "Show info of Erlang VM"},
@@ -657,9 +645,9 @@ listeners([]) ->
 listeners(["stop",  Name = "http" ++ _N, ListenOn]) ->
     case minirest:stop_http(list_to_atom(Name)) of
         ok ->
-            io:format("Stop ~s listener on ~s successfully.~n", [Name, ListenOn]);
+            ?PRINT("Stop ~s listener on ~s successfully.~n", [Name, ListenOn]);
         {error, Error} ->
-            io:format("Failed to stop ~s listener on ~s, error:~p~n", [Name, ListenOn, Error])
+            ?PRINT("Failed to stop ~s listener on ~s, error:~p~n", [Name, ListenOn, Error])
     end;
 
 listeners(["stop", Proto, ListenOn]) ->
@@ -669,9 +657,9 @@ listeners(["stop", Proto, ListenOn]) ->
     end,
     case emqx_listeners:stop_listener({list_to_atom(Proto), ListenOn1, []}) of
         ok ->
-            io:format("Stop ~s listener on ~s successfully.~n", [Proto, ListenOn]);
+            ?PRINT("Stop ~s listener on ~s successfully.~n", [Proto, ListenOn]);
         {error, Error} ->
-            io:format("Failed to stop ~s listener on ~s, error:~p~n", [Proto, ListenOn, Error])
+            ?PRINT("Failed to stop ~s listener on ~s, error:~p~n", [Proto, ListenOn, Error])
     end;
 
 listeners(_) ->
