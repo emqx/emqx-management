@@ -14,7 +14,7 @@
 
 -module(emqx_mgmt_util).
 
--author("Feng Lee <feng@emqtt.io>").
+-author("Feng Lee <feng@emqx.io>").
 
 -export([strftime/1, datetime/1, kmg/1, ntoa/1]).
 

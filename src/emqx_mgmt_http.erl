@@ -16,7 +16,7 @@
 
 -module(emqx_mgmt_http).
 
--author("Feng Lee <feng@emqtt.io>").
+-author("Feng Lee <feng@emqx.io>").
 
 -export([start_listeners/0, handle_request/2, stop_listeners/0]).
 

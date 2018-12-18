@@ -12,9 +12,10 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 
--module(emq_mgmt_SUITE).
+-module(emqx_mgmt_SUITE).
 
 -compile(export_all).
+-compile(nowarn_export_all).
 
 -include_lib("emqx/include/emqx.hrl").
 
