@@ -30,13 +30,13 @@
 
 %% List stats of all nodes
 list(Bindings, _Params) when map_size(Bindings) == 0 ->
-    {ok, [[{node, Node} | Stats]
-          || {Node, Stats} <- emqx_mgmt:get_stats()]}.
+    emqx_mgmt:return({ok, [[{node, Node} | Stats]
+                              || {Node, Stats} <- emqx_mgmt:get_stats()]}).
 
 %% List stats of a node
 lookup(#{node := Node}, _Params) ->
     case emqx_mgmt:get_stats(Node) of
-        {error, Reason} -> {error, #{message => Reason}};
-        Stats -> {ok, Stats}
+        {error, Reason} -> emqx_mgmt:return({error, Reason});
+        Stats -> emqx_mgmt:return({ok, Stats})
     end.
 

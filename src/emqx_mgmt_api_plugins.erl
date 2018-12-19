@@ -14,6 +14,8 @@
 
 -module(emqx_mgmt_api_plugins).
 
+-include("emqx_mgmt.hrl").
+
 -include_lib("emqx/include/emqx.hrl").
 
 -rest_api(#{name   => list_all_plugins,
@@ -43,10 +45,10 @@
 -export([list/2, load/2, unload/2]).
 
 list(#{node := Node}, _Params) ->
-    {ok, [format(Plugin) || Plugin <- emqx_mgmt:list_plugins(Node)]};
+    emqx_mgmt:return({ok, [format(Plugin) || Plugin <- emqx_mgmt:list_plugins(Node)]});
 
 list(_Bindings, _Params) ->
-    {ok, [format({Node, Plugins}) || {Node, Plugins} <- emqx_mgmt:list_plugins()]}.
+    emqx_mgmt:return({ok, [format({Node, Plugins}) || {Node, Plugins} <- emqx_mgmt:list_plugins()]}).
 
 load(#{node := Node, plugin := Plugin}, _Params) ->
     return(emqx_mgmt:load_plugin(Node, Plugin)).
@@ -61,9 +63,9 @@ format(#plugin{name = Name, version = Ver, descr = Descr, active = Active}) ->
     [{name, Name}, {version, iolist_to_binary(Ver)}, {description, iolist_to_binary(Descr)}, {active, Active}].
 
 return(ok) ->
-    ok;
+    emqx_mgmt:return();
 return({ok, _}) ->
-    ok;
+    emqx_mgmt:return();
 return({error, Reason}) ->
-    {error, #{message => Reason}}.
+    emqx_mgmt:return({error, ?ERROR2, Reason}).
 

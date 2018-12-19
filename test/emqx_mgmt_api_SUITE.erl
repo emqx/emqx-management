@@ -19,7 +19,7 @@ all() ->
     [{group, rest_api}].
 
 groups() ->
-    [{rest_api, [sequence], [alarms, 
+    [{rest_api, [sequence], [alarms,
                              apps,
                              banned,
                              brokers,
@@ -104,6 +104,11 @@ with_connection(DoFun, NumberOfConnections) ->
 with_connection(DoFun) ->
     with_connection(DoFun, 1).
 
+get(data, ResponseBody) ->
+    proplists:get_value(<<"data">>, jsx:decode(list_to_binary(ResponseBody)));
+get(meta, ResponseBody) ->
+    proplists:get_value(<<"meta">>, jsx:decode(list_to_binary(ResponseBody))).
+
 alarms(_) ->
     AlarmTest = #alarm{id = <<"1">>, severity = error, title="alarm title", summary="alarm summary"},
     emqx_alarm_mgr:set_alarm(AlarmTest),
@@ -125,10 +130,10 @@ apps(_) ->
                           auth_header_(), [{<<"name">>, <<"test 2">>},
                                            {<<"status">>, true}]),
     {ok, AppInfo} = request_api(get, api_path(["apps", erlang:binary_to_list(AppId)]), auth_header_()),
-    ?assertEqual(<<"test 2">>, proplists:get_value(<<"name">>, jsx:decode(list_to_binary(AppInfo)))),
+    ?assertEqual(<<"test 2">>, proplists:get_value(<<"name">>, get(data, AppInfo))),
     {ok, _} = request_api(delete, api_path(["apps", erlang:binary_to_list(AppId)]), auth_header_()),
     {ok, Result} = request_api(get, api_path(["apps"]), auth_header_()),
-    [App] = jsx:decode(list_to_binary(Result)),
+    [App] = get(data, Result),
     ?assertEqual(<<"myappid">>, proplists:get_value(<<"app_id">>, App)).
 
 banned(_) ->
@@ -142,14 +147,14 @@ banned(_) ->
                                            {<<"until">>, erlang:system_time(second) + 10}]),
 
     {ok, Result} = request_api(get, api_path(["banned"]), auth_header_()),
-    [Banned] = proplists:get_value(<<"items">>, jsx:decode(list_to_binary(Result))),
+    [Banned] = get(data, Result),
     ?assertEqual(Who, proplists:get_value(<<"who">>, Banned)),
 
     {ok, _} = request_api(delete, api_path(["banned", erlang:binary_to_list(Who)]), [], 
                           auth_header_(), [{<<"as">>, <<"client_id">>}]),
 
     {ok, Result2} = request_api(get, api_path(["banned"]), auth_header_()),
-    ?assertEqual([], proplists:get_value(<<"items">>, jsx:decode(list_to_binary(Result2)))).
+    ?assertEqual([], get(data, Result2)).
 
 brokers(_) ->
     {ok, _} = request_api(get, api_path(["brokers"]), auth_header_()),
@@ -181,7 +186,7 @@ configs(_) ->
                                   <<"100">> == proplists:get_value(<<"value">>, Elem);
                               _ -> false
                           end
-                      end, jsx:decode(list_to_binary(Result)))).
+                      end, get(data, Result))).
 
 connections_and_sessions(_) ->
     with_connection(fun([Sock]) ->
@@ -201,9 +206,7 @@ connections_and_sessions(_) ->
                                                   "_limit=100&_page=1", 
                                                   auth_header_()),
 
-                        ?assertEqual(1, proplists:get_value(<<"count">>, 
-                                                            proplists:get_value(<<"meta">>, 
-                                                                                jsx:decode(list_to_binary(Conns))))),
+                        ?assertEqual(1, proplists:get_value(<<"count">>, get(meta, Conns))),
                         {ok, Conns} = request_api(get, 
                                                   api_path(["nodes", 
                                                             erlang:atom_to_list(node()), 
@@ -217,7 +220,7 @@ connections_and_sessions(_) ->
                                                              "connections", 
                                                              erlang:binary_to_list(ClientId)]), 
                                                    auth_header_()),
-                        [Conn] = jsx:decode(list_to_binary(Result)),
+                        [Conn] = get(data, Result),
                         ?assertEqual(ClientId, proplists:get_value(<<"client_id">>, Conn)),
 
                         {ok, Result} = request_api(get, 
@@ -228,7 +231,7 @@ connections_and_sessions(_) ->
                         {ok, Result2} = request_api(get, 
                                                     api_path(["sessions"]),
                                                     auth_header_()),
-                        [Session] = proplists:get_value(<<"items">>, jsx:decode(list_to_binary(Result2))),
+                        [Session] = get(data, Result2),
                         ?assertEqual(ClientId, proplists:get_value(<<"client_id">>, Session)),
 
                         {ok, Result2} = request_api(get, 
@@ -241,7 +244,7 @@ connections_and_sessions(_) ->
                                                     api_path(["sessions", 
                                                               erlang:binary_to_list(ClientId)]),
                                                     auth_header_()),
-                        [Session] = jsx:decode(list_to_binary(Result3)),
+                        [Session] = get(data, Result3),
 
                         {ok, Result3} = request_api(get, 
                                                     api_path(["nodes", 
@@ -260,12 +263,12 @@ connections_and_sessions(_) ->
                                                     "_limit=100&_page=1", 
                                                     auth_header_()),
 
-                        ?assertEqual([], proplists:get_value(<<"items">>, jsx:decode(list_to_binary(NonConn)))),
+                        ?assertEqual([], get(data, NonConn)),
 
                         {ok, NonSession} = request_api(get, 
                                                        api_path(["sessions"]),
                                                        auth_header_()),
-                        ?assertEqual([], proplists:get_value(<<"items">>, jsx:decode(list_to_binary(NonSession))))
+                        ?assertEqual([], get(data, NonSession))
                     end).
 
 listeners(_) ->
@@ -294,7 +297,7 @@ plugins(_) ->
                                           erlang:atom_to_list(node()),
                                           "plugins"]),
                                 auth_header_()),
-    [Plugin3] = jsx:decode(list_to_binary(Result3)),
+    [Plugin3] = get(data, Result3),
     ?assertEqual(<<"emqx_retainer">>, proplists:get_value(<<"name">>, Plugin3)),
     ?assertNot(proplists:get_value(<<"active">>, Plugin3)),
 
@@ -307,7 +310,7 @@ plugins(_) ->
                           auth_header_()),
     
     {ok, Result} = request_api(get, api_path(["plugins"]), auth_header_()),
-    [Plugins] = jsx:decode(list_to_binary(Result)),
+    [Plugins] = get(data, Result),
     [Plugin] = proplists:get_value(<<"plugins">>, Plugins),
     ?assertEqual(<<"emqx_retainer">>, proplists:get_value(<<"name">>, Plugin)),
     ?assert(proplists:get_value(<<"active">>, Plugin)),
@@ -317,7 +320,7 @@ plugins(_) ->
                                           erlang:atom_to_list(node()),
                                           "plugins"]),
                                 auth_header_()),
-    [Plugin] = jsx:decode(list_to_binary(Result2)).
+    [Plugin] = get(data, Result2).
 
     
 
@@ -377,7 +380,7 @@ pubsub(_) ->
 routes_and_subscriptions(_) ->
     with_connection(fun([Sock]) ->
                         {ok, NonRoute} = request_api(get, api_path(["routes"]), auth_header_()),
-                        ?assertEqual([], proplists:get_value(<<"items">>, jsx:decode(list_to_binary(NonRoute)))),
+                        ?assertEqual([], get(data, NonRoute)),
 
                         ClientId = <<"myclient">>,
                         Topic = <<"mytopic">>,
@@ -402,14 +405,14 @@ routes_and_subscriptions(_) ->
                         {ok, ?SUBACK_PACKET(1, #{}, [2]), _} = raw_recv_parse(SubData, ?MQTT_PROTO_V5),
 
                         {ok, Result} = request_api(get, api_path(["routes"]), auth_header_()),
-                        [Route] = proplists:get_value(<<"items">>, jsx:decode(list_to_binary(Result))),
+                        [Route] = get(data, Result),
                         ?assertEqual(Topic, proplists:get_value(<<"topic">>, Route)),
                         
                         {ok, Result2} = request_api(get, api_path(["routes", erlang:binary_to_list(Topic)]), auth_header_()),
-                        [Route] = jsx:decode(list_to_binary(Result2)),
+                        [Route] = get(data, Result2),
 
                         {ok, Result3} = request_api(get, api_path(["subscriptions"]), auth_header_()),
-                        [Subscription] = proplists:get_value(<<"items">>, jsx:decode(list_to_binary(Result3))),
+                        [Subscription] = get(data, Result3),
                         ?assertEqual(Topic, proplists:get_value(<<"topic">>, Subscription)),
                         ?assertEqual(ClientId, proplists:get_value(<<"client_id">>, Subscription)),
 
@@ -419,7 +422,7 @@ routes_and_subscriptions(_) ->
 
                         {ok, Result4} = request_api(get, api_path(["subscriptions",
                                                                          erlang:binary_to_list(ClientId)]), auth_header_()),
-                        [Subscription] = jsx:decode(list_to_binary(Result4)),
+                        [Subscription] = get(data, Result4),
 
                         {ok, Result4} = request_api(get, api_path(["nodes",
                                                                    erlang:atom_to_list(node()),

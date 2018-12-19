@@ -10,7 +10,7 @@
 -define(ERROR8, 108). %% Request parameter type error
 -define(ERROR9, 109). %% Request parameter is not a json
 -define(ERROR10, 110). %% Plugin has been loaded
--define(ERROR11, 111). %% Plugin has been loaded
+-define(ERROR11, 111). %% Plugin has been unloaded
 -define(ERROR12, 112). %% Client not online
 -define(ERROR13, 113). %% User already exist
 -define(ERROR14, 114). %% OldPassword error

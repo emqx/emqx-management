@@ -30,12 +30,12 @@
 
 %% List listeners on a node.
 list(#{node := Node}, _Params) ->
-    {ok, format(emqx_mgmt:list_listeners(Node))};
+    emqx_mgmt:return({ok, format(emqx_mgmt:list_listeners(Node))});
 
 %% List listeners in the cluster.
 list(_Binding, _Params) ->
-    {ok, [#{node => Node, listeners => format(Listeners)}
-          || {Node, Listeners} <- emqx_mgmt:list_listeners()]}.
+    emqx_mgmt:return({ok, [#{node => Node, listeners => format(Listeners)}
+                              || {Node, Listeners} <- emqx_mgmt:list_listeners()]}).
 
 format(Listeners) when is_list(Listeners) ->
     [ Info#{listen_on => list_to_binary(esockd:to_string(ListenOn))}

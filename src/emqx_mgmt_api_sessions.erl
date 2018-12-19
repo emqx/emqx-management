@@ -47,19 +47,19 @@ list(Bindings, Params) when map_size(Bindings) =:= 0 ->
     list(#{node => node()}, Params);
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    {ok, emqx_mgmt_api:paginate(emqx_session, Params, fun format/1)};
+    emqx_mgmt:return({ok, emqx_mgmt_api:paginate(emqx_session, Params, fun format/1)});
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
-        {badrpc, Reason} -> {error, #{message => Reason}};
+        {badrpc, Reason} -> emqx_mgmt:return({error, Reason});
         Res -> Res
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    {ok, format(emqx_mgmt:lookup_session(Node, http_uri:decode(ClientId)))};
+    emqx_mgmt:return({ok, format(emqx_mgmt:lookup_session(Node, http_uri:decode(ClientId)))});
 
 lookup(#{clientid := ClientId}, _Params) ->
-    {ok, format(emqx_mgmt:lookup_session(http_uri:decode(ClientId)))}.
+    emqx_mgmt:return({ok, format(emqx_mgmt:lookup_session(http_uri:decode(ClientId)))}).
 
 format([]) ->
     [];

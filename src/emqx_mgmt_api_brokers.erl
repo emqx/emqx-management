@@ -14,6 +14,8 @@
 
 -module(emqx_mgmt_api_brokers).
 
+-include("emqx_mgmt.hrl").
+
 -rest_api(#{name   => list_brokers,
             method => 'GET',
             path   => "/brokers/",
@@ -29,11 +31,13 @@
 -export([list/2, get/2]).
 
 list(_Bindings, _Params) ->
-    {ok, [Info#{node => Node} || {Node, Info} <- emqx_mgmt:list_brokers()]}.
+    emqx_mgmt:return({ok, [Info#{node => Node} || {Node, Info} <- emqx_mgmt:list_brokers()]}).
 
 get(#{node := Node}, _Params) ->
     case emqx_mgmt:lookup_broker(Node) of
-        {error, Reason} -> {error, #{message => Reason}};
-        Info -> {ok, Info}
+        {error, Reason} -> 
+            emqx_mgmt:return({error, ?ERROR2, Reason});
+        Info -> 
+            emqx_mgmt:return({ok, Info})
     end.
 

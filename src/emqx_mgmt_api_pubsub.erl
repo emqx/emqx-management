@@ -49,11 +49,13 @@ subscribe(_Bindings, Params) ->
         true ->
             TopicTable = parse_topic_filters(Topics, QoS),
             case emqx_mgmt:subscribe(ClientId, TopicTable) of
-                {error, _Reson} -> {ok, #{code => ?ERROR12}};
-                _ -> {ok, #{code => 0}}
+                {error, Reason} -> 
+                    emqx_mgmt:return({ok, ?ERROR12, Reason});
+                _ ->
+                    emqx_mgmt:return()
             end;
         false ->
-            {ok, #{code => ?ERROR15}}
+            emqx_mgmt:return({ok, ?ERROR15, bad_topic})
     end.
 
 publish(_Bindings, Params) ->
@@ -69,9 +71,9 @@ publish(_Bindings, Params) ->
                 Msg = emqx_message:make(ClientId, Qos, Topic, Payload),
                 emqx_mgmt:publish(Msg#message{flags = #{retain => Retain}})
             end, Topics),
-            {ok, #{code => 0}};
+            emqx_mgmt:return();
         false ->
-            {ok, #{code => ?ERROR15}}
+            emqx_mgmt:return({ok, ?ERROR15, bad_topic})
     end.
 
 unsubscribe(_Bindings, Params) ->
@@ -81,11 +83,13 @@ unsubscribe(_Bindings, Params) ->
     case validate_by_filter(Topic) of
         true ->
             case emqx_mgmt:unsubscribe(ClientId, Topic) of
-                {error, _} -> {ok, #{code => ?ERROR12}};
-                _ -> {ok, #{code => 0}}
+                {error, Reason} -> 
+                    emqx_mgmt:return({ok, ?ERROR12, Reason});
+                _ -> 
+                    emqx_mgmt:return()
             end;
         false ->
-            {ok, #{code => ?ERROR15}}
+            emqx_mgmt:return({ok, ?ERROR15, bad_topic})
     end.
 
 topics(Type, undefined, Topics0) ->
