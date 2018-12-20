@@ -111,7 +111,7 @@ t_mgmt_cmd(_) ->
 
 t_status_cmd(_) ->
     ct:pal("start testing status command"),
-    emqx_mgmt_cli:status([]).
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:status([]), "is running")).
 
 t_broker_cmd(_) ->
     ct:pal("start testing  the broker command"),
@@ -121,17 +121,17 @@ t_broker_cmd(_) ->
 t_clients_cmd(_) ->
     ct:pal("start testing the client command"),
     process_flag(trap_exit, true),
-    {ok, T1} = emqx_client:start_link([{host, "localhost"},
+    {ok, T} = emqx_client:start_link([{host, "localhost"},
                                        {client_id, <<"client12">>},
                                        {username, <<"testuser1">>},
                                        {password, <<"pass1">>}]),
-    {ok, _} = emqx_client:connect(T1),
+    {ok, _} = emqx_client:connect(T),
     emqx_mgmt_cli:clients(["list"]),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:clients(["show", "client12"]), "client12")),
     emqx_mgmt_cli:clients(["kick", "client12"]),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:clients(["show", "client12"]), "Not Found")),
     receive
-        {'EXIT', T1, Reason} ->
+        {'EXIT', T, Reason} ->
             ct:pal("Connection closed: ~p~n", [Reason])
     after
         500 ->
@@ -153,6 +153,7 @@ t_sessions_cmd(_) ->
                                        {clean_start, true}]),
     {ok, _} = emqx_client:connect(T2),
     emqx_mgmt_cli:sessions(["list"]),
+    [?assertMatch({match, _}, re:run(Result, "client1")) || Result <- emqx_mgmt_cli:sessions(["list"])],
     [?assertMatch({match, _}, re:run(Result, "client1")) || Result <- emqx_mgmt_cli:sessions(["list", "persistent"])],
     [?assertMatch({match, _}, re:run(Result, "client2")) || Result <- emqx_mgmt_cli:sessions(["list", "transient"])],
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["show", "client2"]), "client2")).
@@ -168,42 +169,48 @@ t_vm_cmd(_) ->
 
 t_trace_cmd(_) ->
     ct:pal("start testing the trace command"),
-    {ok, T3} = emqx_client:start_link([{host, "localhost"},
-                                       {client_id, <<"client2">>},
-                                       {username, <<"testuser2">>},
-                                       {password, <<"pass2">>}]),
-    emqx_client:connect(T3),
-    emqx_client:subscribe(T3, <<"a/b/c">>),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:trace(["start", "client", "client2", "log/clientid_trace.log"]), "successfully")),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:trace(["stop", "client", "client2"]), "successfully")),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:trace(["start", "client", "client2", "log/clientid_trace.log", "error"]), "successfully")),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:trace(["stop", "client", "client2"]), "successfully")),
+    {ok, T} = emqx_client:start_link([{host, "localhost"},
+                                      {client_id, <<"client">>},
+                                      {username, <<"testuser">>},
+                                      {password, <<"pass">>}]),
+    emqx_client:connect(T),
+    emqx_client:subscribe(T, <<"a/b/c">>),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:trace(["start", "client", "client", "log/clientid_trace.log"]), "successfully")),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:trace(["stop", "client", "client"]), "successfully")),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:trace(["start", "client", "client", "log/clientid_trace.log", "error"]), "successfully")),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:trace(["stop", "client", "client"]), "successfully")),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:trace(["start", "topic", "a/b/c", "log/clientid_trace.log"]), "successfully")),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:trace(["stop", "topic", "a/b/c"]), "successfully")),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:trace(["start", "topic", "a/b/c", "log/clientid_trace.log", "error"]), "successfully")).
 
 t_router_cmd(_) ->
     ct:pal("start testing the router command"),
-    {ok, T3} = emqx_client:start_link([{host, "localhost"},
+    {ok, T} = emqx_client:start_link([{host, "localhost"},
+                                      {client_id, <<"client1">>},
+                                      {username, <<"testuser1">>},
+                                      {password, <<"pass1">>}]),
+    emqx_client:connect(T),
+    emqx_client:subscribe(T, <<"a/b/c">>),
+    {ok, T1} = emqx_client:start_link([{host, "localhost"},
                                        {client_id, <<"client2">>},
                                        {username, <<"testuser2">>},
                                        {password, <<"pass2">>}]),
-    emqx_client:connect(T3),
-    emqx_client:subscribe(T3, <<"a/b/c">>),
-    emqx_mgmt_cli:routes(["show", "a/b/c"]),
-    emqx_mgmt_cli:routes(["list"]),
+    emqx_client:connect(T1),
+    emqx_client:subscribe(T1, <<"a/b/c/d">>),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:routes(["list"]), "a/b/c | a/b/c/d")),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:routes(["show", "a/b/c"]), "a/b/c")).
 
 t_subscriptions_cmd(_) ->
     ct:pal("Start testing the subscriptions command"),
-    {ok, T4} = emqx_client:start_link([{host, "localhost"},
-                                       {client_id, <<"client4">>},
-                                       {username, <<"testuser4">>},
-                                       {password, <<"pass4">>}]),
-    emqx_client:connect(T4),
-    emqx_client:subscribe(T4, <<"/b/b/c">>),
-    ?assertEqual(emqx_mgmt_cli:subscriptions(["add", "client4", "/b/b/c", "0"]), ["ok~n"]),
-    ?assertEqual(emqx_mgmt_cli:subscriptions(["del", "client4", "/b/b/c"]), ["ok~n"]).
+    {ok, T3} = emqx_client:start_link([{host, "localhost"},
+                                       {client_id, <<"client">>},
+                                       {username, <<"testuser">>},
+                                       {password, <<"pass">>}]),
+    emqx_client:connect(T3),
+    emqx_client:subscribe(T3, <<"/b/b/c">>),
+    [?assertMatch({match, _} , re:run(Result, "/b/b/c")) || Result <- emqx_mgmt_cli:subscriptions(["show", <<"client">>])],
+    ?assertEqual(emqx_mgmt_cli:subscriptions(["add", "client", "/b/b/c", "0"]), ["ok~n"]),
+    ?assertEqual(emqx_mgmt_cli:subscriptions(["del", "client", "/b/b/c"]), ["ok~n"]).
 
 run_setup_steps(App) ->
     NewConfig = generate_config(App),
