@@ -42,7 +42,7 @@ groups() ->
        t_check_app_acl,
        t_log_cmd
       ]},
-      {check_cli, [sequence],
+      {check_cli, [non_parallel_tests],
        [t_log_cmd,
         t_mgmt_cmd,
         t_status_cmd,
@@ -152,8 +152,7 @@ t_sessions_cmd(_) ->
                                        {password, <<"pass2">>},
                                        {clean_start, true}]),
     {ok, _} = emqx_client:connect(T2),
-    emqx_mgmt_cli:sessions(["list"]),
-    [?assertMatch({match, _}, re:run(Result, "client1")) || Result <- emqx_mgmt_cli:sessions(["list"])],
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["list"]), "Session")),
     [?assertMatch({match, _}, re:run(Result, "client1")) || Result <- emqx_mgmt_cli:sessions(["list", "persistent"])],
     [?assertMatch({match, _}, re:run(Result, "client2")) || Result <- emqx_mgmt_cli:sessions(["list", "transient"])],
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["show", "client2"]), "client2")).
@@ -197,7 +196,7 @@ t_router_cmd(_) ->
                                        {password, <<"pass2">>}]),
     emqx_client:connect(T1),
     emqx_client:subscribe(T1, <<"a/b/c/d">>),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:routes(["list"]), "a/b/c | a/b/c/d")),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:routes(["list"]), "a/b/c | a/b/c")),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:routes(["show", "a/b/c"]), "a/b/c")).
 
 t_subscriptions_cmd(_) ->

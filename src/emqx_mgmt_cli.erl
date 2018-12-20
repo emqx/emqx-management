@@ -707,7 +707,7 @@ listeners(_) ->
 %%--------------------------------------------------------------------
 
 dump(Table) ->
-    emqx_cli:print(dump(Table, ets:first(Table), [])).
+    dump(Table, ets:first(Table), []).
 
 dump(_Table, '$end_of_table', Result) ->
     Result;
