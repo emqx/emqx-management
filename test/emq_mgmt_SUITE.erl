@@ -22,9 +22,7 @@
 
 -include_lib("common_test/include/ct.hrl").
 
--import(lists, [foreach/2,zip/2]).
-
--define(LOG_NAMES,[debug]).
+-define(LOG_LEVELS,["debug", "error", "info"]).
 -define(LOG_HANDLER_ID, [file, default]).
 
 all() ->
@@ -85,21 +83,19 @@ t_check_app_acl(_Config) ->
     ok.
 
 t_log_cmd(_) ->
-    ct:pal("start testing the log command"),
-    foreach(fun(LogValues) ->
-                emqx_mgmt_cli:log(["primary-level",atom_to_list(LogValues)]),
-                ?assertEqual(LogValues, emqx_logger:get_primary_log_level())
-            end, ?LOG_NAMES),
-    foreach(fun(LogValues) ->
-                emqx_mgmt_cli:log(["set-level", atom_to_list(LogValues)]),
-                ?assertEqual("ok\n", emqx_mgmt_cli:log(["set-level", atom_to_list(LogValues)]))
-            end, ?LOG_NAMES),
-    ct:pal("start testing set level the log level "),
+    lists:foreach(fun(Level) ->
+                emqx_mgmt_cli:log(["primary-level", Level]),
+                ?assertEqual(Level, emqx_logger:get_primary_log_level())
+            end, ?LOG_LEVELS),
+    lists:foreach(fun(Level) ->
+                emqx_mgmt_cli:log(["set-level", Level]),
+                ?assertEqual(Level++"\n", emqx_mgmt_cli:log(["primary-level"]))
+            end, ?LOG_LEVELS),
     [
-        foreach(fun(LOG_NAME) ->
-                    Result = emqx_mgmt_cli:log(["handlers", "set-level",atom_to_list(Id), atom_to_list(LOG_NAME)]),
-                    ?assertEqual(Result, io_lib:format("~s~n", [LOG_NAME]))
-                end, ?LOG_NAMES)
+        lists:foreach(fun(Level) ->
+                    ?assertEqual(Level, emqx_mgmt_cli:log(["handlers", "set-level",
+                                                           atom_to_list(Id), Level]))
+                end, ?LOG_LEVELS)
         || {Id, _Level, _Dst} <- emqx_logger:get_log_handlers()].
 
 t_mgmt_cmd(_) ->
@@ -114,9 +110,9 @@ t_status_cmd(_) ->
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:status([]), "is running")).
 
 t_broker_cmd(_) ->
-    ct:pal("start testing  the broker command"),
+    ct:pal("start testing the broker command"),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["stats"]), "_")),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["metrice"]), "_")).
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["metrics"]), "_")).
 
 t_clients_cmd(_) ->
     ct:pal("start testing the client command"),
@@ -153,8 +149,6 @@ t_sessions_cmd(_) ->
                                        {clean_start, true}]),
     {ok, _} = emqx_client:connect(T2),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["list"]), "Session")),
-    [?assertMatch({match, _}, re:run(Result, "client1")) || Result <- emqx_mgmt_cli:sessions(["list", "persistent"])],
-    [?assertMatch({match, _}, re:run(Result, "client2")) || Result <- emqx_mgmt_cli:sessions(["list", "transient"])],
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["show", "client2"]), "client2")).
 
 t_vm_cmd(_) ->

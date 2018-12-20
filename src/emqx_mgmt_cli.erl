@@ -19,8 +19,6 @@
 
 -define(PRINT_CMD(Cmd, Descr), io:format("~-48s# ~s~n", [Cmd, Descr])).
 
--define(USAGE(CmdList), [?PRINT_CMD(Cmd, Descr) || {Cmd, Descr} <- CmdList]).
-
 -import(lists, [foreach/2]).
 
 -import(proplists, [get_value/2]).
@@ -117,7 +115,7 @@ mgmt(_) ->
 
 status([]) ->
     {InternalStatus, _ProvidedStatus} = init:get_status(),
-        emqx_cli:print("Node ~p is ~p~n", [node(), InternalStatus]),
+    emqx_cli:print("Node ~p is ~p~n", [node(), InternalStatus]),
     case lists:keysearch(?APP, 1, application:which_applications()) of
         false ->
             emqx_cli:print("~s is not running~n", [?APP]);
@@ -138,7 +136,7 @@ broker(["stats"]) ->
     [emqx_cli:print("~-20s: ~w~n", [Stat, Val]) || {Stat, Val} <- emqx_stats:getstats()];
 
 broker(["metrics"]) ->
-    [emqx_cli:print("~-24s: ~w~n", [Metric, Val]) || {Metric, Val} <- list:sort(emqx_metrics:all())];
+    [emqx_cli:print("~-24s: ~w~n", [Metric, Val]) || {Metric, Val} <- lists:sort(emqx_metrics:all())];
 
 broker(_) ->
     emqx_cli:usage([{"broker",         "Show broker version, uptime and description"},
@@ -227,16 +225,6 @@ if_client(ClientId, Fun) ->
 sessions(["list"]) ->
     dump(emqx_session);
 
-%% performance issue?
-
-sessions(["list", "persistent"]) ->
-    [print(Print) || Print <- ets:match_object(emqx_session, {'_', '_', false, '_'})];
-
-%% performance issue?
-
-sessions(["list", "transient"]) ->
-    [print(Print) || Print <- ets:match_object(emqx_session, {'_', '_', ture, '_'})];
-
 sessions(["show", ClientId]) ->
     case ets:lookup(emqx_session, bin(ClientId)) of
         []         -> emqx_cli:print("Not Found.~n");
@@ -245,8 +233,6 @@ sessions(["show", ClientId]) ->
 
 sessions(_) ->
     emqx_cli:usage([{"sessions list",            "List all sessions"},
-                    {"sessions list persistent", "List all persistent sessions"},
-                    {"sessions list transient",  "List all transient sessions"},
                     {"sessions show <ClientId>", "Show a session"}]).
 
 %%--------------------------------------------------------------------
@@ -513,7 +499,7 @@ mnesia([]) ->
     mnesia:system_info();
 
 mnesia(_) ->
-    ?PRINT_CMD("mnesia", "Mnesia system info").
+    emqx_cli:usage([{"mnesia", "Mnesia system info"}]).
 
 %%--------------------------------------------------------------------
 %% @doc Logger Command
@@ -729,15 +715,16 @@ print({emqx_conn, Key}) ->
                 username,
                 peername,
                 connected_at],
-        emqx_cli:print("Connection(~s, clean_sess=~s, username=~s, peername=~s, connected_at=~p)~n",
-                      [format(K, get_value(K, Attrs)) || K <- InfoKeys]);
+    emqx_cli:print("Connection(~s, clean_start=~s, username=~s, peername=~s, connected_at=~p)~n",
+                   [format(K, get_value(K, Attrs)) || K <- InfoKeys]);
 
 print({emqx_session, Key}) ->
     [{_, Attrs}] = ets:lookup(emqx_session_attrs, Key),
     [{_, Stats}] = ets:lookup(emqx_session_stats, Key),
     InfoKeys = [client_id,
                 clean_start,
-                subscriptions,
+                expiry_interval,
+                subscriptions_count,
                 max_inflight,
                 inflight_len,
                 mqueue_len,
@@ -746,10 +733,12 @@ print({emqx_session, Key}) ->
                 deliver_msg,
                 enqueue_msg,
                 created_at],
-    emqx_cli:print("Session(~s, clean_sess=~s, subscriptions=~w, max_inflight=~w, inflight=~w, "
-                   "mqueue_len=~w, mqueue_dropped=~w, awaiting_rel=~w, "
-                   "deliver_msg=~w, enqueue_msg=~w, created_at=~w)~n",
-                   [format(K, get_value(K, Attrs++Stats)) || K <- InfoKeys]);
+
+    emqx_cli:print("Session(~s, clean_start=~s, expiry_interval=~w, "
+                    "subscriptions_count=~w, max_inflight=~w, inflight=~w, "
+                    "mqueue_len=~w, mqueue_dropped=~w, awaiting_rel=~w, "
+                    "deliver_msg=~w, enqueue_msg=~w, created_at=~w)~n",
+                    [format(K, get_value(K, Attrs++Stats)) || K <- InfoKeys]);
 
 print({emqx_route, #route{topic = Topic, dest = {_, Node}}}) ->
     emqx_cli:print("~s -> ~s~n", [Topic, Node]);
@@ -759,6 +748,7 @@ print({emqx_route, #route{topic = Topic, dest = Node}}) ->
 print(#plugin{name = Name, version = Ver, descr = Descr, active = Active}) ->
     emqx_cli:print("Plugin(~s, version=~s, description=~s, active=~s)~n",
                   [Name, Ver, Descr, Active]);
+
 
 print({emqx_suboption, {{Topic, {Sub, ClientId}}, _Options}}) when is_pid(Sub) ->
     emqx_cli:print("~s -> ~s~n", [ClientId, Topic]).
