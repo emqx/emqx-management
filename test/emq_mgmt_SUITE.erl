@@ -202,8 +202,8 @@ t_subscriptions_cmd(_) ->
     emqx_client:connect(T3),
     emqx_client:subscribe(T3, <<"/b/b/c">>),
     [?assertMatch({match, _} , re:run(Result, "/b/b/c")) || Result <- emqx_mgmt_cli:subscriptions(["show", <<"client">>])],
-    ?assertEqual(emqx_mgmt_cli:subscriptions(["add", "client", "/b/b/c", "0"]), "ok~n"),
-    ?assertEqual(emqx_mgmt_cli:subscriptions(["del", "client", "/b/b/c"]), "ok~n").
+    ?assertEqual(emqx_mgmt_cli:subscriptions(["add", "client", "/b/b/c", "0"]), "\"ok~n\""),
+    ?assertEqual(emqx_mgmt_cli:subscriptions(["del", "client", "/b/b/c"]), "\"ok~n\"").
 
 run_setup_steps(App) ->
     NewConfig = generate_config(App),
