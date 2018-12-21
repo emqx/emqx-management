@@ -24,7 +24,11 @@
 
 -define(APP, emqx_management).
 
+-ifdef(TEST).
+-define(EXCEPT, []).
+-else.
 -define(EXCEPT, [add_app, del_app, list_apps, lookup_app, update_app]).
+-endif.
 
 %%--------------------------------------------------------------------
 %% Start/Stop Listeners

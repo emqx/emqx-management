@@ -59,32 +59,42 @@
 -export([get_configs/2, update_config/2, get_plugin_configs/2, update_plugin_configs/2]).
 
 get_configs(#{node := Node}, _Params) ->
-    {ok, format(emqx_mgmt:get_all_configs(Node))};
+    emqx_mgmt:return({ok, format(emqx_mgmt:get_all_configs(Node))});
 
 get_configs(_Binding, _Params) ->
-    {ok, [#{node => Node,  config => format(Configs)} || {Node, Configs} <- emqx_mgmt:get_all_configs()]}.
+    emqx_mgmt:return({ok, 
+                      [#{node => Node,  config => format(Configs)} || {Node, Configs} <- emqx_mgmt:get_all_configs()]}).
 
-update_config(#{node := Node, app := App}, Params) ->
+update_config(Binding = #{app := App}, Params) ->
     Key   = binary_to_list(get_value(<<"key">>, Params)),
     Value = binary_to_list(get_value(<<"value">>, Params)),
-    emqx_mgmt:update_config(Node, App, Key, Value);
-
-update_config(#{app := App}, Params) ->
-    Key   = binary_to_list(get_value(<<"key">>, Params)),
-    Value = binary_to_list(get_value(<<"value">>, Params)),
-    emqx_mgmt:update_config(App, Key, Value).
+    Result = case maps:get(node, Binding, undefined) of
+        undefined ->
+            emqx_mgmt:update_config(App, Key, Value);
+        Node ->
+            emqx_mgmt:update_config(Node, App, Key, Value)
+    end,
+    case Result of
+        ok -> 
+            emqx_mgmt:return();
+        {error, Reason} ->
+            emqx_mgmt:return({error, ?ERROR2, Reason})
+    end.
 
 get_plugin_configs(#{node := Node, plugin := Plugin}, _Params) ->
     {ok, Configs} = emqx_mgmt:get_plugin_configs(Node, Plugin),
-    {ok, [ format_plugin_config(Config) || Config <-  Configs]}.
+    emqx_mgmt:return({ok, [format_plugin_config(Config) || Config <- Configs]}).
 
 update_plugin_configs(#{node := Node, plugin := Plugin}, Params) ->
     case emqx_mgmt:update_plugin_configs(Node, Plugin, Params) of
         ok  ->
-            ensure_reload_plugin(Plugin);
+            case ensure_reload_plugin(Plugin) of
+                ok -> emqx_mgmt:return();
+                _ -> emqx_mgmt:return({error, ?ERROR2, unknown_error})
+            end;
         Error ->
             logger:error("MGMT update_plugin_configs error:~p~n", [Error]),
-            {error, [{code, ?ERROR2}]}
+            emqx_mgmt:return({error, ?ERROR2, unknown_error})
     end.
 
 ensure_reload_plugin(Plugin) ->

@@ -14,6 +14,8 @@
 
 -module(emqx_mgmt_api_alarms).
 
+-include("emqx_mgmt.hrl").
+
 -include_lib("emqx/include/emqx.hrl").
 
 -rest_api(#{name   => list_all_alarms,
@@ -31,11 +33,12 @@
 -export([list/2]).
 
 list(Bindings, _Params) when map_size(Bindings) == 0 ->
-    {ok, [#{node => Node, alarms => format(Alarms)}
-          || {Node, Alarms} <- emqx_mgmt:get_alarms()]};
+    {ok, #{code => ?SUCCESS,
+           data => [#{node => Node, alarms => format(Alarms)} || {Node, Alarms} <- emqx_mgmt:get_alarms()]}};
 
 list(#{node := Node}, _Params) ->
-    {ok, format(emqx_mgmt:get_alarms(Node))}.
+    {ok, #{code => ?SUCCESS,
+           data => format(emqx_mgmt:get_alarms(Node))}}.
 
 format(Alarms) when is_list(Alarms) ->
     [format(Alarm) || Alarm <- Alarms];

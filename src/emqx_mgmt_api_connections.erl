@@ -14,6 +14,8 @@
 
 -module(emqx_mgmt_api_connections).
 
+-include("emqx_mgmt.hrl").
+
 -include_lib("emqx/include/emqx_mqtt.hrl").
 -include_lib("emqx/include/emqx.hrl").
 
@@ -47,43 +49,34 @@
             func   => kickout,
             descr  => "Kick out a connection"}).
 
--rest_api(#{name   => clean_acl_cache,
-            method => 'DELETE',
-            path   => "/connections/:bin:clientid/acl/:bin:topic",
-            func   => clean_acl_cache,
-            descr  => "Clean ACL cache of a connection"}).
-
 -import(emqx_mgmt_util, [ntoa/1, strftime/1]).
 
--export([list/2, lookup/2, kickout/2, clean_acl_cache/2]).
+-export([list/2, lookup/2, kickout/2]).
 
 list(Bindings, Params) when map_size(Bindings) == 0 ->
     %%TODO: across nodes?
     list(#{node => node()}, Params);
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    {ok, emqx_mgmt_api:paginate(emqx_conn, Params, fun format/1)};
+    emqx_mgmt:return({ok, emqx_mgmt_api:paginate(emqx_conn, Params, fun format/1)});
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
-        {badrpc, Reason} -> {error, #{message => Reason}};
+        {badrpc, Reason} -> emqx_mgmt:return({error, ?ERROR2, Reason});
         Res -> Res
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    {ok, emqx_mgmt:lookup_conn(Node, http_uri:decode(ClientId), fun format/1)};
+    emqx_mgmt:return({ok, emqx_mgmt:lookup_conn(Node, http_uri:decode(ClientId), fun format/1)});
 
 lookup(#{clientid := ClientId}, _Params) ->
-    {ok, emqx_mgmt:lookup_conn(http_uri:decode(ClientId), fun format/1)}.
+    emqx_mgmt:return({ok, emqx_mgmt:lookup_conn(http_uri:decode(ClientId), fun format/1)}).
 
 kickout(#{clientid := ClientId}, _Params) ->
     case emqx_mgmt:kickout_conn(http_uri:decode(ClientId)) of
-        ok -> ok;
-        {error, Reason} -> {error, #{message => Reason}}
+        ok -> emqx_mgmt:return();
+        {error, Reason} -> emqx_mgmt:return({error, Reason})
     end.
-
-clean_acl_cache(#{clientid := ClientId, topic := Topic}, _Params) ->
-    emqx_mgmt:clean_acl_cache(http_uri:decode(ClientId), Topic).
 
 format(ClientList) when is_list(ClientList) ->
     [format(Client) || Client <- ClientList];

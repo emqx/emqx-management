@@ -14,6 +14,8 @@
 
 -module(emqx_mgmt_api_apps).
 
+-include("emqx_mgmt.hrl").
+
 -import(proplists, [get_value/2]).
 
 -rest_api(#{name   => add_app,
@@ -55,27 +57,30 @@ add_app(_Bindings, Params) ->
     Status = get_value(<<"status">>, Params),
     Expired = get_value(<<"expired">>, Params),
     case emqx_mgmt_auth:add_app(AppId, Name, Desc, Status, Expired) of
-        {ok, AppSecret} -> {ok, [{secret, AppSecret}]};
-        Error -> return(Error)
+        {ok, AppSecret} -> emqx_mgmt:return({ok, [{secret, AppSecret}]});
+        {error, Reason} -> emqx_mgmt:return({error, ?ERROR2, Reason})
     end.
 
 del_app(#{appid := AppId}, _Params) ->
-    return(emqx_mgmt_auth:del_app(AppId)).
+    case emqx_mgmt_auth:del_app(AppId) of
+        ok -> emqx_mgmt:return();
+        {error, Reason} -> emqx_mgmt:return({error, ?ERROR2, Reason})
+    end.
 
 list_apps(_Bindings, _Params) ->
-    {ok, [format(Apps)|| Apps <- emqx_mgmt_auth:list_apps()]}.
+    {ok, [{code, ?SUCCESS}, {data, [format(Apps)|| Apps <- emqx_mgmt_auth:list_apps()]}]}.
 
 lookup_app(#{appid := AppId}, _Params) ->
     case emqx_mgmt_auth:lookup_app(AppId) of
         {AppId, AppSecret, Name, Desc, Status, Expired} ->
-            {ok, [{app_id, AppId},
-                  {secret, AppSecret},
-                  {name, Name},
-                  {desc, Desc},
-                  {status, Status},
-                  {expired, Expired}]};
+            emqx_mgmt:return({ok, [{app_id, AppId},
+                                   {secret, AppSecret},
+                                   {name, Name},
+                                   {desc, Desc},
+                                   {status, Status},
+                                   {expired, Expired}]});
         undefined ->
-            {ok, []}
+            emqx_mgmt:return({ok, []})
     end.
 
 update_app(#{appid := AppId}, Params) ->
@@ -83,17 +88,14 @@ update_app(#{appid := AppId}, Params) ->
     Desc = get_value(<<"desc">>, Params),
     Status = get_value(<<"status">>, Params),
     Expired = get_value(<<"expired">>, Params),
-    return(emqx_mgmt_auth:update_app(AppId, Name, Desc, Status, Expired)).
+    case emqx_mgmt_auth:update_app(AppId, Name, Desc, Status, Expired) of
+        ok -> emqx_mgmt:return();
+        {error, Reason} -> emqx_mgmt:return({error, ?ERROR2, Reason})
+    end.
 
 format({AppId, _AppSecret, Name, Desc, Status, Expired}) ->
     [{app_id, AppId}, {name, Name}, {desc, Desc}, {status, Status}, {expired, Expired}].
 
-return(ok) ->
-    ok;
-return({ok, _}) ->
-    ok;
-return({error, Reason}) ->
-    {error, #{message => Reason}}.
 
 
 

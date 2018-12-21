@@ -41,7 +41,7 @@
 -export([list/2, create/2, delete/2]).
 
 list(_Bindings, Params) ->
-    {ok, emqx_mgmt_api:paginate(emqx_banned, Params, fun format/1)}.
+    emqx_mgmt:return({ok, emqx_mgmt_api:paginate(emqx_banned, Params, fun format/1)}).
 
 create(_Bindings, Params) ->
     case pipeline(Params, create, [fun ensure_required/2,
@@ -49,8 +49,9 @@ create(_Bindings, Params) ->
                                    fun pack_banned/2]) of
         {ok, Banned} ->
             ok = emqx_mgmt:create_banned(Banned),
-            {201, Params};
-        {error, StatusCode, Reply} -> {StatusCode, Reply}
+            emqx_mgmt:return({ok, Params});
+        {error, Code, Message} -> 
+            emqx_mgmt:return({error, Code, Message})
     end.
 
 delete(#{who := Who}, Params) ->
@@ -58,12 +59,16 @@ delete(#{who := Who}, Params) ->
                                    fun validate_params/2,
                                    fun fetch_as/2]) of
         {ok, <<"ip_address">>} ->
-            emqx_mgmt:delete_banned({ip_address, inet:parse_address(str(Who))});
+            emqx_mgmt:delete_banned({ip_address, inet:parse_address(str(Who))}),
+            emqx_mgmt:return();
         {ok, <<"username">>} ->
-            emqx_mgmt:delete_banned({username, bin(Who)});
+            emqx_mgmt:delete_banned({username, bin(Who)}),
+            emqx_mgmt:return();
         {ok, <<"client_id">>} ->
-            emqx_mgmt:delete_banned({client_id, bin(Who)});
-        {error, StatusCode, Reply} -> {StatusCode, Reply}
+            emqx_mgmt:delete_banned({client_id, bin(Who)}),
+            emqx_mgmt:return();
+        {error, Code, Message} -> 
+            emqx_mgmt:return({error, Code, Message})
     end.
 
 %% Go through plugs in pipeline
@@ -73,8 +78,8 @@ pipeline(Params, Action, [Plug | PlugList]) ->
     case Plug(Params, Action) of
         {ok, NewParams} ->
             pipeline(NewParams, Action, PlugList);
-        {error, StatusCode, Reply} ->
-            {error, StatusCode, Reply}
+        {error, Code, Message} ->
+            {error, Code, Message}
     end.
 
 %% Plugs
@@ -86,7 +91,7 @@ ensure_required(Params, Action) when is_list(Params) ->
     case AllIncluded of
         true -> {ok, Params};
         false ->
-            {error, 422, error_msg(Msg, ?ERROR7)}
+            {error, ?ERROR7, Msg}
     end.
 
 validate_params(Params, _Action) ->
@@ -94,7 +99,7 @@ validate_params(Params, _Action) ->
     case lists:member(get_value(<<"as">>, Params), AsEnums) of
         true -> {ok, Params};
         false ->
-            {error, 422, error_msg(Msg, ?ERROR8)}
+            {error, ?ERROR8, Msg}
     end.
 
 pack_banned(Params, _Action) ->
@@ -138,12 +143,6 @@ required_params(delete) ->
 enum_values(as) ->
     #{enum_values => [<<"client_id">>, <<"username">>, <<"ip_address">>],
       message => <<"value of 'as' must be one of: ['client_id', 'username', 'ip_address']">> }.
-
-error_msg(Message, ErrorCode) ->
-    #{
-        <<"message">> => Message,
-        <<"errorCode">> => ErrorCode
-     }.
 
 %% Internal Functions
 
