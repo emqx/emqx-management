@@ -243,7 +243,7 @@ lookup_subscriptions(Key) ->
     lists:append([lookup_subscriptions(Node, Key) || Node <- ekka_mnesia:running_nodes()]).
 
 lookup_subscriptions(Node, Key) when Node =:= node() ->
-    ets:match_object(emqx_suboption, {{'_', {'_', Key}}, '_'});
+    ets:match_object(emqx_suboption, {{Key, '_'}, '_'});
 
 lookup_subscriptions(Node, Key) ->
     rpc_call(Node, lookup_subscriptions, [Node, Key]).
@@ -259,27 +259,27 @@ list_routes() ->
     end.
 
 lookup_routes(Topic) ->
-    emqx_router:get_routes(Topic).
+    emqx_router:lookup_routes(Topic).
 
 %%--------------------------------------------------------------------
 %% PubSub
 %%--------------------------------------------------------------------
 
 subscribe(ClientId, TopicTable) ->
-    case emqx_sm:lookup_session_pid(ClientId) of
-        Pid when is_pid(Pid) ->
-            emqx_session:subscribe(Pid, TopicTable);
-        _ -> {error, session_not_found}
+    case emqx_sm:lookup_session_pids(ClientId) of
+        [] -> {error, session_not_found};
+        [Pid | _] ->
+            emqx_session:subscribe(Pid, TopicTable)
     end.
 
 %%TODO: ???
 publish(Msg) -> emqx:publish(Msg).
 
 unsubscribe(ClientId, Topic) ->
-    case emqx_sm:lookup_session_pid(ClientId) of
-        Pid when is_pid(Pid) ->
-            emqx_session:unsubscribe(Pid, [{Topic, []}]);
-        _ -> {error, session_not_found}
+    case emqx_sm:lookup_session_pids(ClientId) of
+        [] -> {error, session_not_found};
+        [Pid | _] ->
+            emqx_session:unsubscribe(Pid, [{Topic, []}])
     end.
 
 %%--------------------------------------------------------------------
@@ -394,7 +394,7 @@ create_banned(Banned) ->
     emqx_banned:add(Banned).
 
 delete_banned(Key) ->
-    emqx_banned:del(Key).
+    emqx_banned:delete(Key).
 
 %%--------------------------------------------------------------------
 %% Common Table API
