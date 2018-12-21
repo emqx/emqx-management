@@ -84,7 +84,7 @@ t_check_app_acl(_Config) ->
 
 t_log_cmd(_) ->
     lists:foreach(fun(Level) ->
-                      emqx_mgmt_cli:log(["primary-level", Level])
+                      emqx_mgmt_cli:log(["primary-level", Level]),
                       ?assertEqual(Level++"\n", emqx_mgmt_cli:log(["primary-level"]))
                   end, ?LOG_LEVELS),
     lists:foreach(fun(Level) ->
@@ -93,7 +93,7 @@ t_log_cmd(_) ->
                   end, ?LOG_LEVELS),
     [
         lists:foreach(fun(Level) ->
-                         ?assertEqual(Level, emqx_mgmt_cli:log(["handlers", "set-level",
+                         ?assertEqual(Level++"\n", emqx_mgmt_cli:log(["handlers", "set-level",
                                                                atom_to_list(Id), Level]))
                       end, ?LOG_LEVELS)
         || {Id, _Level, _Dst} <- emqx_logger:get_log_handlers()].
