@@ -64,7 +64,7 @@ lookup(#{clientid := ClientId}, _Params) ->
 format(Items) when is_list(Items) ->
     [format(Item) || Item <- Items];
 
-format({{Topic, Subscriber}, Options}) ->
+format({{Subscriber, Topic}, Options}) ->
     format({Subscriber, Topic, Options});
 
 format({Subscriber, Topic, Options}) ->
