@@ -56,10 +56,20 @@ list(#{node := Node} = Bindings, Params) ->
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    emqx_mgmt:return({ok, format(emqx_mgmt:lookup_subscriptions(Node, http_uri:decode(ClientId)))});
+    case ets:lookup(emqx_subid, http_uri:decode(ClientId)) of
+        [] ->
+            emqx_mgmt:return({ok, []});
+        [{_, Pid}] ->
+            emqx_mgmt:return({ok, format(emqx_mgmt:lookup_subscriptions(Node, Pid))})
+    end;
 
 lookup(#{clientid := ClientId}, _Params) ->
-    emqx_mgmt:return({ok, format(emqx_mgmt:lookup_subscriptions(http_uri:decode(ClientId)))}).
+    case ets:lookup(emqx_subid, http_uri:decode(ClientId)) of
+        [] ->
+            emqx_mgmt:return({ok, []});
+        [{_, Pid}] ->
+            emqx_mgmt:return({ok, format(emqx_mgmt:lookup_subscriptions(Pid))})
+    end.
 
 format(Items) when is_list(Items) ->
     [format(Item) || Item <- Items];
@@ -67,12 +77,6 @@ format(Items) when is_list(Items) ->
 format({{Subscriber, Topic}, Options}) ->
     format({Subscriber, Topic, Options});
 
-format({Subscriber, Topic, Options}) ->
+format({_Subscriber, Topic, Options}) ->
     QoS = maps:get(qos, Options),
-    #{node => node(), topic => Topic, client_id => client_id(Subscriber), qos => QoS}.
-
-client_id(SubPid) when is_pid(SubPid) ->
-    list_to_binary(pid_to_list(SubPid));
-client_id({_SubPid, SubId}) ->
-    SubId.
-
+    #{node => node(), topic => Topic, client_id => maps:get(subid, Options), qos => QoS}.
