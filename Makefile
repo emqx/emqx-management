@@ -4,14 +4,14 @@ PROJECT_VERSION = 3.0
 PROJECT_MOD = emqx_mgmt_app
 
 DEPS = minirest clique
-dep_minirest = git-emqx https://github.com/emqx/minirest emqx30
-dep_clique   = git-emqx https://github.com/emqx/clique develop
+dep_minirest = git-emqx https://github.com/emqx/minirest v0.1.0
+dep_clique   = git-emqx https://github.com/emqx/clique v0.3.11
 
 LOCAL_DEPS = mnesia
 
 BUILD_DEPS = emqx cuttlefish
 dep_emqx = git-emqx https://github.com/emqx/emqx emqx30
-dep_cuttlefish = git-emqx https://github.com/emqx/cuttlefish emqx30
+dep_cuttlefish = git-emqx https://github.com/emqx/cuttlefish v2.1.1
 
 TEST_DEPS = emqx_retainer
 dep_emqx_retainer = git-emqx https://github.com/emqx/emqx-retainer emqx30
