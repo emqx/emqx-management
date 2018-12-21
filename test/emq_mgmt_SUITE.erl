@@ -111,8 +111,8 @@ t_status_cmd(_) ->
 
 t_broker_cmd(_) ->
     ct:pal("start testing the broker command"),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["stats"]), "_")),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["metrics"]), "_")).
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["stats"]), "clients/count")),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["metrice"]), "bytes/received")).
 
 t_clients_cmd(_) ->
     ct:pal("start testing the client command"),
