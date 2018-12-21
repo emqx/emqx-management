@@ -205,7 +205,6 @@ connections_and_sessions(_) ->
                                                   api_path(["connections"]), 
                                                   "_limit=100&_page=1", 
                                                   auth_header_()),
-
                         ?assertEqual(1, proplists:get_value(<<"count">>, get(meta, Conns))),
                         {ok, Conns} = request_api(get, 
                                                   api_path(["nodes", 

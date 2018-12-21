@@ -60,6 +60,7 @@ init_per_suite(Config) ->
 
 end_per_suite(_Config) ->
     application:stop(mnesia),
+    application:stop(emqx_management),
     emqx:shutdown().
 
 t_add_app(_Config) ->
@@ -125,6 +126,7 @@ t_clients_cmd(_) ->
     emqx_mgmt_cli:clients(["list"]),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:clients(["show", "client12"]), "client12")),
     emqx_mgmt_cli:clients(["kick", "client12"]),
+    timer:sleep(500),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:clients(["show", "client12"]), "Not Found")),
     receive
         {'EXIT', T, Reason} ->
@@ -199,11 +201,13 @@ t_subscriptions_cmd(_) ->
                                        {client_id, <<"client">>},
                                        {username, <<"testuser">>},
                                        {password, <<"pass">>}]),
-    emqx_client:connect(T3),
-    emqx_client:subscribe(T3, <<"/b/b/c">>),
-    [?assertMatch({match, _} , re:run(Result, "/b/b/c")) || Result <- emqx_mgmt_cli:subscriptions(["show", <<"client">>])],
-    ?assertEqual(emqx_mgmt_cli:subscriptions(["add", "client", "/b/b/c", "0"]), "\"ok~n\""),
-    ?assertEqual(emqx_mgmt_cli:subscriptions(["del", "client", "/b/b/c"]), "\"ok~n\"").
+    {ok, _} = emqx_client:connect(T3),
+    {ok, _, _} = emqx_client:subscribe(T3, <<"b/b/c">>),
+    timer:sleep(300),
+    [?assertMatch({match, _} , re:run(Result, "b/b/c"))
+        || Result <- emqx_mgmt_cli:subscriptions(["show", <<"client">>])],
+    ?assertEqual(emqx_mgmt_cli:subscriptions(["add", "client", "b/b/c", "0"]), "\"ok~n\""),
+    ?assertEqual(emqx_mgmt_cli:subscriptions(["del", "client", "b/b/c"]), "\"ok~n\"").
 
 run_setup_steps(App) ->
     NewConfig = generate_config(App),

@@ -255,31 +255,34 @@ subscriptions(["list"]) ->
                   end, ets:tab2list(emqx_suboption));
 
 subscriptions(["show", ClientId]) ->
-    case ets:match_object(emqx_suboption, {{'_', {'_', bin(ClientId)}}, '_'}) of
-        [] -> emqx_cli:print("Not Found.~n");
-        Suboption ->
-            [print({emqx_suboption, Sub}) || Sub <- Suboption]
+    case ets:lookup(emqx_subid, bin(ClientId)) of
+        [] ->
+            emqx_cli:print("Not Found.~n");
+        [{_, Pid}] ->
+            case ets:match_object(emqx_suboption, {{Pid, '_'}, '_'}) of
+                [] -> emqx_cli:print("Not Found.~n");
+                Suboption ->
+                    [print({emqx_suboption, Sub}) || Sub <- Suboption]
+            end
     end;
 
 subscriptions(["add", ClientId, Topic, QoS]) ->
    if_valid_qos(QoS, fun(IntQos) ->
-                        case emqx_sm:lookup_session_pid(bin(ClientId)) of
-                            Pid when is_pid(Pid) ->
+                        case emqx_sm:lookup_session_pids(bin(ClientId)) of
+                            [] -> emqx_cli:print("Error: Session not found!");
+                            [Pid | _] ->
                                 {Topic1, Options} = emqx_topic:parse(bin(Topic)),
                                 emqx_session:subscribe(Pid, [{Topic1, Options#{qos => IntQos}}]),
-                                emqx_cli:print("ok~n");
-                            _ ->
-                                emqx_cli:print("Error: Session not found!")
+                                emqx_cli:print("ok~n")
                         end
                      end);
 
 subscriptions(["del", ClientId, Topic]) ->
-    case emqx_sm:lookup_session_pid(bin(ClientId)) of
-        Pid when is_pid(Pid) ->
+    case emqx_sm:lookup_session_pids(bin(ClientId)) of
+        [] -> emqx_cli:print("Error: Session not found!");
+        [Pid | _] ->
             emqx_session:unsubscribe(Pid, [emqx_topic:parse(bin(Topic))]),
-            emqx_cli:print("ok~n");
-        undefined ->
-            emqx_cli:print("Error: Session not found!")
+            emqx_cli:print("ok~n")
     end;
 
 subscriptions(_) ->
@@ -750,8 +753,8 @@ print(#plugin{name = Name, version = Ver, descr = Descr, active = Active}) ->
                   [Name, Ver, Descr, Active]);
 
 
-print({emqx_suboption, {{Topic, {Sub, ClientId}}, _Options}}) when is_pid(Sub) ->
-    emqx_cli:print("~s -> ~s~n", [ClientId, Topic]).
+print({emqx_suboption, {{Pid, Topic}, Options}}) when is_pid(Pid) ->
+    emqx_cli:print("~s -> ~s~n", [maps:get(subid, Options), Topic]).
 
 format(_, undefined) ->
     undefined;
