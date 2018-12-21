@@ -11,7 +11,7 @@ LOCAL_DEPS = mnesia
 
 BUILD_DEPS = emqx cuttlefish
 dep_emqx = git-emqx https://github.com/emqx/emqx emqx30
-dep_cuttlefish = git-emqx https://github.com/emqx/cuttlefish v2.1.1
+dep_cuttlefish = git-emqx https://github.com/emqx/cuttlefish v2.2.0
 
 TEST_DEPS = emqx_retainer
 dep_emqx_retainer = git-emqx https://github.com/emqx/emqx-retainer emqx30
