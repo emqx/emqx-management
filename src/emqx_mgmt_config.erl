@@ -1,5 +1,4 @@
-%%--------------------------------------------------------------------
-%% Copyright (c) 2013-2017 EMQ Enterprise, Inc. (http://emqtt.io)
+%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -12,12 +11,11 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-%%--------------------------------------------------------------------
 
 %% @doc Hot Configuration
 %%
 %% TODO: How to persist the configuration?
-%% 
+%%
 %% 1. Store in mnesia database?
 %% 2. Store in dets?
 %% 3. Store in data/app.config?
@@ -32,7 +30,7 @@
 %% @doc Read the configuration of an application.
 -spec(read(atom()) -> {ok, list(env())} | {error, term()}).
 read(App) ->
-    %% TODO: 
+    %% TODO:
     %% 1. Read the app.conf from etc folder
     %% 2. Cuttlefish to read the conf
     %% 3. Return the terms and schema
@@ -57,7 +55,7 @@ write(App, Terms) ->
     Schema = cuttlefish_schema:files([Path]),
     case cuttlefish_generator:map(Schema, Configs) of
         [{App, Configs1}] ->
-            emqx_cli_config:write_config(App, Configs),
+            emqx_mgmt_cli_cfg:write_config(App, Configs),
             lists:foreach(fun({Key, Val}) -> application:set_env(App, Key, Val) end, Configs1);
         _ ->
             error
@@ -70,25 +68,25 @@ dump(_App, _Terms) ->
 
 -spec(set(atom(), list(), list()) -> ok).
 set(App, Par, Val) ->
-    emqx_cli_config:run(["config",
+    emqx_mgmt_cli_cfg:run(["config",
                             "set",
                             lists:concat([Par, "=", Val]),
                             lists:concat(["--app=", App])]).
 
 -spec(get(atom(), list()) -> undefined | {ok, term()}).
 get(App, Par) ->
-    case emqx_cli_config:get_cfg(App, Par) of
+    case emqx_mgmt_cli_cfg:get_cfg(App, Par) of
         undefined -> undefined;
         Val -> {ok, Val}
     end.
 
 -spec(get(atom(), list(), atom()) -> term()).
 get(App, Par, Def) ->
-    emqx_cli_config:get_cfg(App, Par, Def).
+    emqx_mgmt_cli_cfg:get_cfg(App, Par, Def).
 
 
 read_(App) ->
-    Configs = emqx_cli_config:read_config(App),
+    Configs = emqx_mgmt_cli_cfg:read_config(App),
     Path = lists:concat([code:priv_dir(App), "/", App, ".schema"]),
     case filelib:is_file(Path) of
         false ->

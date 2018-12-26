@@ -1,5 +1,4 @@
-%%--------------------------------------------------------------------
-%% Copyright (c) 2015-2017 EMQ Enterprise, Inc. (http://emqtt.io).
+%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -12,11 +11,10 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-%%--------------------------------------------------------------------
 
 -module(emqx_mgmt_api_brokers).
 
--author("Feng Lee <feng@emqtt.io>").
+-include("emqx_mgmt.hrl").
 
 -rest_api(#{name   => list_brokers,
             method => 'GET',
@@ -33,11 +31,13 @@
 -export([list/2, get/2]).
 
 list(_Bindings, _Params) ->
-    {ok, [ Info#{node => Node} || {Node, Info} <- emqx_mgmt:list_brokers() ]}.
+    emqx_mgmt:return({ok, [Info#{node => Node} || {Node, Info} <- emqx_mgmt:list_brokers()]}).
 
 get(#{node := Node}, _Params) ->
     case emqx_mgmt:lookup_broker(Node) of
-        {error, Reason} -> {error, #{message => Reason}};
-        Info -> {ok, Info}
+        {error, Reason} -> 
+            emqx_mgmt:return({error, ?ERROR2, Reason});
+        Info -> 
+            emqx_mgmt:return({ok, Info})
     end.
 

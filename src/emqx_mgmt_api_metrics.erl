@@ -1,5 +1,4 @@
-%%--------------------------------------------------------------------
-%% Copyright (c) 2015-2017 EMQ Enterprise, Inc. (http://emqtt.io).
+%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -12,11 +11,8 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-%%--------------------------------------------------------------------
 
 -module(emqx_mgmt_api_metrics).
-
--author("Feng Lee <feng@emqtt.io>").
 
 -rest_api(#{name   => list_all_metrics,
             method => 'GET',
@@ -33,12 +29,12 @@
 -export([list/2]).
 
 list(Bindings, _Params) when map_size(Bindings) == 0 ->
-    {ok, [[{node, Node}, {metrics, Metrics}]
-          || {Node, Metrics} <- emqx_mgmt:get_metrics()]};
+    emqx_mgmt:return({ok, [[{node, Node}, {metrics, Metrics}]
+                              || {Node, Metrics} <- emqx_mgmt:get_metrics()]});
 
 list(#{node := Node}, _Params) ->
     case emqx_mgmt:get_metrics(Node) of
-        {error, Reason} -> {error, #{message => Reason}};
-        Metrics         -> {ok, Metrics}
+        {error, Reason} -> emqx_mgmt:return({error, Reason});
+        Metrics         -> emqx_mgmt:return({ok, Metrics})
     end.
 

@@ -1,5 +1,4 @@
-%%--------------------------------------------------------------------
-%% Copyright (c) 2015-2017 EMQ Enterprise, Inc. (http://emqtt.io).
+%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -12,11 +11,10 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-%%--------------------------------------------------------------------
 
 -module(emqx_mgmt_api_plugins).
 
--author("Feng Lee <feng@emqtt.io>").
+-include("emqx_mgmt.hrl").
 
 -include_lib("emqx/include/emqx.hrl").
 
@@ -47,10 +45,10 @@
 -export([list/2, load/2, unload/2]).
 
 list(#{node := Node}, _Params) ->
-    {ok, [format(Plugin) || Plugin <- emqx_mgmt:list_plugins(Node)]};
+    emqx_mgmt:return({ok, [format(Plugin) || Plugin <- emqx_mgmt:list_plugins(Node)]});
 
 list(_Bindings, _Params) ->
-    {ok, [format({Node, Plugins}) || {Node, Plugins} <- emqx_mgmt:list_plugins()]}.
+    emqx_mgmt:return({ok, [format({Node, Plugins}) || {Node, Plugins} <- emqx_mgmt:list_plugins()]}).
 
 load(#{node := Node, plugin := Plugin}, _Params) ->
     return(emqx_mgmt:load_plugin(Node, Plugin)).
@@ -61,12 +59,13 @@ unload(#{node := Node, plugin := Plugin}, _Params) ->
 format({Node, Plugins}) ->
     [{node, Node}, {plugins, [format(Plugin) || Plugin <- Plugins]}];
 
-format(#mqtt_plugin{name = Name, version = Ver, descr = Descr, active = Active}) ->
+format(#plugin{name = Name, version = Ver, descr = Descr, active = Active}) ->
     [{name, Name}, {version, iolist_to_binary(Ver)}, {description, iolist_to_binary(Descr)}, {active, Active}].
 
 return(ok) ->
-    ok;
+    emqx_mgmt:return();
 return({ok, _}) ->
-    ok;
+    emqx_mgmt:return();
 return({error, Reason}) ->
-    {error, #{message => Reason}}.
+    emqx_mgmt:return({error, ?ERROR2, Reason}).
+

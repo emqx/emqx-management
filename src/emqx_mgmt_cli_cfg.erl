@@ -1,5 +1,4 @@
-%%--------------------------------------------------------------------
-%% Copyright (c) 2013-2017 EMQ Enterprise, Inc. (http://emqtt.io)
+%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -12,7 +11,6 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-%%--------------------------------------------------------------------
 
 -module (emqx_mgmt_cli_cfg).
 
@@ -34,20 +32,36 @@ register_config() ->
     application:start(clique),
     F = fun() -> ekka_mnesia:running_nodes() end,
     clique:register_node_finder(F),
-    register_config_cli(),
+    % register_config_cli(),
     create_config_tab().
 
 create_config_tab() ->
     case ets:info(?TAB, name) of
         undefined ->
             ets:new(?TAB, [named_table, public]),
-            {ok, PluginsEtcDir} = emqx:env(plugins_etc_dir),
+            PluginsEtcDir = emqx_config:get_env(plugins_etc_dir),
             Files = filelib:wildcard("*.conf", PluginsEtcDir),
             lists:foreach(fun(File) ->
                 [FileName | _] = string:tokens(File, "."),
                 Configs = cuttlefish_conf:file(lists:concat([PluginsEtcDir, File])),
                 ets:insert(?TAB, {list_to_atom(FileName), Configs})
-            end, Files);
+            end, Files),
+            Dir = emqx_config:get_env(expand_plugins_dir),
+            PluginsDir = filelib:wildcard("*", Dir),
+            lists:foreach(fun(PluginDir) ->
+                case filelib:is_dir(Dir ++ PluginDir) of
+                    true ->
+                        Etc  = Dir ++ PluginDir ++ "/etc",
+                        case filelib:wildcard("*.conf", Etc) of
+                            [] -> ok;
+                            [Conf] ->
+                                [FileName | _] = string:tokens(Conf, "."),
+                                Configs = cuttlefish_conf:file(lists:concat([Etc,"/", Conf])),
+                                ets:insert(?TAB, {list_to_atom(FileName), Configs})
+                        end;
+                    false -> ok
+                end
+            end, PluginsDir);
         _ ->
             ok
     end.

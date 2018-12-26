@@ -1,5 +1,4 @@
-%%--------------------------------------------------------------------
-%% Copyright (c) 2015-2017 EMQ Enterprise, Inc. (http://emqtt.io).
+%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -12,11 +11,10 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-%%--------------------------------------------------------------------
 
 -module(emqx_mgmt_api_alarms).
 
--author("Feng Lee <feng@emqtt.io>").
+-include("emqx_mgmt.hrl").
 
 -include_lib("emqx/include/emqx.hrl").
 
@@ -35,20 +33,21 @@
 -export([list/2]).
 
 list(Bindings, _Params) when map_size(Bindings) == 0 ->
-    {ok, [#{node => Node, alarms => format(Alarms)}
-          || {Node, Alarms} <- emqx_mgmt:get_alarms()]};
+    {ok, #{code => ?SUCCESS,
+           data => [#{node => Node, alarms => format(Alarms)} || {Node, Alarms} <- emqx_mgmt:get_alarms()]}};
 
 list(#{node := Node}, _Params) ->
-    {ok, format(emqx_mgmt:get_alarms(Node))}.
+    {ok, #{code => ?SUCCESS,
+           data => format(emqx_mgmt:get_alarms(Node))}}.
 
 format(Alarms) when is_list(Alarms) ->
     [format(Alarm) || Alarm <- Alarms];
 
-format(#mqtt_alarm{id        = Id,
-                   severity  = Severity,
-                   title     = Title,
-                   summary   = Summary,
-                   timestamp = Ts}) ->
+format(#alarm{id        = Id,
+              severity  = Severity,
+              title     = Title,
+              summary   = Summary,
+              timestamp = Ts}) ->
     #{id        => Id,
       severity  => Severity,
       title     => iolist_to_binary(Title),

@@ -13,3 +13,13 @@ emqx_management.d
 ebin/*
 data/
 log/
+_build/
+rebar.lock
+rebar3.crashdump
+.erlang.mk
+erlang.mk
+cover/
+ct.coverdata
+eunit.coverdata
+logs/
+test/ct.cover.spec

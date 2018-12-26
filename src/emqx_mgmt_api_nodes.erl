@@ -1,5 +1,4 @@
-%%--------------------------------------------------------------------
-%% Copyright (c) 2015-2017 EMQ Enterprise, Inc. (http://emqtt.io).
+%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -12,11 +11,8 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-%%--------------------------------------------------------------------
 
 -module(emqx_mgmt_api_nodes).
-
--author("Feng Lee <feng@emqtt.io>").
 
 -rest_api(#{name   => list_nodes,
             method => 'GET',
@@ -33,10 +29,10 @@
 -export([list/2, get/2]).
 
 list(_Bindings, _Params) ->
-    {ok, [format(Node, Info) || {Node, Info} <- emqx_mgmt:list_nodes()]}.
+    emqx_mgmt:return({ok, [format(Node, Info) || {Node, Info} <- emqx_mgmt:list_nodes()]}).
 
 get(#{node := Node}, _Params) ->
-    {ok, emqx_mgmt:lookup_node(Node)}.
+    emqx_mgmt:return({ok, emqx_mgmt:lookup_node(Node)}).
 
 format(Node, {error, Reason}) -> [{node, Node}, {error, Reason}];
 

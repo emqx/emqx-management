@@ -1,5 +1,4 @@
-%%--------------------------------------------------------------------
-%% Copyright (c) 2015-2017 EMQ Enterprise, Inc. (http://emqtt.io).
+%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -12,15 +11,12 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-%%--------------------------------------------------------------------
 
 -module(emqx_mgmt_api_pubsub).
 
--author("Feng Lee <feng@emqtt.io>").
-
 -include_lib("emqx/include/emqx.hrl").
-
 -include_lib("emqx/include/emqx_mqtt.hrl").
+-include("emqx_mgmt.hrl").
 
 -import(proplists, [get_value/2, get_value/3]).
 
@@ -45,36 +41,80 @@
 -export([subscribe/2, publish/2, unsubscribe/2]).
 
 subscribe(_Bindings, Params) ->
+    logger:debug("API subscribe Params:~p", [Params]),
     ClientId = get_value(<<"client_id">>, Params),
-    Topic    = get_value(<<"topic">>, Params),
+    Topics   = topics(filter, get_value(<<"topic">>, Params), get_value(<<"topics">>, Params, <<"">>)),
     QoS      = get_value(<<"qos">>, Params, 0),
-    emqx_mgmt:subscribe(ClientId, Topic, QoS).
+    case Topics =/= [] of
+        true ->
+            TopicTable = parse_topic_filters(Topics, QoS),
+            case emqx_mgmt:subscribe(ClientId, TopicTable) of
+                {error, Reason} -> 
+                    emqx_mgmt:return({ok, ?ERROR12, Reason});
+                _ ->
+                    emqx_mgmt:return()
+            end;
+        false ->
+            emqx_mgmt:return({ok, ?ERROR15, bad_topic})
+    end.
 
 publish(_Bindings, Params) ->
-    Topics   = topics(Params),
+    logger:debug("API publish Params:~p", [Params]),
+    Topics   = topics(name, get_value(<<"topic">>, Params), get_value(<<"topics">>, Params, <<"">>)),
     ClientId = get_value(<<"client_id">>, Params),
     Payload  = get_value(<<"payload">>, Params, <<>>),
     Qos      = get_value(<<"qos">>, Params, 0),
     Retain   = get_value(<<"retain">>, Params, false),
-    lists:foreach(fun(Topic) ->
-        Msg = emqx_message:make(ClientId, Qos, Topic, Payload),
-        emqx_mgmt:publish(Msg#mqtt_message{retain = Retain})
-    end, Topics).
+    case Topics =/= [] of
+        true ->
+            lists:foreach(fun(Topic) ->
+                Msg = emqx_message:make(ClientId, Qos, Topic, Payload),
+                emqx_mgmt:publish(Msg#message{flags = #{retain => Retain}})
+            end, Topics),
+            emqx_mgmt:return();
+        false ->
+            emqx_mgmt:return({ok, ?ERROR15, bad_topic})
+    end.
 
 unsubscribe(_Bindings, Params) ->
+    logger:debug("API unsubscribe Params:~p", [Params]),
     ClientId = get_value(<<"client_id">>, Params),
     Topic    = get_value(<<"topic">>, Params),
-    emqx_mgmt:unsubscribe(ClientId, Topic).
+    case validate_by_filter(Topic) of
+        true ->
+            case emqx_mgmt:unsubscribe(ClientId, Topic) of
+                {error, Reason} -> 
+                    emqx_mgmt:return({ok, ?ERROR12, Reason});
+                _ -> 
+                    emqx_mgmt:return()
+            end;
+        false ->
+            emqx_mgmt:return({ok, ?ERROR15, bad_topic})
+    end.
 
-topics(Params) ->
-    Topics = [get_value(<<"topic">>, Params) | binary:split(get_value(<<"topics">>, Params), <<",">>, [global])],
-    [Topic || Topic <- Topics, Topic =/= undefined].
+topics(Type, undefined, Topics0) ->
+    Topics = binary:split(Topics0, <<",">>, [global]),
+    case Type of
+        name -> lists:filter(fun(T) -> validate_by_name(T) end, Topics);
+        filter -> lists:filter(fun(T) -> validate_by_filter(T) end, Topics)
+    end;
+
+topics(Type, Topic, _) ->
+    topics(Type, undefined, Topic).
 
 %%TODO:
+% validate(qos, Qos) ->
+%    (Qos >= ?QOS_0) and (Qos =< ?QOS_2).
 
-%%validate(qos, Qos) ->
-%%    (Qos >= ?QOS_0) and (Qos =< ?QOS_2);
+validate_by_filter(Topic) ->
+    emqx_topic:validate({filter, Topic}).
 
-%%validate(topic, Topic) ->
-%%    emqx_topic:validate({name, Topic}).
+validate_by_name(Topic) ->
+    emqx_topic:validate({name, Topic}).
+
+parse_topic_filters(Topics, Qos) ->
+    [begin
+         {Topic, Opts} = emqx_topic:parse(Topic0),
+         {Topic, Opts#{qos => Qos}}
+     end || Topic0 <- Topics].
 

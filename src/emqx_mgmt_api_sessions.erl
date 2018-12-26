@@ -1,5 +1,4 @@
-%%--------------------------------------------------------------------
-%% Copyright (c) 2015-2017 EMQ Enterprise, Inc. (http://emqtt.io).
+%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -12,7 +11,6 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-%%--------------------------------------------------------------------
 
 -module(emqx_mgmt_api_sessions).
 
@@ -49,26 +47,29 @@ list(Bindings, Params) when map_size(Bindings) =:= 0 ->
     list(#{node => node()}, Params);
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    QH = emqx_mgmt:query_handle(sessions),
-    {ok, emqx_mgmt_api:paginate(QH, emqx_mgmt:count(sessions), Params, fun format/1)};
+    emqx_mgmt:return({ok, emqx_mgmt_api:paginate(emqx_session, Params, fun format/1)});
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
-        {badrpc, Reason} -> {error, #{message => Reason}};
+        {badrpc, Reason} -> emqx_mgmt:return({error, Reason});
         Res -> Res
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    {ok, format(emqx_mgmt:lookup_session(Node, ClientId))};
+    emqx_mgmt:return({ok, format(emqx_mgmt:lookup_session(Node, http_uri:decode(ClientId)))});
 
 lookup(#{clientid := ClientId}, _Params) ->
-    {ok, format(emqx_mgmt:lookup_session(ClientId))}.
+    emqx_mgmt:return({ok, format(emqx_mgmt:lookup_session(http_uri:decode(ClientId)))}).
 
-format(Item = {_ClientId, _Pid, _Persistent, _Properties}) ->
-    format(emqx_mgmt:item(session, Item));
-
+format([]) ->
+    [];
 format(Items) when is_list(Items) ->
     [format(Item) || Item <- Items];
 
+format(Key) when is_tuple(Key) ->
+    format(emqx_mgmt:item(session, Key));
+
 format(Item = #{created_at := CreatedAt}) ->
-    Item#{node => node(), created_at => iolist_to_binary(emqx_mgmt_util:strftime(CreatedAt))}.
+    Item1 = maps:remove(client_pid, Item),
+    Item1#{node => node(), created_at => iolist_to_binary(emqx_mgmt_util:strftime(CreatedAt))}.
+

@@ -1,5 +1,4 @@
-%%--------------------------------------------------------------------
-%% Copyright (c) 2015-2017 EMQ Enterprise, Inc. (http://emqtt.io).
+%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -12,13 +11,16 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-%%--------------------------------------------------------------------
 
 -module(emqx_mgmt_api_subscriptions).
 
--author("Feng Lee <feng@emqtt.io>").
-
 -include_lib("emqx/include/emqx.hrl").
+
+-rest_api(#{name   => list_subscriptions,
+            method => 'GET',
+            path   => "/subscriptions/",
+            func   => list,
+            descr  => "A list of subscriptions in the cluster"}).
 
 -rest_api(#{name   => list_node_subscriptions,
             method => 'GET',
@@ -40,26 +42,41 @@
 
 -export([list/2, lookup/2]).
 
+list(Bindings, Params) when map_size(Bindings) == 0 ->
+    %%TODO: across nodes?
+    list(#{node => node()}, Params);
+
 list(#{node := Node}, Params) when Node =:= node() ->
-    Qh = emqx_mgmt:query_handle(subscriptions),
-    {ok, emqx_mgmt_api:paginate(Qh, emqx_mgmt:count(subscriptions), Params, fun format/1)}.
+    emqx_mgmt:return({ok, emqx_mgmt_api:paginate(emqx_suboption, Params, fun format/1)});
+
+list(#{node := Node} = Bindings, Params) ->
+    case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
+        {badrpc, Reason} -> emqx_mgmt:return({error, Reason});
+        Res -> Res
+    end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    {ok, format(emqx_mgmt:lookup_subscriptions(Node, ClientId))};
+    case ets:lookup(emqx_subid, http_uri:decode(ClientId)) of
+        [] ->
+            emqx_mgmt:return({ok, []});
+        [{_, Pid}] ->
+            emqx_mgmt:return({ok, format(emqx_mgmt:lookup_subscriptions(Node, Pid))})
+    end;
 
 lookup(#{clientid := ClientId}, _Params) ->
-    {ok, format(emqx_mgmt:lookup_subscriptions(ClientId))}.
+    case ets:lookup(emqx_subid, http_uri:decode(ClientId)) of
+        [] ->
+            emqx_mgmt:return({ok, []});
+        [{_, Pid}] ->
+            emqx_mgmt:return({ok, format(emqx_mgmt:lookup_subscriptions(Pid))})
+    end.
 
 format(Items) when is_list(Items) ->
     [format(Item) || Item <- Items];
 
-format(#{topic := Topic, clientid := ClientId, options := Options}) ->
-    QoS = proplists:get_value(qos, Options),
-    [{topic, Topic}, {client_id, maybe_to_binary(ClientId)}, {qos, QoS}].
+format({{Subscriber, Topic}, Options}) ->
+    format({Subscriber, Topic, Options});
 
-maybe_to_binary(ClientId) when is_pid(ClientId) ->
-    list_to_binary(pid_to_list(ClientId));
-
-maybe_to_binary(ClientId) ->
-    ClientId.
-
+format({_Subscriber, Topic, Options}) ->
+    QoS = maps:get(qos, Options),
+    #{node => node(), topic => Topic, client_id => maps:get(subid, Options), qos => QoS}.

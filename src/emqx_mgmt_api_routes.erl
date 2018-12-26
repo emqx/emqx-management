@@ -1,5 +1,4 @@
-%%--------------------------------------------------------------------
-%% Copyright (c) 2015-2017 EMQ Enterprise, Inc. (http://emqtt.io).
+%% Copyright (c) 2018 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -12,11 +11,10 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-%%--------------------------------------------------------------------
 
 -module(emqx_mgmt_api_routes).
 
--author("Feng Lee <feng@emqtt.io>").
+-include_lib("emqx/include/emqx.hrl").
 
 -rest_api(#{name   => list_routes,
             method => 'GET',
@@ -26,18 +24,19 @@
 
 -rest_api(#{name   => lookup_routes,
             method => 'GET',
-            url    => "/routes/:bin:topic",
+            path   => "/routes/:bin:topic",
             func   => lookup,
             descr  => "Lookup routes to a topic"}).
 
 -export([list/2, lookup/2]).
 
 list(Bindings, Params) when map_size(Bindings) == 0 ->
-    Qh = emqx_mgmt:query_handle(routes),
-    {ok, emqx_mgmt_api:paginate(Qh, emqx_mgmt:count(routes), Params, fun format/1)}.
+    emqx_mgmt:return({ok, emqx_mgmt_api:paginate(emqx_route, Params, fun format/1)}).
 
 lookup(#{topic := Topic}, _Params) ->
-    {ok, emqx_mgmt:lookup_routes(Topic)}.
-
-format(R) -> emqx_mgmt:item(route, R).
+    emqx_mgmt:return({ok, [format(R) || R <- emqx_mgmt:lookup_routes(http_uri:decode(Topic))]}).
+format(#route{topic = Topic, dest = {_, Node}}) ->
+    #{topic => Topic, node => Node};
+format(#route{topic = Topic, dest = Node}) ->
+    #{topic => Topic, node => Node}.
 
