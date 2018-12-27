@@ -164,6 +164,7 @@ publish_lwm2m(_Bindings, Params) ->
         Payload      = get_value(<<"payload">>, Params),
         TaskId       = get_value(<<"taskID">>, Payload),
         MsgType      = get_value(<<"msgType">>, Payload),
+        DataType     = get_value(<<"data_type">>, Params, 1),
         Lwm2mData    = lwm2m_data(MsgType, Payload),
         MsgId = emqx_guid:gen(),
         MqttPayload = [{<<"cacheID">>, emqx_guid:to_base62(MsgId)},
@@ -173,7 +174,7 @@ publish_lwm2m(_Bindings, Params) ->
                        {<<"data">>, Lwm2mData}],
         MountTopic  = mount_lwm2m_topic(Params),
         Msg = emqx_message:make(MsgId , AppId, 0, MountTopic, jsx:encode(MqttPayload), 
-                                [{<<"ttl">>, Ttl}, {<<"taskID">>, TaskId}]),
+                                [{<<"ttl">>, Ttl}, {<<"taskID">>, TaskId}, {<<"data_type">>, DataType}]),
         emqx_mgmt:publish(Msg),
         {ok, [{code, 0}, {message, <<>>}]};
     {error, Error} ->
