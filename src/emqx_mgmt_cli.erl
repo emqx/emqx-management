@@ -508,7 +508,7 @@ mnesia(_) ->
 %% @doc Logger Command
 
 log(["set-level", Level]) ->
-    case emqx_logger:set_overall_log_level(list_to_atom(Level)) of
+    case emqx_logger:set_log_level(list_to_atom(Level)) of
         ok -> emqx_cli:print("~s~n", [Level]);
         Error -> emqx_cli:print("[error] set overall log level failed: ~p~n", [Error])
     end;
