@@ -129,9 +129,9 @@ transformat_binary(Value) ->
 
 is_transformat_binary(Value) when is_binary(Value) ->
     false;
-is_transformat_binary([FirstValue | _Value]) when is_tuple(FirstValue) ->
+is_transformat_binary([{Name, Value} | _]) when is_binary(Name), is_binary(Value) ->
     false;
-is_transformat_binary([FirstValue | _Value]) when is_list(FirstValue) ->
+is_transformat_binary([[{Name, Value}] | _]) when is_binary(Name), is_binary(Value) ->
     false;
 is_transformat_binary(Value) when is_list(Value) ->
     true.
