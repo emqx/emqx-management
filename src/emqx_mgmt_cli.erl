@@ -334,8 +334,8 @@ plugins(["reload", Name]) ->
         case emqx_plugins:unload(Plugin) of
             ok ->
                 case emqx_plugins:load(Plugin) of
-                    {ok, StartedApps} ->
-                        emqx_cli:print("Start apps: ~p~nPlugin ~s reloaded successfully.~n", [StartedApps, Name]);
+                    {ok, _StartedApp} ->
+                        emqx_cli:print("Plugin ~s reloaded successfully.~n", [Name]);
                     {error, Reason1}   ->
                         emqx_cli:print("reload plugin error: ~p~n", [Reason1])
                 end;
