@@ -330,9 +330,10 @@ plugins(["unload", Name]) ->
 plugins(["reload", Name]) ->
     try
         Plugin = list_to_atom(Name),
-        reload_config(Plugin),
+        Config = gen_config(Plugin),
         case emqx_plugins:unload(Plugin) of
             ok ->
+                lists:foreach(fun({Key, Val}) -> application:set_env(Plugin, Key, Val) end, Config),
                 case emqx_plugins:load(Plugin) of
                     {ok, _StartedApp} ->
                         emqx_cli:print("Plugin ~s reloaded successfully.~n", [Name]);
@@ -792,8 +793,8 @@ format(_, Val) ->
 
 bin(S) -> iolist_to_binary(S).
 
-reload_config(App) ->
+gen_config(App) ->
     Schema = cuttlefish_schema:files([lists:concat([code:priv_dir(App), "/", App, ".schema"])]),
     Conf = cuttlefish_conf:file(lists:concat([emqx_config:get_env(plugins_etc_dir), App, ".conf"])),
     [{_, Config}] = cuttlefish_generator:map(Schema, Conf),
-    lists:foreach(fun({Key, Val}) -> application:set_env(App, Key, Val) end, Config).
+    Config.
