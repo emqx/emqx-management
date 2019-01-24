@@ -327,6 +327,25 @@ plugins(["unload", Name]) ->
             emqx_cli:print("unload plugin error: ~p~n", [Reason])
     end;
 
+plugins(["reload", Name]) ->
+    try
+        Plugin = list_to_atom(Name),
+        reload_config(Plugin),
+        case emqx_plugins:unload(Plugin) of
+            ok ->
+                case emqx_plugins:load(Plugin) of
+                    {ok, StartedApps} ->
+                        emqx_cli:print("Start apps: ~p~nPlugin ~s reloaded successfully.~n", [StartedApps, Name]);
+                    {error, Reason1}   ->
+                        emqx_cli:print("reload plugin error: ~p~n", [Reason1])
+                end;
+            {error, Reason} ->
+                emqx_cli:print("reload plugin error: ~p~n", [Reason])
+        end
+    catch _:_:Error ->
+        emqx_cli:print("reload plugin error:~p~n", [Error])
+    end;
+
 % plugins(["add", Name]) ->
 %     {ok, Path} = emqx:env(expand_plugins_dir),
 %     Dir = Path ++ Name,
@@ -344,7 +363,8 @@ plugins(["unload", Name]) ->
 plugins(_) ->
     emqx_cli:usage([{"plugins list",            "Show loaded plugins"},
                     {"plugins load <Plugin>",   "Load plugin"},
-                    {"plugins unload <Plugin>", "Unload plugin"}
+                    {"plugins unload <Plugin>", "Unload plugin"},
+                    {"plugins reload <Plugin>", "Reload plugin"}
                     % {"plugins add <Plugin.zip>", "Add plugin"}
                     ]).
 
@@ -771,3 +791,11 @@ format(_, Val) ->
     Val.
 
 bin(S) -> iolist_to_binary(S).
+
+reload_config(App) ->
+    Schema = cuttlefish_schema:files([lists:concat([code:priv_dir(App), "/", App, ".schema"])]),
+    Conf = cuttlefish_conf:file(lists:concat([emqx_config:get_env(plugins_etc_dir), App, ".conf"])),
+    [{_, Config}] = cuttlefish_generator:map(Schema, Conf),
+    lists:foreach(fun({Key, Val}) ->
+        application:set_env(App, Key, Val)
+    end, Config).
