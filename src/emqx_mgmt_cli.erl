@@ -796,6 +796,4 @@ reload_config(App) ->
     Schema = cuttlefish_schema:files([lists:concat([code:priv_dir(App), "/", App, ".schema"])]),
     Conf = cuttlefish_conf:file(lists:concat([emqx_config:get_env(plugins_etc_dir), App, ".conf"])),
     [{_, Config}] = cuttlefish_generator:map(Schema, Conf),
-    lists:foreach(fun({Key, Val}) ->
-        application:set_env(App, Key, Val)
-    end, Config).
+    lists:foreach(fun({Key, Val}) -> application:set_env(App, Key, Val) end, Config).
