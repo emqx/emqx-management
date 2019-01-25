@@ -329,7 +329,7 @@ plugins(["unload", Name]) ->
 
 plugins(["reload", Name]) ->
     try
-        Plugin = list_to_atom(Name),
+        Plugin = list_to_existing_atom(Name),
         Config = gen_config(Plugin),
         case emqx_plugins:unload(Plugin) of
             ok ->
@@ -343,8 +343,8 @@ plugins(["reload", Name]) ->
             {error, Reason} ->
                 emqx_cli:print("reload plugin error: ~p~n", [Reason])
         end
-    catch _:_:Error ->
-        emqx_cli:print("reload plugin error:~p~n", [Error])
+    catch _ : _Error : Stacktrace ->
+        emqx_cli:print("reload plugin error:~p~n", [Stacktrace])
     end;
 
 % plugins(["add", Name]) ->
