@@ -111,7 +111,7 @@ format(Configs) when is_list(Configs) ->
     format(Configs, []);
 format({Key, Value, Datatpye, App}) ->
     [{<<"key">>, list_to_binary(Key)},
-     {<<"value">>, list_to_binary(Value)},
+     {<<"value">>, transformat_binary(Value)},
      {<<"datatpye">>, list_to_binary(Datatpye)},
      {<<"app">>, App}].
 
@@ -119,6 +119,22 @@ format([], Acc) ->
     Acc;
 format([{Key, Value, Datatpye, App}| Configs], Acc) ->
     format(Configs, [format({Key, Value, Datatpye, App}) | Acc]).
+
+%% Whether to convert to binary data for the 'emqx_auth_mongo' plugin
+transformat_binary(Value) ->
+    case is_transformat_binary(Value) of
+        true -> list_to_binary(Value);
+        false -> Value
+    end.
+
+is_transformat_binary(Value) when is_binary(Value) ->
+    false;
+is_transformat_binary([{Name, Value} | _]) when is_binary(Name), is_binary(Value) ->
+    false;
+is_transformat_binary([[{Name, Value}] | _]) when is_binary(Name), is_binary(Value) ->
+    false;
+is_transformat_binary(Value) when is_list(Value) ->
+    true.
 
 format_plugin_config({Key, Value, Desc, Required}) ->
     [{<<"key">>, list_to_binary(Key)},
