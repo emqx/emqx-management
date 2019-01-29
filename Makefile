@@ -1,6 +1,6 @@
 PROJECT = emqx_management
 PROJECT_DESCRIPTION = EMQ X Management API and CLI
-PROJECT_VERSION = 3.0
+PROJECT_VERSION = 3.1
 PROJECT_MOD = emqx_mgmt_app
 
 DEPS = minirest clique
@@ -10,11 +10,11 @@ dep_clique   = git-emqx https://github.com/emqx/clique v0.3.11
 LOCAL_DEPS = mnesia
 
 BUILD_DEPS = emqx cuttlefish
-dep_emqx = git-emqx https://github.com/emqx/emqx emqx30
+dep_emqx = git-emqx https://github.com/emqx/emqx develop
 dep_cuttlefish = git-emqx https://github.com/emqx/cuttlefish v2.2.1
 
 TEST_DEPS = emqx_retainer
-dep_emqx_retainer = git-emqx https://github.com/emqx/emqx-retainer emqx30
+dep_emqx_retainer = git-emqx https://github.com/emqx/emqx-retainer develop
 
 NO_AUTOPATCH = cuttlefish
 
