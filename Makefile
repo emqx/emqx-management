@@ -10,11 +10,11 @@ dep_clique   = git-emqx https://github.com/emqx/clique v0.3.11
 LOCAL_DEPS = mnesia
 
 BUILD_DEPS = emqx cuttlefish
-dep_emqx = git-emqx https://github.com/emqx/emqx develop
+dep_emqx = git-emqx https://github.com/emqx/emqx release-3.1
 dep_cuttlefish = git-emqx https://github.com/emqx/cuttlefish v2.2.1
 
 TEST_DEPS = emqx_retainer
-dep_emqx_retainer = git-emqx https://github.com/emqx/emqx-retainer develop
+dep_emqx_retainer = git-emqx https://github.com/emqx/emqx-retainer release-3.1
 
 NO_AUTOPATCH = cuttlefish
 
