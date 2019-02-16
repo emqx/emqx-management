@@ -9,8 +9,10 @@ dep_clique   = git-emqx https://github.com/emqx/clique v0.3.11
 
 LOCAL_DEPS = mnesia
 
+BRANCH = $(shell git branch | grep -e "^*" | cut -d' ' -f 2)
+
 BUILD_DEPS = emqx cuttlefish
-dep_emqx = git-emqx https://github.com/emqx/emqx testing
+dep_emqx = git-emqx https://github.com/emqx/emqx $(BRANCH)
 dep_cuttlefish = git-emqx https://github.com/emqx/cuttlefish v2.2.1
 
 TEST_DEPS = emqx_retainer
