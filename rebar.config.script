@@ -16,7 +16,12 @@ CONFIG1 = case os:getenv("TRAVIS") of
                   CONFIG
           end,
 
-BRANCH = os:cmd("git branch | grep -e '^*' | cut -d' ' -f 2") -- "\n",
+CUR_BRANCH = os:cmd("git branch | grep -e '^*' | cut -d' ' -f 2") -- "\n",
+
+BRANCH = case lists:member(CUR_BRANCH, ["master", "develop", "testing"]) of
+             true -> CUR_BRANCH;
+             false -> "testing"
+         end,
 
 {_, LibDeps} = lists:keyfind(github_emqx_libs, 1, CONFIG1),
 {_, ProjDeps} = lists:keyfind(github_emqx_projects, 1, CONFIG1),
