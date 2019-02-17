@@ -17,7 +17,7 @@ dep_emqx = git-emqx https://github.com/emqx/emqx $(BRANCH)
 dep_cuttlefish = git-emqx https://github.com/emqx/cuttlefish v2.2.1
 
 TEST_DEPS = emqx_retainer
-dep_emqx_retainer = git-emqx https://github.com/emqx/emqx-retainer testing
+dep_emqx_retainer = git-emqx https://github.com/emqx/emqx-retainer $(BRANCH)
 
 NO_AUTOPATCH = cuttlefish
 
