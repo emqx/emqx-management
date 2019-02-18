@@ -1,6 +1,5 @@
 PROJECT = emqx_management
 PROJECT_DESCRIPTION = EMQ X Management API and CLI
-PROJECT_VERSION = 3.1
 PROJECT_MOD = emqx_mgmt_app
 
 DEPS = minirest clique
