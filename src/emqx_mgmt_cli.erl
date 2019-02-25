@@ -429,7 +429,7 @@ plugins(_) ->
 
 bridges(["list"]) ->
     foreach(fun({Name, State}) ->
-                emqx_cli:print("name: ~s     status: ~s~n", [Name, maps:get(status, State)])
+                emqx_cli:print("name: ~s     status: ~s~n", [Name, State])
             end, emqx_portal_sup:portals());
 
 bridges(["start", Name]) ->
