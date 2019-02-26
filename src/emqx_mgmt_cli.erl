@@ -437,7 +437,7 @@ bridges(["list"]) ->
             end, emqx_portal_sup:portals());
 
 bridges(["drop", Name]) ->
-    emqx_cli:print("~s.~n", [case emqx_portal_sup:drop_portal(Name) of
+    emqx_cli:print("~s.~n", [case emqx_portal_sup:drop_portal(list_to_atom(Name)) of
                                  ok -> <<"drop bridge successfully">>;
                                  _Error -> <<"drop bridge failed">>
                              end]);
