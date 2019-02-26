@@ -428,15 +428,39 @@ plugins(_) ->
 %     emqx_cli:print("Bad Option: ~s~n", [Opt]).
 
 bridges(["list"]) ->
-    foreach(fun({Name, State}) ->
+    foreach(fun({Name, State0}) ->
+                State = case State0 of
+                            connected -> <<"Running">>;
+                            _ -> <<"Stopped">>
+                        end,
                 emqx_cli:print("name: ~s     status: ~s~n", [Name, State])
             end, emqx_portal_sup:portals());
 
+bridges(["drop", Name]) ->
+    emqx_cli:print("~s.~n", [case emqx_portal_sup:drop_portal(Name) of
+                                 ok -> <<"drop bridge successfully">>;
+                                 _Error -> <<"drop bridge failed">>
+                             end]);
+
 bridges(["start", Name]) ->
-    emqx_cli:print("~s.~n", [emqx_portal:start_bridge(Name)]);
+    emqx_cli:print("~s.~n", [try emqx_portal:ensure_started(Name) of 
+                                 ok -> <<"start bridge successfully">>;
+                                 connected -> <<"bridge already started">>;
+                                 _ -> <<"start bridge failed">>
+                             catch
+                                 _Error:_Reason ->
+                                     <<"start bridge failed">>
+                             end]);
 
 bridges(["stop", Name]) ->
-    emqx_cli:print("~s.~n", [emqx_portal:stop_bridge(Name)]);
+    emqx_cli:print("~s.~n", [try emqx_portal:ensure_stopped(Name) of
+                                 ok -> <<"stop bridge successfully">>;
+                                 standing_by -> <<"bridge already started">>;
+                                 _ -> <<"stop bridge failed]">>
+                             catch
+                                 _Error:_Reason ->
+                                     <<"stop bridge failed">>
+                             end]);
 
 bridges(["forwards", Name]) ->
     foreach(fun(Topic) ->
@@ -474,6 +498,8 @@ bridges(["del-subscription", Name, Topic]) ->
 
 bridges(_) ->
     emqx_cli:usage([{"bridges list",           "List bridges"},
+                    {"bridges create <Name>",  "Create a bridge"},
+                    {"bridges drop <Name>",    "Drop a bridge"},
                     {"bridges start <Name>",   "Start a bridge"},
                     {"bridges stop <Name>",    "Stop a bridge"},
                     {"bridges forwards <Name>", "Show a bridge forward topic"},
