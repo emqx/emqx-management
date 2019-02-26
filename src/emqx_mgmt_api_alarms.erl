@@ -43,14 +43,20 @@ list(#{node := Node}, _Params) ->
 format(Alarms) when is_list(Alarms) ->
     [format(Alarm) || Alarm <- Alarms];
 
-format(#alarm{id        = Id,
-              severity  = Severity,
-              title     = Title,
-              summary   = Summary,
-              timestamp = Ts}) ->
-    #{id        => Id,
-      severity  => Severity,
-      title     => iolist_to_binary(Title),
-      summary   => iolist_to_binary(Summary),
-      timestamp => iolist_to_binary(emqx_mgmt_util:strftime(Ts))}.
+format({AlarmId, #alarm_desc{severity  = Severity, 
+                             title     = Title,
+                             summary   = Summary, 
+                             timestamp = Ts}}) ->
+    #{id   => maybe_to_binary(AlarmId),
+      desc => #{severity  => Severity,
+                title     => iolist_to_binary(Title),
+                summary   => iolist_to_binary(Summary),
+                timestamp => iolist_to_binary(emqx_mgmt_util:strftime(Ts))}};
+format({AlarmId, AlarmDesc}) ->
+    #{id   => maybe_to_binary(AlarmId),
+      desc => maybe_to_binary(AlarmDesc)}.
 
+maybe_to_binary(Data) when is_binary(Data) ->
+    Data;
+maybe_to_binary(Data) ->
+    iolist_to_binary(io_lib:format("~p", [Data])).
