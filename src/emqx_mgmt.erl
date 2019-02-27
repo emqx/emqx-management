@@ -176,14 +176,23 @@ kickout_conn(ClientId) ->
     end.
 
 kickout_conn(Node, ClientId) when Node =:= node() ->
-    case emqx_cm:lookup_conn_pid(ClientId) of
-        Pid when is_pid(Pid) ->
-            emqx_connection:kick(Pid);
-        _ -> {error, not_found}
+    case emqx_cm:get_conn_attrs(ClientId) of
+        Attrs ->
+            SockType = proplists:get_value(socktype, Attrs),
+            Cpid = emqx_cm:lookup_conn_pid(ClientId),
+            do_kickout_conn(SockType, Cpid);
+        [] -> {error, not_found}
     end;
 
 kickout_conn(Node, ClientId) ->
     rpc_call(Node, kickout_conn, [Node, ClientId]).
+
+do_kickout_conn(websocket, Pid) when is_pid(Pid) ->
+    emqx_ws_connection:kick(Pid);
+do_kickout_conn(_, Pid) when is_pid(Pid) ->
+    emqx_connection:kick(Pid);
+do_kickout_conn(_, _) ->
+    {error, not_found}.
 
 clean_acl_cache(ClientId, Topic) ->
     Results = [clean_acl_cache(Node, ClientId, Topic) || Node <- ekka_mnesia:running_nodes()],
@@ -465,6 +474,8 @@ return({ok, Data, Meta}) ->
     {ok, [{code, ?SUCCESS},
           {data, Data},
           {meta, Meta}]};
+return({error, Message}) ->
+    {ok, [{message, Message}]};
 return({error, Code, Message}) ->
     {ok, [{code,    Code},
           {message, Message}]}.

@@ -73,6 +73,8 @@ lookup(#{clientid := ClientId}, _Params) ->
     emqx_mgmt:return({ok, emqx_mgmt:lookup_conn(http_uri:decode(ClientId), fun format/1)}).
 
 kickout(#{clientid := ClientId}, _Params) ->
+    io:format("the client is ~p~n", [ClientId]),
+    io:format("the client is ~p~n", [http_uri:decode(ClientId)]),
     case emqx_mgmt:kickout_conn(http_uri:decode(ClientId)) of
         ok -> emqx_mgmt:return();
         {error, Reason} -> emqx_mgmt:return({error, Reason})
