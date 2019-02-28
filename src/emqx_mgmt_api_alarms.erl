@@ -43,7 +43,7 @@ list(#{node := Node}, _Params) ->
 format(Alarms) when is_list(Alarms) ->
     [format(Alarm) || Alarm <- Alarms];
 
-format({AlarmId, #alarm_desc{severity  = Severity, 
+format({AlarmId, #alarm{severity  = Severity, 
                              title     = Title,
                              summary   = Summary, 
                              timestamp = Ts}}) ->

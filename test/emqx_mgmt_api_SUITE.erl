@@ -111,9 +111,9 @@ get(meta, ResponseBody) ->
 
 alarms(_) ->
     AlarmTest = #alarm{id = <<"1">>, severity = error, title="alarm title", summary="alarm summary"},
-    emqx_alarm_mgr:set_alarm(AlarmTest),
-    [Alarm] = emqx_alarm_mgr:get_alarms(),
-    ?assertEqual(error, Alarm#alarm.severity),
+    alarm_handler:set_alarm({<<"1">>, AlarmTest}),
+    [{_AlarmId, AlarmDesc}] = emqx_alarm_handler:get_alarms(),
+    ?assertEqual(error, AlarmDesc#alarm.severity),
     {ok, _} = request_api(get, api_path(["alarms"]), auth_header_()),
     {ok, _} = request_api(get, api_path(["alarms", erlang:atom_to_list(node())]), auth_header_()).
 
