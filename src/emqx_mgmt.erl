@@ -176,10 +176,10 @@ kickout_conn(ClientId) ->
     end.
 
 kickout_conn(Node, ClientId) when Node =:= node() ->
-    case emqx_cm:get_conn_attrs(ClientId) of
+    Cpid = emqx_cm:lookup_conn_pid(ClientId),
+    case emqx_cm:get_conn_attrs(ClientId, Cpid) of
         Attrs ->
-            SockType = proplists:get_value(socktype, Attrs),
-            Cpid = emqx_cm:lookup_conn_pid(ClientId),
+            SockType = proplists:get_value(conn_mod, Attrs),
             do_kickout_conn(SockType, Cpid);
         [] -> {error, not_found}
     end;
@@ -187,9 +187,9 @@ kickout_conn(Node, ClientId) when Node =:= node() ->
 kickout_conn(Node, ClientId) ->
     rpc_call(Node, kickout_conn, [Node, ClientId]).
 
-do_kickout_conn(websocket, Pid) when is_pid(Pid) ->
+do_kickout_conn(emqx_ws_connection, Pid) when is_pid(Pid) ->
     emqx_ws_connection:kick(Pid);
-do_kickout_conn(_, Pid) when is_pid(Pid) ->
+do_kickout_conn(emqx_connection, Pid) when is_pid(Pid) ->
     emqx_connection:kick(Pid);
 do_kickout_conn(_, _) ->
     {error, not_found}.
