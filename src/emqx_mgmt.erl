@@ -176,10 +176,12 @@ kickout_conn(ClientId) ->
     end.
 
 kickout_conn(Node, ClientId) when Node =:= node() ->
-    case emqx_cm:lookup_conn_pid(ClientId) of
-        Pid when is_pid(Pid) ->
-            emqx_connection:kick(Pid);
-        _ -> {error, not_found}
+    Cpid = emqx_cm:lookup_conn_pid(ClientId),
+    case emqx_cm:get_conn_attrs(ClientId, Cpid) of
+        Attrs ->
+            Module = proplists:get_value(conn_mod, Attrs),
+            Module:kick(Cpid);
+        [] -> {error, not_found}
     end;
 
 kickout_conn(Node, ClientId) ->
@@ -465,6 +467,8 @@ return({ok, Data, Meta}) ->
     {ok, [{code, ?SUCCESS},
           {data, Data},
           {meta, Meta}]};
+return({error, Message}) ->
+    {ok, [{message, Message}]};
 return({error, Code, Message}) ->
     {ok, [{code,    Code},
           {message, Message}]}.
