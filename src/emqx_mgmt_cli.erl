@@ -434,10 +434,10 @@ bridges(["list"]) ->
                             _ -> <<"Stopped">>
                         end,
                 emqx_cli:print("name: ~s     status: ~s~n", [Name, State])
-            end, emqx_portal_sup:portals());
+            end, emqx_bridge_sup:bridges());
 
 bridges(["start", Name]) ->
-    emqx_cli:print("~s.~n", [try emqx_portal:ensure_started(Name) of 
+    emqx_cli:print("~s.~n", [try emqx_bridge:ensure_started(Name) of 
                                  ok -> <<"start bridge successfully">>;
                                  connected -> <<"bridge already started">>;
                                  _ -> <<"start bridge failed">>
@@ -447,7 +447,7 @@ bridges(["start", Name]) ->
                              end]);
 
 bridges(["stop", Name]) ->
-    emqx_cli:print("~s.~n", [try emqx_portal:ensure_stopped(Name) of
+    emqx_cli:print("~s.~n", [try emqx_bridge:ensure_stopped(Name) of
                                  ok -> <<"stop bridge successfully">>;
                                  standing_by -> <<"bridge already started">>;
                                  _ -> <<"stop bridge failed]">>
@@ -459,16 +459,16 @@ bridges(["stop", Name]) ->
 bridges(["forwards", Name]) ->
     foreach(fun(Topic) ->
                 emqx_cli:print("topic:   ~s~n", [Topic])
-            end, emqx_portal:get_forwards(Name));
+            end, emqx_bridge:get_forwards(Name));
 
 bridges(["add-forward", Name, Topic]) ->
-    case emqx_portal:ensure_forward_present(Name, iolist_to_binary(Topic)) of
+    case emqx_bridge:ensure_forward_present(Name, iolist_to_binary(Topic)) of
         ok -> emqx_cli:print("Add-forward topic successfully.~n");
         {error, Reason} -> emqx_cli:print("Add-forward failed reason: ~p.~n", [Reason])
     end;
 
 bridges(["del-forward", Name, Topic]) ->
-    case emqx_portal:ensure_forward_absent(Name, iolist_to_binary(Topic)) of
+    case emqx_bridge:ensure_forward_absent(Name, iolist_to_binary(Topic)) of
         ok -> emqx_cli:print("Del-forward topic successfully.~n");
         {error, Reason} -> emqx_cli:print("Del-forward failed reason: ~p.~n", [Reason])
     end;
@@ -476,16 +476,16 @@ bridges(["del-forward", Name, Topic]) ->
 bridges(["subscriptions", Name]) ->
     foreach(fun({Topic, Qos}) ->
                 emqx_cli:print("topic: ~s, qos: ~p~n", [Topic, Qos])
-            end, emqx_portal:get_subscriptions(Name));
+            end, emqx_bridge:get_subscriptions(Name));
 
 bridges(["add-subscription", Name, Topic, Qos]) ->
-    case emqx_portal:ensure_subscription_present(Name, Topic, list_to_integer(Qos)) of
+    case emqx_bridge:ensure_subscription_present(Name, Topic, list_to_integer(Qos)) of
         ok -> emqx_cli:print("Add-subscription topic successfully.~n");
         {error, Reason} -> emqx_cli:print("Add-subscription failed reason: ~p.~n", [Reason])
     end;
 
 bridges(["del-subscription", Name, Topic]) ->
-    case emqx_portal:ensure_subscription_absent(Name, Topic) of
+    case emqx_bridge:ensure_subscription_absent(Name, Topic) of
         ok -> emqx_cli:print("Del-subscription topic successfully.~n");
         {error, Reason} -> emqx_cli:print("Del-subscription failed reason: ~p.~n", [Reason])
     end;
