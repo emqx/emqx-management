@@ -438,22 +438,22 @@ bridges(["list"]) ->
 
 bridges(["start", Name]) ->
     emqx_cli:print("~s.~n", [try emqx_bridge:ensure_started(Name) of 
-                                 ok -> <<"start bridge successfully">>;
-                                 connected -> <<"bridge already started">>;
-                                 _ -> <<"start bridge failed">>
+                                 ok -> <<"Start bridge successfully">>;
+                                 connected -> <<"Bridge already started">>;
+                                 _ -> <<"Start bridge failed">>
                              catch
                                  _Error:_Reason ->
-                                     <<"start bridge failed">>
+                                     <<"Start bridge failed">>
                              end]);
 
 bridges(["stop", Name]) ->
     emqx_cli:print("~s.~n", [try emqx_bridge:ensure_stopped(Name) of
-                                 ok -> <<"stop bridge successfully">>;
-                                 standing_by -> <<"bridge already started">>;
-                                 _ -> <<"stop bridge failed]">>
+                                 ok -> <<"Stop bridge successfully">>;
+                                 standing_by -> <<"Bridge already started">>;
+                                 _ -> <<"Stop bridge failed]">>
                              catch
                                  _Error:_Reason ->
-                                     <<"stop bridge failed">>
+                                     <<"Stop bridge failed">>
                              end]);
 
 bridges(["forwards", Name]) ->
