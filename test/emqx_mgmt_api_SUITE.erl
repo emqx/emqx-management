@@ -34,22 +34,22 @@ groups() ->
                              stats]}].
 
 init_per_suite(Config) ->
-    application:load(emqx_retainer),
+    application:load(emqx_reloader),
     [start_apps(App, {SchemaFile, ConfigFile}) ||
         {App, SchemaFile, ConfigFile}
             <- [{emqx, local_path("deps/emqx/priv/emqx.schema"),
                        local_path("deps/emqx/etc/emqx.conf")},
                 {emqx_management, local_path("priv/emqx_management.schema"),
                                   local_path("etc/emqx_management.conf")},
-                {emqx_retainer, local_path("deps/emqx_retainer/priv/emqx_retainer.schema"),
-                                  local_path("deps/emqx_retainer/etc/emqx_retainer.conf")}]],
+                {emqx_reloader, local_path("deps/emqx_reloader/priv/emqx_reloader.schema"),
+                                  local_path("deps/emqx_reloader/etc/emqx_reloader.conf")}]],
     ekka_mnesia:start(),
     emqx_mgmt_auth:mnesia(boot),
     emqx_mgmt_auth:add_app(<<"myappid">>, <<"test">>),
     Config.
 
 end_per_suite(_Config) ->
-    [application:stop(App) || App <- [emqx_retainer, emqx_management, emqx]],
+    [application:stop(App) || App <- [emqx_reloader, emqx_management, emqx]],
     ekka_mnesia:ensure_stopped().
 
 get_base_dir() ->
@@ -75,7 +75,7 @@ read_schema_configs(App, {SchemaFile, ConfigFile}) ->
 set_special_configs(emqx) ->
     application:set_env(emqx, plugins_loaded_file,
                         local_path("deps/emqx/test/emqx_SUITE_data/loaded_plugins")),
-    PluginsEtcDir = local_path("deps/emqx_retainer/etc/") ++ "/",
+    PluginsEtcDir = local_path("deps/emqx_reloader/etc/") ++ "/",
     application:set_env(emqx, plugins_etc_dir, PluginsEtcDir);
 set_special_configs(_App) ->
     ok.
@@ -111,9 +111,9 @@ get(meta, ResponseBody) ->
 
 alarms(_) ->
     AlarmTest = #alarm{id = <<"1">>, severity = error, title="alarm title", summary="alarm summary"},
-    emqx_alarm_mgr:set_alarm(AlarmTest),
-    [Alarm] = emqx_alarm_mgr:get_alarms(),
-    ?assertEqual(error, Alarm#alarm.severity),
+    alarm_handler:set_alarm({<<"1">>, AlarmTest}),
+    [{_AlarmId, AlarmDesc}] = emqx_alarm_handler:get_alarms(),
+    ?assertEqual(error, AlarmDesc#alarm.severity),
     {ok, _} = request_api(get, api_path(["alarms"]), auth_header_()),
     {ok, _} = request_api(get, api_path(["alarms", erlang:atom_to_list(node())]), auth_header_()).
 
@@ -170,20 +170,18 @@ configs(_) ->
     {ok, _} = request_api(put, api_path(["nodes", 
                                          erlang:atom_to_list(node()),
                                          "plugin_configs",
-                                         erlang:atom_to_list(emqx_retainer)]), [], 
-                          auth_header_(), [{<<"retainer.expiry_interval">>, <<"100">>},
-                                           {<<"retainer.max_payload_size">>, <<"2MB">>},
-                                           {<<"retainer.max_retained_messages">>, <<"100">>},
-                                           {<<"retainer.storage_type">>, <<"ram">>}]),
+                                         erlang:atom_to_list(emqx_reloader)]), [], 
+                          auth_header_(), [{<<"reloader.interval">>, <<"60s">>},
+                                           {<<"reloader.logfile">>, <<"reloader.log">>}]),
 
     {ok, Result} = request_api(get, api_path(["nodes",
                                               erlang:atom_to_list(node()),
                                               "plugin_configs",
-                                              erlang:atom_to_list(emqx_retainer)]), auth_header_()),
+                                              erlang:atom_to_list(emqx_reloader)]), auth_header_()),
     ?assert(lists:any(fun(Elem) -> 
                           case proplists:get_value(<<"key">>, Elem) of
-                              <<"retainer.max_retained_messages">> -> 
-                                  <<"100">> == proplists:get_value(<<"value">>, Elem);
+                              <<"reloader.interval">> -> 
+                                  <<"60s">> == proplists:get_value(<<"value">>, Elem);
                               _ -> false
                           end
                       end, get(data, Result))).
@@ -287,7 +285,7 @@ plugins(_) ->
                           api_path(["nodes",
                                     erlang:atom_to_list(node()),
                                     "plugins",
-                                    erlang:atom_to_list(emqx_retainer),
+                                    erlang:atom_to_list(emqx_reloader),
                                     "unload"]), 
                           auth_header_()),
 
@@ -297,21 +295,21 @@ plugins(_) ->
                                           "plugins"]),
                                 auth_header_()),
     [Plugin3] = get(data, Result3),
-    ?assertEqual(<<"emqx_retainer">>, proplists:get_value(<<"name">>, Plugin3)),
+    ?assertEqual(<<"emqx_reloader">>, proplists:get_value(<<"name">>, Plugin3)),
     ?assertNot(proplists:get_value(<<"active">>, Plugin3)),
 
     {ok, _} = request_api(put, 
                           api_path(["nodes",
                                     erlang:atom_to_list(node()),
                                     "plugins",
-                                    erlang:atom_to_list(emqx_retainer),
+                                    erlang:atom_to_list(emqx_reloader),
                                     "load"]), 
                           auth_header_()),
     
     {ok, Result} = request_api(get, api_path(["plugins"]), auth_header_()),
     [Plugins] = get(data, Result),
     [Plugin] = proplists:get_value(<<"plugins">>, Plugins),
-    ?assertEqual(<<"emqx_retainer">>, proplists:get_value(<<"name">>, Plugin)),
+    ?assertEqual(<<"emqx_reloader">>, proplists:get_value(<<"name">>, Plugin)),
     ?assert(proplists:get_value(<<"active">>, Plugin)),
 
     {ok, Result2} = request_api(get, 
