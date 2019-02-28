@@ -436,12 +436,6 @@ bridges(["list"]) ->
                 emqx_cli:print("name: ~s     status: ~s~n", [Name, State])
             end, emqx_portal_sup:portals());
 
-bridges(["drop", Name]) ->
-    emqx_cli:print("~s.~n", [case emqx_portal_sup:drop_portal(list_to_atom(Name)) of
-                                 ok -> <<"drop bridge successfully">>;
-                                 _Error -> <<"drop bridge failed">>
-                             end]);
-
 bridges(["start", Name]) ->
     emqx_cli:print("~s.~n", [try emqx_portal:ensure_started(Name) of 
                                  ok -> <<"start bridge successfully">>;
@@ -498,8 +492,6 @@ bridges(["del-subscription", Name, Topic]) ->
 
 bridges(_) ->
     emqx_cli:usage([{"bridges list",           "List bridges"},
-                    {"bridges create <Name>",  "Create a bridge"},
-                    {"bridges drop <Name>",    "Drop a bridge"},
                     {"bridges start <Name>",   "Start a bridge"},
                     {"bridges stop <Name>",    "Stop a bridge"},
                     {"bridges forwards <Name>", "Show a bridge forward topic"},
