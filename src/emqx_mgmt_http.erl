@@ -22,8 +22,10 @@
 
 -export([init/2]).
 
--define(APP, emqx_management).
+-include_lib("emqx/include/emqx.hrl").
 
+-define(APP, emqx_management).
+-define(EXCEPT_PLUGIN, [emqx_dashboard]).
 -ifdef(TEST).
 -define(EXCEPT, []).
 -else.
@@ -60,7 +62,8 @@ listener_name(Proto) ->
     list_to_atom(atom_to_list(Proto) ++ ":management").
 
 http_handlers() ->
-    [{"/api/v3", minirest:handler(#{apps => [?APP], except => ?EXCEPT }),
+    Plugins = lists:map(fun(Plugin) -> Plugin#plugin.name end, emqx_plugins:list()),
+    [{"/api/v3", minirest:handler(#{apps => Plugins -- ?EXCEPT_PLUGIN, except => ?EXCEPT }),
                  [{authorization, fun authorize_appid/1}]}].
 
 %%--------------------------------------------------------------------
