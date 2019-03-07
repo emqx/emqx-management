@@ -581,24 +581,6 @@ log(_) ->
                     {"log handlers list", "Show log handlers"},
                     {"log handlers set-level <HandlerId> <Level>", "Set log level of a log handler"}]).
 
-set_handlers_level([{ID, Level, _Dst} | List], NewLevel) ->
-    set_handlers_level([{ID, Level, _Dst} | List], NewLevel, []).
-
-set_handlers_level([{ID, Level, _Dst} | List], NewLevel, ChangeHistory) ->
-    case emqx_logger:set_log_handler_level(ID, list_to_atom(NewLevel)) of
-        ok -> set_handlers_level(List, NewLevel, [{ID, Level} | ChangeHistory]);
-        {error, Error} ->
-            emqx_cli:print("[error] set level for handler ~p failed: ~p~n", [ID, Error]),
-            rollback(ChangeHistory)
-    end;
-set_handlers_level([], _NewLevel, _NewHanlder) ->
-    emqx_cli:print("~s~n", [ok]).
-
-rollback([{ID, Level} | List]) ->
-    emqx_logger:set_log_handler_level(ID, list_to_atom(Level)),
-    rollback(List);
-rollback([]) -> ok.
-
 %%--------------------------------------------------------------------
 %% @doc Trace Command
 

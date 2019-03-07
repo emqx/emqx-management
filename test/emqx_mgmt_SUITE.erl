@@ -15,6 +15,7 @@
 -module(emqx_mgmt_SUITE).
 
 -compile(export_all).
+-compile(nowarn_export_all).
 
 -include_lib("emqx/include/emqx.hrl").
 
@@ -52,16 +53,17 @@ groups() ->
         t_subscriptions_cmd
        ]}].
 
+apps() ->
+    [emqx, emqx_management].
+
 init_per_suite(Config) ->
     ekka_mnesia:start(),
     emqx_mgmt_auth:mnesia(boot),
-    [run_setup_steps(App) || App <- [emqx, emqx_management]],
+    emqx_mgmt_helper:start_apps(apps()),
     Config.
 
 end_per_suite(_Config) ->
-    application:stop(mnesia),
-    application:stop(emqx_management),
-    emqx:shutdown().
+    emqx_mgmt_helper:stop_apps(apps()).
 
 t_add_app(_Config) ->
     {ok, AppSecret} = emqx_mgmt_auth:add_app(<<"app_id">>, <<"app_name">>),
@@ -119,9 +121,9 @@ t_clients_cmd(_) ->
     ct:pal("start testing the client command"),
     process_flag(trap_exit, true),
     {ok, T} = emqx_client:start_link([{host, "localhost"},
-                                       {client_id, <<"client12">>},
-                                       {username, <<"testuser1">>},
-                                       {password, <<"pass1">>}]),
+                                      {client_id, <<"client12">>},
+                                      {username, <<"testuser1">>},
+                                      {password, <<"pass1">>}]),
     {ok, _} = emqx_client:connect(T),
     emqx_mgmt_cli:clients(["list"]),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:clients(["show", "client12"]), "client12")),
@@ -205,44 +207,40 @@ t_subscriptions_cmd(_) ->
     {ok, _, _} = emqx_client:subscribe(T3, <<"b/b/c">>),
     timer:sleep(300),
     [?assertMatch({match, _} , re:run(Result, "b/b/c"))
-        || Result <- emqx_mgmt_cli:subscriptions(["show", <<"client">>])],
+     || Result <- emqx_mgmt_cli:subscriptions(["show", <<"client">>])],
     ?assertEqual(emqx_mgmt_cli:subscriptions(["add", "client", "b/b/c", "0"]), "\"ok~n\""),
     ?assertEqual(emqx_mgmt_cli:subscriptions(["del", "client", "b/b/c"]), "\"ok~n\"").
 
-run_setup_steps(App) ->
-    NewConfig = generate_config(App),
-    lists:foreach(fun set_app_env/1, NewConfig),
-                      application:ensure_all_started(App),
-                      ct:log("Applications: ~p", [application:loaded_applications()]).
 
-generate_config(emqx) ->
-    Schema = cuttlefish_schema:files([local_path(["deps", "emqx", "priv", "emqx.schema"])]),
-    Conf = conf_parse:file([local_path(["deps", "emqx", "etc", "emqx.conf"])]),
-    cuttlefish_generator:map(Schema, Conf);
+%-------------------------------------------------------------------------------
+% start apps
+%-------------------------------------------------------------------------------
 
-generate_config(emqx_management) ->
-    Schema = cuttlefish_schema:files([local_path(["priv", "emqx_management.schema"])]),
-    Conf = conf_parse:file([local_path(["etc", "emqx_management.conf"])]),
-    cuttlefish_generator:map(Schema, Conf).
+start_apps(App, SchemaFile, ConfigFile) ->
+    read_schema_configs(App, SchemaFile, ConfigFile),
+    set_special_configs(App),
+    application:ensure_all_started(App).
 
-local_path(Components, Module) ->
-    filename:join([get_base_dir(Module) | Components]).
+local_path(RelativePath) ->
+    deps_path(emqx_management, RelativePath).
 
-get_base_dir(Module) ->
-    {file, Here} = code:is_loaded(Module),
-    filename:dirname(filename:dirname(Here)).
+deps_path(App, RelativePath) ->
+    %% Note: not lib_dir because etc dir is not sym-link-ed to _build dir
+    %% but priv dir is
+    Path0 = code:priv_dir(App),
+    Path = case file:read_link(Path0) of
+               {ok, Resolved} -> Resolved;
+               {error, _} -> Path0
+           end,
+    filename:join([Path, "..", RelativePath]).
 
-get_base_dir() ->
-    get_base_dir(?MODULE).
+read_schema_configs(App, SchemaFile, ConfigFile) ->
+    ct:pal("Read configs - SchemaFile: ~p, ConfigFile: ~p", [SchemaFile, ConfigFile]),
+    Schema = cuttlefish_schema:files([SchemaFile]),
+    Conf = conf_parse:file(ConfigFile),
+    NewConfig = cuttlefish_generator:map(Schema, Conf),
+    Vals = proplists:get_value(App, NewConfig, []),
+    [application:set_env(App, Par, Value) || {Par, Value} <- Vals].
 
-local_path(Components) ->
-    local_path(Components, ?MODULE).
-
-set_app_env({App, Lists}) ->
-    lists:foreach(fun({acl_file, _Var}) ->
-                      application:set_env(App, acl_file, local_path(["deps", "emqx", "etc", "acl.conf"]));
-                      ({plugins_loaded_file, _Var}) ->
-                          application:set_env(App, plugins_loaded_file, local_path(["deps","emqx", "test", "emqx_SUITE_data", "loaded_plugins"]));
-                      ({Par, Var}) ->
-                          application:set_env(App, Par, Var)
-                  end, Lists).
+set_special_configs(_App) ->
+    ok.

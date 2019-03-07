@@ -30,7 +30,7 @@
 
 %% Clients, Sessions
 -export([list_conns/1, lookup_conn/2, lookup_conn/3,
-         kickout_conn/1, kickout_conn/2, clean_acl_cache/2, clean_acl_cache/3]).
+         kickout_conn/1, kickout_conn/2]).
 
 -export([list_sessions/1, lookup_session/1, lookup_session/2]).
 
@@ -180,28 +180,27 @@ kickout_conn(Node, ClientId) when Node =:= node() ->
     case emqx_cm:get_conn_attrs(ClientId, Cpid) of
         Attrs ->
             Module = proplists:get_value(conn_mod, Attrs),
-            Module:kick(Cpid);
-        [] -> {error, not_found}
+            Module:kick(Cpid)
     end;
 
 kickout_conn(Node, ClientId) ->
     rpc_call(Node, kickout_conn, [Node, ClientId]).
 
-clean_acl_cache(ClientId, Topic) ->
-    Results = [clean_acl_cache(Node, ClientId, Topic) || Node <- ekka_mnesia:running_nodes()],
-    case lists:any(fun(Item) -> Item =:= ok end, Results) of
-        true  -> ok;
-        false -> lists:last(Results)
-    end.
+%% clean_acl_cache(ClientId, Topic) ->
+%%     Results = [clean_acl_cache(Node, ClientId, Topic) || Node <- ekka_mnesia:running_nodes()],
+%%     case lists:any(fun(Item) -> Item =:= ok end, Results) of
+%%         true  -> ok;
+%%         false -> lists:last(Results)
+%%     end.
 
-clean_acl_cache(Node, ClientId, Topic) when Node =:= node() ->
-    case emqx_cm:lookup_conn_pid(ClientId) of
-        Pid when is_pid(Pid) ->
-            emqx_connection:clean_acl_cache(Pid, Topic);
-        _ -> {error, not_found}
-    end;
-clean_acl_cache(Node, ClientId, Topic) ->
-    rpc_call(Node, clean_acl_cache, [Node, ClientId, Topic]).
+%% clean_acl_cache(Node, ClientId, Topic) when Node =:= node() ->
+%%     case emqx_cm:lookup_conn_pid(ClientId) of
+%%         Pid when is_pid(Pid) ->
+%%             emqx_connection:clean_acl_cache(Pid, Topic);
+%%         _ -> {error, not_found}
+%%     end;
+%% clean_acl_cache(Node, ClientId, Topic) ->
+%%     rpc_call(Node, clean_acl_cache, [Node, ClientId, Topic]).
 
 %%--------------------------------------------------------------------
 %% Sessions
