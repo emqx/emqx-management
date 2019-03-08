@@ -25,6 +25,8 @@
 
 -export([load/0, unload/0]).
 
+-export([create_bridge/2]).
+
 -export([status/1, broker/1, cluster/1, clients/1, sessions/1,
          routes/1, subscriptions/1, plugins/1, bridges/1,
          listeners/1, vm/1, mnesia/1, trace/1, log/1, acl/1, mgmt/1]).
@@ -432,13 +434,35 @@ plugins(_) ->
 % parse_opt(_Cmd, Opt, _Val) ->
 %     emqx_cli:print("Bad Option: ~s~n", [Opt]).
 
+read_file([$~ | LeftPath]) ->
+    HomePath = os:getenv("HOME"),
+    RealPath = HomePath ++ LeftPath,
+    read_file(RealPath);
+read_file(Path) ->
+    {ok, Data} = file:read_file(Path),
+    Data.
+
+create_bridge(Name, Config) ->
+    Config1 = case jsx:is_json(Config) of
+                  true ->
+                      jsx:decode(Config);
+                  _  ->
+                      Config
+              end,
+    emqx_bridge_sup:create_bridge(Name, Config1).
+
+bridges(["create", Name, Path]) ->
+    Config = read_file(Path),
+    create_bridge(Name, Config);
+bridges(["drop", Name]) ->
+    emqx_bridge_sup:drop_bridge(Name);
 bridges(["list"]) ->
     foreach(fun({Name, State0}) ->
-                State = case State0 of
-                            connected -> <<"Running">>;
-                            _ -> <<"Stopped">>
-                        end,
-                emqx_cli:print("name: ~s     status: ~s~n", [Name, State])
+                    State = case State0 of
+                                connected -> <<"Running">>;
+                                _ -> <<"Stopped">>
+                            end,
+                    emqx_cli:print("name: ~s     status: ~s~n", [Name, State])
             end, emqx_bridge_sup:bridges());
 
 bridges(["start", Name]) ->
