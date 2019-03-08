@@ -24,6 +24,7 @@
 %% APP Management API
 -export([add_app/2,
          add_app/5,
+         add_app/6,
          lookup_app/1,
          get_appsecret/1,
          update_app/2,
@@ -33,6 +34,8 @@
 
 %% APP Auth/ACL API
 -export([is_authorized/2]).
+
+-define(APP, emqx_management).
 
 -record(mqtt_app, {id, secret, name, desc, status, expired}).
 
@@ -62,9 +65,13 @@ add_app(AppId, Name) when is_binary(AppId) ->
 
 -spec(add_app(appid(), binary(), binary(), boolean(), integer() | undefined) -> {ok, appsecret()} | {error, term()}).
 add_app(AppId, Name, Desc, Status, Expired) when is_binary(AppId) ->
-    Secret = emqx_guid:to_base62(emqx_guid:gen()),
+    add_app(AppId, Name, undefined, Desc, Status, Expired).
+
+-spec(add_app(appid(), binary(), binary(), binary(), boolean(), integer() | undefined) -> {ok, appsecret()} | {error, term()}).
+add_app(AppId, Name, Secret, Desc, Status, Expired) when is_binary(AppId) ->
+    Secret1 = generate_appsecret_if_need(Secret),
     App = #mqtt_app{id = AppId,
-                    secret = Secret,
+                    secret = Secret1,
                     name = Name,
                     desc = Desc,
                     status = Status,
@@ -76,9 +83,19 @@ add_app(AppId, Name, Desc, Status, Expired) when is_binary(AppId) ->
                  end
              end,
     case mnesia:transaction(AddFun) of
-        {atomic, ok} -> {ok, Secret};
+        {atomic, ok} -> {ok, Secret1};
         {aborted, Reason} -> {error, Reason}
     end.
+
+-spec(generate_appsecret_if_need(binary() | undefined) -> binary()).
+generate_appsecret_if_need(InSecrt) when is_binary(InSecrt) ->
+    InSecrt;
+generate_appsecret_if_need(undefined) ->
+    AppConf = application:get_env(?APP, application, []),
+    case proplists:get_value(default_secret,  AppConf) of
+       undefined -> emqx_guid:to_base62(emqx_guid:gen());
+       Secret when is_binary(Secret) -> Secret
+   end.
 
 -spec(get_appsecret(appid()) -> {appsecret() | undefined}).
 get_appsecret(AppId) when is_binary(AppId) ->
