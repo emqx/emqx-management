@@ -60,8 +60,7 @@
 
 %% Banned
 -export([create_banned/1,
-         delete_banned/1
-        ]).
+         delete_banned/1]).
 
 %% Common Table API
 -export([count/1, tables/1, query_handle/1, item/2, max_row_limit/0]).
