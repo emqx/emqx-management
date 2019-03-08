@@ -17,15 +17,18 @@
 -compile(export_all).
 -compile(nowarn_export_all).
 
+-import(filename, [join/1]).
+
 start_apps([]) ->
     ok;
 start_apps([emqx_management | LeftApps]) ->
-    start_app(emqx_management, local_path("priv/emqx_management.schema"), 
-                               local_path("etc/emqx_management.conf")),
+    start_app(emqx_management,
+              local_path(join(["priv", "emqx_management.schema"])),
+              local_path(join(["etc", "emqx_management.conf"]))),
     start_apps(LeftApps);
 start_apps([App | LeftApps]) ->
-    SchemaFile = deps_path(App, "priv/" ++ atom_to_list(App) ++ ".schema"),
-    ConfigFile = deps_path(App, "etc/" ++ atom_to_list(App) ++ ".conf"),
+    SchemaFile = deps_path(App, join(["priv", atom_to_list(App) ++ ".schema"])),
+    ConfigFile = deps_path(App, join(["etc", atom_to_list(App) ++ ".conf"])),
     start_app(App, SchemaFile, ConfigFile),
     start_apps(LeftApps).
 

@@ -177,6 +177,7 @@ kickout_conn(ClientId) ->
 kickout_conn(Node, ClientId) when Node =:= node() ->
     Cpid = emqx_cm:lookup_conn_pid(ClientId),
     case emqx_cm:get_conn_attrs(ClientId, Cpid) of
+        [] -> {error, not_found};
         Attrs ->
             Module = proplists:get_value(conn_mod, Attrs),
             Module:kick(Cpid)
