@@ -520,7 +520,7 @@ vm(["process"]) ->
     [emqx_cli:print("process/~-16s: ~w~n", [Name, erlang:system_info(Key)]) || {Name, Key} <- [{limit, process_limit}, {count, process_count}]];
 
 vm(["io"]) ->
-    IoInfo = erlang:system_info(check_io),
+    IoInfo = lists:usort(lists:flatten(erlang:system_info(check_io))),
     [emqx_cli:print("io/~-21s: ~w~n", [Key, get_value(Key, IoInfo)]) || Key <- [max_fds, active_fds]];
 
 vm(["ports"]) ->
