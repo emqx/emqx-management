@@ -95,7 +95,7 @@ generate_appsecret_if_need(undefined) ->
     case proplists:get_value(default_secret,  AppConf) of
        undefined -> emqx_guid:to_base62(emqx_guid:gen());
        Secret when is_binary(Secret) -> Secret
-   end.
+    end.
 
 -spec(get_appsecret(appid()) -> {appsecret() | undefined}).
 get_appsecret(AppId) when is_binary(AppId) ->
