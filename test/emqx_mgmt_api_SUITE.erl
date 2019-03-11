@@ -1,6 +1,21 @@
+%% Copyright (c) 2013-2019 EMQ Technologies Co., Ltd. All Rights Reserved.
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+
 -module(emqx_mgmt_api_SUITE).
 
 -compile(export_all).
+-compile(nowarn_export_all).
 
 -include_lib("eunit/include/eunit.hrl").
 
@@ -19,66 +34,36 @@ all() ->
     [{group, rest_api}].
 
 groups() ->
-    [{rest_api, [sequence], [alarms,
-                             apps,
-                             banned,
-                             brokers,
-                             configs,
-                             connections_and_sessions,
-                             listeners,
-                             metrics,
-                             nodes,
-                             plugins,
-                             pubsub,
-                             routes_and_subscriptions,
-                             stats]}].
+    [{rest_api,
+      [sequence], 
+      [alarms,
+       apps,
+       banned,
+       brokers,
+       configs,
+       connections_and_sessions,
+       listeners,
+       metrics,
+       nodes,
+       plugins,
+       pubsub,
+       routes_and_subscriptions,
+       stats]}].
+
+apps() ->
+    [emqx, emqx_management, emqx_reloader].
 
 init_per_suite(Config) ->
     application:load(emqx_reloader),
-    [start_apps(App, {SchemaFile, ConfigFile}) ||
-        {App, SchemaFile, ConfigFile}
-            <- [{emqx, local_path("deps/emqx/priv/emqx.schema"),
-                       local_path("deps/emqx/etc/emqx.conf")},
-                {emqx_management, local_path("priv/emqx_management.schema"),
-                                  local_path("etc/emqx_management.conf")},
-                {emqx_reloader, local_path("deps/emqx_reloader/priv/emqx_reloader.schema"),
-                                  local_path("deps/emqx_reloader/etc/emqx_reloader.conf")}]],
+    emqx_mgmt_helper:start_apps(apps()),
     ekka_mnesia:start(),
     emqx_mgmt_auth:mnesia(boot),
     emqx_mgmt_auth:add_app(<<"myappid">>, <<"test">>),
     Config.
 
 end_per_suite(_Config) ->
-    [application:stop(App) || App <- [emqx_reloader, emqx_management, emqx]],
+    emqx_mgmt_helper:stop_apps(apps()),
     ekka_mnesia:ensure_stopped().
-
-get_base_dir() ->
-    {file, Here} = code:is_loaded(?MODULE),
-    filename:dirname(filename:dirname(Here)).
-
-local_path(RelativePath) ->
-    filename:join([get_base_dir(), RelativePath]).
-
-start_apps(App, {SchemaFile, ConfigFile}) ->
-    read_schema_configs(App, {SchemaFile, ConfigFile}),
-    set_special_configs(App),
-    application:ensure_all_started(App).
-
-read_schema_configs(App, {SchemaFile, ConfigFile}) ->
-    ct:pal("Read configs - SchemaFile: ~p, ConfigFile: ~p", [SchemaFile, ConfigFile]),
-    Schema = cuttlefish_schema:files([SchemaFile]),
-    Conf = conf_parse:file(ConfigFile),
-    NewConfig = cuttlefish_generator:map(Schema, Conf),
-    Vals = proplists:get_value(App, NewConfig, []),
-    [application:set_env(App, Par, Value) || {Par, Value} <- Vals].
-
-set_special_configs(emqx) ->
-    application:set_env(emqx, plugins_loaded_file,
-                        local_path("deps/emqx/test/emqx_SUITE_data/loaded_plugins")),
-    PluginsEtcDir = local_path("deps/emqx_reloader/etc/") ++ "/",
-    application:set_env(emqx, plugins_etc_dir, PluginsEtcDir);
-set_special_configs(_App) ->
-    ok.
 
 batch_connect(NumberOfConnections) ->
     batch_connect([], NumberOfConnections).
@@ -111,9 +96,9 @@ get(meta, ResponseBody) ->
 
 alarms(_) ->
     AlarmTest = #alarm{id = <<"1">>, severity = error, title="alarm title", summary="alarm summary"},
-    emqx_alarm_mgr:set_alarm(AlarmTest),
-    [Alarm] = emqx_alarm_mgr:get_alarms(),
-    ?assertEqual(error, Alarm#alarm.severity),
+    alarm_handler:set_alarm({<<"1">>, AlarmTest}),
+    [{_AlarmId, AlarmDesc}] = emqx_alarm_handler:get_alarms(),
+    ?assertEqual(error, AlarmDesc#alarm.severity),
     {ok, _} = request_api(get, api_path(["alarms"]), auth_header_()),
     {ok, _} = request_api(get, api_path(["alarms", erlang:atom_to_list(node())]), auth_header_()).
 

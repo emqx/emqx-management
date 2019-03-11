@@ -27,4 +27,3 @@ start(_Type, _Args) ->
 stop(_State) ->
     emqx_mgmt_http:stop_listeners(),
     emqx_mgmt_cli:unload().
-

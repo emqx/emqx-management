@@ -30,7 +30,7 @@
 
 %% Clients, Sessions
 -export([list_conns/1, lookup_conn/2, lookup_conn/3,
-         kickout_conn/1, kickout_conn/2, clean_acl_cache/2, clean_acl_cache/3]).
+         kickout_conn/1, kickout_conn/2]).
 
 -export([list_sessions/1, lookup_session/1, lookup_session/2]).
 
@@ -60,8 +60,7 @@
 
 %% Banned
 -export([create_banned/1,
-         delete_banned/1
-        ]).
+         delete_banned/1]).
 
 %% Common Table API
 -export([count/1, tables/1, query_handle/1, item/2, max_row_limit/0]).
@@ -176,30 +175,32 @@ kickout_conn(ClientId) ->
     end.
 
 kickout_conn(Node, ClientId) when Node =:= node() ->
-    case emqx_cm:lookup_conn_pid(ClientId) of
-        Pid when is_pid(Pid) ->
-            emqx_connection:kick(Pid);
-        _ -> {error, not_found}
+    Cpid = emqx_cm:lookup_conn_pid(ClientId),
+    case emqx_cm:get_conn_attrs(ClientId, Cpid) of
+        [] -> {error, not_found};
+        Attrs ->
+            Module = proplists:get_value(conn_mod, Attrs),
+            Module:kick(Cpid)
     end;
 
 kickout_conn(Node, ClientId) ->
     rpc_call(Node, kickout_conn, [Node, ClientId]).
 
-clean_acl_cache(ClientId, Topic) ->
-    Results = [clean_acl_cache(Node, ClientId, Topic) || Node <- ekka_mnesia:running_nodes()],
-    case lists:any(fun(Item) -> Item =:= ok end, Results) of
-        true  -> ok;
-        false -> lists:last(Results)
-    end.
+%% clean_acl_cache(ClientId, Topic) ->
+%%     Results = [clean_acl_cache(Node, ClientId, Topic) || Node <- ekka_mnesia:running_nodes()],
+%%     case lists:any(fun(Item) -> Item =:= ok end, Results) of
+%%         true  -> ok;
+%%         false -> lists:last(Results)
+%%     end.
 
-clean_acl_cache(Node, ClientId, Topic) when Node =:= node() ->
-    case emqx_cm:lookup_conn_pid(ClientId) of
-        Pid when is_pid(Pid) ->
-            emqx_connection:clean_acl_cache(Pid, Topic);
-        _ -> {error, not_found}
-    end;
-clean_acl_cache(Node, ClientId, Topic) ->
-    rpc_call(Node, clean_acl_cache, [Node, ClientId, Topic]).
+%% clean_acl_cache(Node, ClientId, Topic) when Node =:= node() ->
+%%     case emqx_cm:lookup_conn_pid(ClientId) of
+%%         Pid when is_pid(Pid) ->
+%%             emqx_connection:clean_acl_cache(Pid, Topic);
+%%         _ -> {error, not_found}
+%%     end;
+%% clean_acl_cache(Node, ClientId, Topic) ->
+%%     rpc_call(Node, clean_acl_cache, [Node, ClientId, Topic]).
 
 %%--------------------------------------------------------------------
 %% Sessions
@@ -341,7 +342,7 @@ get_alarms() ->
     [{Node, get_alarms(Node)} || Node <- ekka_mnesia:running_nodes()].
 
 get_alarms(Node) when Node =:= node() ->
-    emqx_alarm_mgr:get_alarms();
+    emqx_alarm_handler:get_alarms();
 get_alarms(Node) ->
     rpc_call(Node, get_alarms, [Node]).
 
@@ -465,6 +466,8 @@ return({ok, Data, Meta}) ->
     {ok, [{code, ?SUCCESS},
           {data, Data},
           {meta, Meta}]};
+return({error, Message}) ->
+    {ok, [{message, Message}]};
 return({error, Code, Message}) ->
     {ok, [{code,    Code},
           {message, Message}]}.

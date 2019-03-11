@@ -23,7 +23,7 @@
 
 -import(proplists, [get_value/2]).
 
--export([load/0]).
+-export([load/0, unload/0]).
 
 -export([status/1, broker/1, cluster/1, clients/1, sessions/1,
          routes/1, subscriptions/1, plugins/1, bridges/1,
@@ -46,6 +46,11 @@ load() ->
     Cmds = [Fun || {Fun, _} <- ?MODULE:module_info(exports), is_cmd(Fun)],
     lists:foreach(fun(Cmd) -> emqx_ctl:register_command(Cmd, {?MODULE, Cmd}, []) end, Cmds),
     emqx_mgmt_cli_cfg:register_config().
+
+-spec(unload() -> ok).
+unload() ->
+    Cmds = [Fun || {Fun, _} <- ?MODULE:module_info(exports), is_cmd(Fun)],
+    lists:foreach(fun(Cmd) -> emqx_ctl:unregister_command(Cmd) end, Cmds).
 
 is_cmd(Fun) ->
     not lists:member(Fun, [init, load, module_info]).
@@ -428,29 +433,47 @@ plugins(_) ->
 %     emqx_cli:print("Bad Option: ~s~n", [Opt]).
 
 bridges(["list"]) ->
-    foreach(fun({Name, State}) ->
-                emqx_cli:print("name: ~s     status: ~s~n", [Name, maps:get(status, State)])
+    foreach(fun({Name, State0}) ->
+                State = case State0 of
+                            connected -> <<"Running">>;
+                            _ -> <<"Stopped">>
+                        end,
+                emqx_cli:print("name: ~s     status: ~s~n", [Name, State])
             end, emqx_bridge_sup:bridges());
 
 bridges(["start", Name]) ->
-    emqx_cli:print("~s.~n", [maps:get(msg, emqx_bridge:start_bridge(list_to_atom(Name)))]);
+    emqx_cli:print("~s.~n", [try emqx_bridge:ensure_started(Name) of 
+                                 ok -> <<"Start bridge successfully">>;
+                                 connected -> <<"Bridge already started">>;
+                                 _ -> <<"Start bridge failed">>
+                             catch
+                                 _Error:_Reason ->
+                                     <<"Start bridge failed">>
+                             end]);
 
 bridges(["stop", Name]) ->
-    emqx_cli:print("~s.~n", [maps:get(msg, emqx_bridge:stop_bridge(list_to_atom(Name)))]);
+    emqx_cli:print("~s.~n", [try emqx_bridge:ensure_stopped(Name) of
+                                 ok -> <<"Stop bridge successfully">>;
+                                 standing_by -> <<"Bridge already started">>;
+                                 _ -> <<"Stop bridge failed]">>
+                             catch
+                                 _Error:_Reason ->
+                                     <<"Stop bridge failed">>
+                             end]);
 
 bridges(["forwards", Name]) ->
     foreach(fun(Topic) ->
                 emqx_cli:print("topic:   ~s~n", [Topic])
-            end, emqx_bridge:show_forwards(list_to_atom(Name)));
+            end, emqx_bridge:get_forwards(Name));
 
 bridges(["add-forward", Name, Topic]) ->
-    case emqx_bridge:add_forward(list_to_atom(Name), iolist_to_binary(Topic)) of
+    case emqx_bridge:ensure_forward_present(Name, iolist_to_binary(Topic)) of
         ok -> emqx_cli:print("Add-forward topic successfully.~n");
         {error, Reason} -> emqx_cli:print("Add-forward failed reason: ~p.~n", [Reason])
     end;
 
 bridges(["del-forward", Name, Topic]) ->
-    case emqx_bridge:del_forward(list_to_atom(Name), iolist_to_binary(Topic)) of
+    case emqx_bridge:ensure_forward_absent(Name, iolist_to_binary(Topic)) of
         ok -> emqx_cli:print("Del-forward topic successfully.~n");
         {error, Reason} -> emqx_cli:print("Del-forward failed reason: ~p.~n", [Reason])
     end;
@@ -458,16 +481,16 @@ bridges(["del-forward", Name, Topic]) ->
 bridges(["subscriptions", Name]) ->
     foreach(fun({Topic, Qos}) ->
                 emqx_cli:print("topic: ~s, qos: ~p~n", [Topic, Qos])
-            end, emqx_bridge:show_subscriptions(list_to_atom(Name)));
+            end, emqx_bridge:get_subscriptions(Name));
 
 bridges(["add-subscription", Name, Topic, Qos]) ->
-    case emqx_bridge:add_subscription(list_to_atom(Name), iolist_to_binary(Topic), list_to_integer(Qos)) of
+    case emqx_bridge:ensure_subscription_present(Name, Topic, list_to_integer(Qos)) of
         ok -> emqx_cli:print("Add-subscription topic successfully.~n");
         {error, Reason} -> emqx_cli:print("Add-subscription failed reason: ~p.~n", [Reason])
     end;
 
 bridges(["del-subscription", Name, Topic]) ->
-    case emqx_bridge:del_subscription(list_to_atom(Name), iolist_to_binary(Topic)) of
+    case emqx_bridge:ensure_subscription_absent(Name, Topic) of
         ok -> emqx_cli:print("Del-subscription topic successfully.~n");
         {error, Reason} -> emqx_cli:print("Del-subscription failed reason: ~p.~n", [Reason])
     end;
@@ -502,7 +525,7 @@ vm(["process"]) ->
     [emqx_cli:print("process/~-16s: ~w~n", [Name, erlang:system_info(Key)]) || {Name, Key} <- [{limit, process_limit}, {count, process_count}]];
 
 vm(["io"]) ->
-    IoInfo = erlang:system_info(check_io),
+    IoInfo = lists:usort(lists:flatten(erlang:system_info(check_io))),
     [emqx_cli:print("io/~-21s: ~w~n", [Key, get_value(Key, IoInfo)]) || Key <- [max_fds, active_fds]];
 
 vm(["ports"]) ->
@@ -562,24 +585,6 @@ log(_) ->
                     {"log primary-level <Level>","Set the primary log level"},
                     {"log handlers list", "Show log handlers"},
                     {"log handlers set-level <HandlerId> <Level>", "Set log level of a log handler"}]).
-
-set_handlers_level([{ID, Level, _Dst} | List], NewLevel) ->
-    set_handlers_level([{ID, Level, _Dst} | List], NewLevel, []).
-
-set_handlers_level([{ID, Level, _Dst} | List], NewLevel, ChangeHistory) ->
-    case emqx_logger:set_log_handler_level(ID, list_to_atom(NewLevel)) of
-        ok -> set_handlers_level(List, NewLevel, [{ID, Level} | ChangeHistory]);
-        {error, Error} ->
-            emqx_cli:print("[error] set level for handler ~p failed: ~p~n", [ID, Error]),
-            rollback(ChangeHistory)
-    end;
-set_handlers_level([], _NewLevel, _NewHanlder) ->
-    emqx_cli:print("~s~n", [ok]).
-
-rollback([{ID, Level} | List]) ->
-    emqx_logger:set_log_handler_level(ID, list_to_atom(Level)),
-    rollback(List);
-rollback([]) -> ok.
 
 %%--------------------------------------------------------------------
 %% @doc Trace Command
