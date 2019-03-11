@@ -63,11 +63,15 @@ mnesia(copy) ->
 add_app(AppId, Name) when is_binary(AppId) ->
     add_app(AppId, Name, <<"Application user">>, true, undefined).
 
--spec(add_app(appid(), binary(), binary(), boolean(), integer() | undefined) -> {ok, appsecret()} | {error, term()}).
+-spec(add_app(appid(), binary(), binary(), boolean(), integer() | undefined)
+      -> {ok, appsecret()}
+       | {error, term()}).
 add_app(AppId, Name, Desc, Status, Expired) when is_binary(AppId) ->
     add_app(AppId, Name, undefined, Desc, Status, Expired).
 
--spec(add_app(appid(), binary(), binary(), binary(), boolean(), integer() | undefined) -> {ok, appsecret()} | {error, term()}).
+-spec(add_app(appid(), binary(), binary(), binary(), boolean(), integer() | undefined)
+      -> {ok, appsecret()}
+       | {error, term()}).
 add_app(AppId, Name, Secret, Desc, Status, Expired) when is_binary(AppId) ->
     Secret1 = generate_appsecret_if_need(Secret),
     App = #mqtt_app{id = AppId,
