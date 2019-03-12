@@ -65,7 +65,7 @@ http_handlers() ->
     Plugins = lists:map(fun(Plugin) -> Plugin#plugin.name end, emqx_plugins:list()),
     [{"/api/v3", minirest:handler(#{apps     => Plugins -- ?EXCEPT_PLUGIN,
                                     except   => ?EXCEPT,
-                                    validate => fun validate/1}),
+                                    filter => fun filter/1}),
                  [{authorization, fun authorize_appid/1}]}].
 
 %%--------------------------------------------------------------------
@@ -97,7 +97,7 @@ authorize_appid(Req) ->
          _  -> false
     end.
 
-validate(#{app := App}) ->
+filter(#{app := App}) ->
     case emqx_plugins:find_plugin(App) of
         false -> false;
         Plugin -> Plugin#plugin.active
