@@ -6,6 +6,11 @@
   {datatype, integer}
 ]}.
 
+{mapping, "management.application.default_secret", "emqx_management.application", [
+  {default, undefined},
+  {datatype, string}
+]}.
+
 {mapping, "management.listener.http", "emqx_management.listeners", [
   {datatype, [integer, ip]}
 ]}.
@@ -133,6 +138,18 @@
 {mapping, "management.listener.https.fail_if_no_peer_cert", "emqx_management.listeners", [
   {datatype, {enum, [true, false]}}
 ]}.
+
+{translation, "emqx_management.application", fun(Conf) ->
+  Filter = fun(Opts) -> [{K, V} || {K, V} <- Opts, V =/= undefined] end,
+  Opts = fun(Prefix) ->
+            Filter([{default_secret, cuttlefish:conf_get(Prefix ++ ".default_secret", Conf)}])
+         end,
+  Prefix = "management.application",
+  Transfer = fun(default_secret, V) -> list_to_binary(V);
+                (_, V) -> V
+             end,
+  [{K, Transfer(K, V)}|| {K, V} <- Opts(Prefix)]
+end}.
 
 {translation, "emqx_management.listeners", fun(Conf) ->
   Filter = fun(Opts) -> [{K, V} || {K, V} <- Opts, V =/= undefined] end,

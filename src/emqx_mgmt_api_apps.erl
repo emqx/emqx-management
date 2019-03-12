@@ -53,10 +53,11 @@
 add_app(_Bindings, Params) ->
     AppId = get_value(<<"app_id">>, Params),
     Name = get_value(<<"name">>, Params),
+    Secret = get_value(<<"secret">>, Params),
     Desc = get_value(<<"desc">>, Params),
     Status = get_value(<<"status">>, Params),
     Expired = get_value(<<"expired">>, Params),
-    case emqx_mgmt_auth:add_app(AppId, Name, Desc, Status, Expired) of
+    case emqx_mgmt_auth:add_app(AppId, Name, Secret, Desc, Status, Expired) of
         {ok, AppSecret} -> emqx_mgmt:return({ok, [{secret, AppSecret}]});
         {error, Reason} -> emqx_mgmt:return({error, ?ERROR2, Reason})
     end.
