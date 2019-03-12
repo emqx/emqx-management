@@ -333,18 +333,14 @@ plugins(["reload", Name]) ->
         Config = gen_config(Plugin),
         case emqx_plugins:unload(Plugin) of
             ok ->
-                lists:foreach(fun({Key, Val}) -> application:set_env(Plugin, Key, Val) end, Config),
-                case emqx_plugins:load(Plugin) of
-                    {ok, _StartedApp} ->
-                        emqx_cli:print("Plugin ~s reloaded successfully.~n", [Name]);
-                    {error, Reason1}   ->
-                        emqx_cli:print("reload plugin error: ~p~n", [Reason1])
-                end;
+                load_plugin(Plugin, Config);
+            {error, not_started} ->
+                load_plugin(Plugin, Config);
             {error, Reason} ->
-                emqx_cli:print("reload plugin error: ~p~n", [Reason])
+                emqx_cli:print("Reload plugin error: ~p~n", [Reason])
         end
     catch _ : _Error : Stacktrace ->
-        emqx_cli:print("reload plugin error:~p~n", [Stacktrace])
+        emqx_cli:print("Reload plugin error:~p~n", [Stacktrace])
     end;
 
 % plugins(["add", Name]) ->
@@ -798,3 +794,12 @@ gen_config(App) ->
     Conf = cuttlefish_conf:file(lists:concat([emqx_config:get_env(plugins_etc_dir), App, ".conf"])),
     [{_, Config}] = cuttlefish_generator:map(Schema, Conf),
     Config.
+
+load_plugin(Plugin, Config) ->
+    lists:foreach(fun({Key, Val}) -> application:set_env(Plugin, Key, Val) end, Config),
+    case emqx_plugins:load(Plugin) of
+        {ok, _StartedApp} ->
+            emqx_cli:print("Plugin ~p reloaded successfully.~n", [Plugin]);
+        {error, Reason1}   ->
+            emqx_cli:print("Reload plugin error: ~p~n", [Reason1])
+    end.
