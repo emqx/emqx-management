@@ -4,7 +4,7 @@ PROJECT_VERSION = 2.4.3
 PROJECT_MOD = emqx_mgmt_app
 
 DEPS = minirest clique
-dep_minirest = git https://github.com/emqx/minirest master
+dep_minirest = git https://github.com/emqx/minirest v0.1.1
 dep_clique   = git https://github.com/emqtt/clique
 
 LOCAL_DEPS = mnesia
