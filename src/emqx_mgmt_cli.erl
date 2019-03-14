@@ -341,7 +341,7 @@ plugins(["reload", Name]) ->
             false ->
                 load_plugin(PluginName, Config);
             true ->
-                case mqx_plugins:unload(Plugin) of
+                case emqx_plugins:unload(Plugin) of
                     ok ->
                         load_plugin(PluginName, Config);
                     {error, Reason} ->
