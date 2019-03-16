@@ -3,17 +3,18 @@ PROJECT_DESCRIPTION = EMQ X Management API and CLI
 PROJECT_MOD = emqx_mgmt_app
 
 DEPS = minirest clique
-dep_minirest = git-emqx https://github.com/emqx/minirest v0.1.0
+dep_minirest = git-emqx https://github.com/emqx/minirest v0.2.0
 dep_clique   = git-emqx https://github.com/emqx/clique v0.3.11
 
 LOCAL_DEPS = mnesia
 
 CUR_BRANCH := $(shell git branch | grep -e "^*" | cut -d' ' -f 2)
-BRANCH := $(if $(filter $(CUR_BRANCH), master develop), $(CUR_BRANCH))
+BRANCH := $(if $(filter $(CUR_BRANCH), master develop), $(CUR_BRANCH), develop)
 
 BUILD_DEPS = emqx cuttlefish
 dep_emqx = git-emqx https://github.com/emqx/emqx $(BRANCH)
 dep_cuttlefish = git-emqx https://github.com/emqx/cuttlefish v2.2.1
+
 
 TEST_DEPS = emqx_reloader
 dep_emqx_reloader = git-emqx https://github.com/emqx/emqx-reloader $(BRANCH)

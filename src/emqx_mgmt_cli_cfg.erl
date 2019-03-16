@@ -83,17 +83,17 @@ register_config_cli() ->
     register_protocol_formatter(),
     register_client_formatter(),
     register_session_formatter(),
-    register_queue_formatter(),
-    register_lager_formatter(),
+    %% register_queue_formatter(),
+    %% register_lager_formatter(),
 
     register_auth_config(),
-    register_protocol_config(),
+    %% register_protocol_config(),
     register_connection_config(),
-    register_client_config(),
-    register_session_config(),
-    register_queue_config(),
-    register_broker_config(),
-    register_lager_config().
+    %% register_client_config(),
+    %% register_session_config(),
+    %% register_queue_config(),
+    register_broker_config().
+    %% register_lager_config().
 
 set_usage() ->
     io:format("~-40s# ~-20s# ~-20s ~p~n", ["key", "value", "datatype", "app"]),
@@ -152,8 +152,8 @@ register_auth_config() ->
                   "mqtt.acl_nomatch",
                   "mqtt.acl_file",
                   "mqtt.cache_acl"],
-    [clique:register_config(Key , fun auth_config_callback/2) || Key <- ConfigKeys],
-    ok = register_config_whitelist(ConfigKeys).
+    [clique:register_config(Key , fun auth_config_callback/2) || Key <- ConfigKeys].
+    %% ok = register_config_whitelist(ConfigKeys).
 
 auth_config_callback([_, KeyStr], Value) ->
     application:set_env(?APP, l2a(KeyStr), Value), " successfully\n".
@@ -167,30 +167,31 @@ register_protocol_formatter() ->
                   "max_packet_size",
                   "websocket_protocol_header",
                   "keepalive_backoff"],
-    [clique:register_formatter(["mqtt", Key], fun protocol_formatter_callback/2) || Key <- ConfigKeys].
+    [clique:register_formatter(["mqtt", Key], fun protocol_formatter_callback/2) 
+     || Key <- ConfigKeys].
 
 protocol_formatter_callback([_, "websocket_protocol_header"], Params) ->
     Params;
 protocol_formatter_callback([_, Key], Params) ->
     proplists:get_value(l2a(Key), Params).
 
-register_protocol_config() ->
-    ConfigKeys = ["mqtt.max_clientid_len",
-                  "mqtt.max_packet_size",
-                  "mqtt.websocket_protocol_header",
-                  "mqtt.keepalive_backoff"],
-    [clique:register_config(Key , fun protocol_config_callback/2) || Key <- ConfigKeys],
-    ok = register_config_whitelist(ConfigKeys).
+%% register_protocol_config() ->
+%%     ConfigKeys = ["mqtt.max_clientid_len",
+%%                   "mqtt.max_packet_size",
+%%                   "mqtt.websocket_protocol_header",
+%%                   "mqtt.keepalive_backoff"],
+%%     [clique:register_config(Key , fun protocol_config_callback/2) || Key <- ConfigKeys].
+%%     ok = register_config_whitelist(ConfigKeys).
 
-protocol_config_callback([_AppStr, KeyStr], Value) ->
-    protocol_config_callback(protocol, l2a(KeyStr), Value).
-protocol_config_callback(_App, websocket_protocol_header, Value) ->
-    application:set_env(?APP, websocket_protocol_header, Value),
-    " successfully\n";
-protocol_config_callback(App, Key, Value) ->
-    {ok, Env} = emqx:env(App),
-    application:set_env(?APP, App, lists:keyreplace(Key, 1, Env, {Key, Value})),
-    " successfully\n".
+%% protocol_config_callback([_AppStr, KeyStr], Value) ->
+%%     protocol_config_callback(protocol, l2a(KeyStr), Value).
+%% protocol_config_callback(_App, websocket_protocol_header, Value) ->
+%%     application:set_env(?APP, websocket_protocol_header, Value),
+%%     " successfully\n";
+%% protocol_config_callback(App, Key, Value) ->
+%%     {ok, Env} = emqx:env(App),
+%%     application:set_env(?APP, App, lists:keyreplace(Key, 1, Env, {Key, Value})),
+%%     " successfully\n".
 
 %%--------------------------------------------------------------------
 %% MQTT Connection
@@ -198,8 +199,8 @@ protocol_config_callback(App, Key, Value) ->
 
 register_connection_config() ->
     ConfigKeys = ["mqtt.conn.force_gc_count"],
-    [clique:register_config(Key , fun connection_config_callback/2) || Key <- ConfigKeys],
-    ok = register_config_whitelist(ConfigKeys).
+    [clique:register_config(Key , fun connection_config_callback/2) || Key <- ConfigKeys].
+    %% ok = register_config_whitelist(ConfigKeys).
 
 connection_config_callback([_, KeyStr0, KeyStr1], Value) ->
     KeyStr = lists:concat([KeyStr0, "_", KeyStr1]),
@@ -219,28 +220,28 @@ register_client_formatter() ->
 client_formatter_callback([_, _, Key], Params) ->
     proplists:get_value(list_to_atom(Key), Params).
 
-register_client_config() ->
-    ConfigKeys = ["mqtt.client.max_publish_rate",
-                  "mqtt.client.idle_timeout",
-                  "mqtt.client.enable_stats"],
-    [clique:register_config(Key , fun client_config_callback/2) || Key <- ConfigKeys],
-    ok = register_config_whitelist(ConfigKeys).
+%% register_client_config() ->
+%%     ConfigKeys = ["mqtt.client.max_publish_rate",
+%%                   "mqtt.client.idle_timeout",
+%%                   "mqtt.client.enable_stats"],
+%%     [clique:register_config(Key , fun client_config_callback/2) || Key <- ConfigKeys],
+%%     ok = register_config_whitelist(ConfigKeys).
 
-client_config_callback([_, AppStr, KeyStr], Value) ->
-    client_config_callback(l2a(AppStr), l2a(KeyStr), Value).
+%% client_config_callback([_, AppStr, KeyStr], Value) ->
+%%     client_config_callback(l2a(AppStr), l2a(KeyStr), Value).
 
-client_config_callback(App, idle_timeout, Value) ->
-    {ok, Env} = emqx:env(App),
-    application:set_env(?APP, App, lists:keyreplace(client_idle_timeout, 1, Env, {client_idle_timeout, Value})),
-    " successfully\n";
-client_config_callback(App, enable_stats, Value) ->
-    {ok, Env} = emqx:env(App),
-    application:set_env(?APP, App, lists:keyreplace(client_enable_stats, 1, Env, {client_enable_stats, Value})),
-    " successfully\n";
-client_config_callback(App, Key, Value) ->
-    {ok, Env} = emqx:env(App),
-    application:set_env(?APP, App, lists:keyreplace(Key, 1, Env, {Key, Value})),
-    " successfully\n".
+%% client_config_callback(App, idle_timeout, Value) ->
+%%     {ok, Env} = emqx:env(App),
+%%     application:set_env(?APP, App, lists:keyreplace(client_idle_timeout, 1, Env, {client_idle_timeout, Value})),
+%%     " successfully\n";
+%% client_config_callback(App, enable_stats, Value) ->
+%%     {ok, Env} = emqx:env(App),
+%%     application:set_env(?APP, App, lists:keyreplace(client_enable_stats, 1, Env, {client_enable_stats, Value})),
+%%     " successfully\n";
+%% client_config_callback(App, Key, Value) ->
+%%     {ok, Env} = emqx:env(App),
+%%     application:set_env(?APP, App, lists:keyreplace(Key, 1, Env, {Key, Value})),
+%%     " successfully\n".
 
 %%--------------------------------------------------------------------
 %% session
@@ -261,25 +262,25 @@ register_session_formatter() ->
 session_formatter_callback([_, _, Key], Params) ->
     proplists:get_value(list_to_atom(Key), Params).
 
-register_session_config() ->
-    ConfigKeys = ["mqtt.session.max_subscriptions",
-                  "mqtt.session.upgrade_qos",
-                  "mqtt.session.max_inflight",
-                  "mqtt.session.retry_interval",
-                  "mqtt.session.max_awaiting_rel",
-                  "mqtt.session.await_rel_timeout",
-                  "mqtt.session.enable_stats",
-                  "mqtt.session.expiry_interval",
-                  "mqtt.session.ignore_loop_deliver"],
-    [clique:register_config(Key , fun session_config_callback/2) || Key <- ConfigKeys],
-    ok = register_config_whitelist(ConfigKeys).
+%% register_session_config() ->
+%%     ConfigKeys = ["mqtt.session.max_subscriptions",
+%%                   "mqtt.session.upgrade_qos",
+%%                   "mqtt.session.max_inflight",
+%%                   "mqtt.session.retry_interval",
+%%                   "mqtt.session.max_awaiting_rel",
+%%                   "mqtt.session.await_rel_timeout",
+%%                   "mqtt.session.enable_stats",
+%%                   "mqtt.session.expiry_interval",
+%%                   "mqtt.session.ignore_loop_deliver"],
+%%     [clique:register_config(Key , fun session_config_callback/2) || Key <- ConfigKeys].
+%%     ok = register_config_whitelist(ConfigKeys).
 
-session_config_callback([_, AppStr, KeyStr], Value) ->
-    session_config_callback(l2a(AppStr), l2a(KeyStr), Value).
-session_config_callback(App, Key, Value) ->
-    {ok, Env} = emqx:env(App),
-    application:set_env(?APP, App, lists:keyreplace(Key, 1, Env, {Key, Value})),
-    " successfully\n".
+%% session_config_callback([_, AppStr, KeyStr], Value) ->
+%%     session_config_callback(l2a(AppStr), l2a(KeyStr), Value).
+%% session_config_callback(App, Key, Value) ->
+%%     {ok, Env} = emqx:env(App),
+%%     application:set_env(?APP, App, lists:keyreplace(Key, 1, Env, {Key, Value})),
+%%     " successfully\n".
 
 l2a(List) -> list_to_atom(List).
 
@@ -287,43 +288,43 @@ l2a(List) -> list_to_atom(List).
 %% MQTT MQueue
 %%--------------------------------------------------------------------
 
-register_queue_formatter() ->
-    ConfigKeys = ["type", 
-                  "priority",
-                  "max_length",
-                  "low_watermark",
-                  "high_watermark",
-                  "store_qos0"],
-    [clique:register_formatter(["mqtt", "mqueue", Key], fun queue_formatter_callback/2) || Key <- ConfigKeys].
+%% register_queue_formatter() ->
+%%     ConfigKeys = ["type", 
+%%                   "priority",
+%%                   "max_length",
+%%                   "low_watermark",
+%%                   "high_watermark",
+%%                   "store_qos0"],
+%%     [clique:register_formatter(["mqtt", "mqueue", Key], fun queue_formatter_callback/2) || Key <- ConfigKeys].
 
-queue_formatter_callback([_, _, Key], Params) ->
-    proplists:get_value(list_to_atom(Key), Params).
+%% queue_formatter_callback([_, _, Key], Params) ->
+%%     proplists:get_value(list_to_atom(Key), Params).
 
-register_queue_config() ->
-    ConfigKeys = ["mqtt.mqueue.type",
-                  "mqtt.mqueue.priority",
-                  "mqtt.mqueue.max_length",
-                  "mqtt.mqueue.low_watermark",
-                  "mqtt.mqueue.high_watermark",
-                  "mqtt.mqueue.store_qos0"],
-    [clique:register_config(Key , fun queue_config_callback/2) || Key <- ConfigKeys],
-    ok = register_config_whitelist(ConfigKeys).
+%% register_queue_config() ->
+%%     ConfigKeys = ["mqtt.mqueue.type",
+%%                   "mqtt.mqueue.priority",
+%%                   "mqtt.mqueue.max_length",
+%%                   "mqtt.mqueue.low_watermark",
+%%                   "mqtt.mqueue.high_watermark",
+%%                   "mqtt.mqueue.store_qos0"],
+%%     [clique:register_config(Key , fun queue_config_callback/2) || Key <- ConfigKeys],
+%%     ok = register_config_whitelist(ConfigKeys).
 
-queue_config_callback([_, AppStr, KeyStr], Value) ->
-    queue_config_callback(l2a(AppStr), l2a(KeyStr), Value).
+%% queue_config_callback([_, AppStr, KeyStr], Value) ->
+%%     queue_config_callback(l2a(AppStr), l2a(KeyStr), Value).
 
-queue_config_callback(App, low_watermark, Value) ->
-    {ok, Env} = emqx:env(App),
-    application:set_env(?APP, App, lists:keyreplace(low_watermark, 1, Env, {low_watermark, Value})),
-    " successfully\n";
-queue_config_callback(App, high_watermark, Value) ->
-    {ok, Env} = emqx:env(App),
-    application:set_env(?APP, App, lists:keyreplace(high_watermark, 1, Env, {high_watermark, Value})),
-    " successfully\n";
-queue_config_callback(App, Key, Value) ->
-    {ok, Env} = emqx:env(App),
-    application:set_env(?APP, App, lists:keyreplace(Key, 1, Env, {Key, Value})),
-    " successfully\n".
+%% queue_config_callback(App, low_watermark, Value) ->
+%%     {ok, Env} = emqx:env(App),
+%%     application:set_env(?APP, App, lists:keyreplace(low_watermark, 1, Env, {low_watermark, Value})),
+%%     " successfully\n";
+%% queue_config_callback(App, high_watermark, Value) ->
+%%     {ok, Env} = emqx:env(App),
+%%     application:set_env(?APP, App, lists:keyreplace(high_watermark, 1, Env, {high_watermark, Value})),
+%%     " successfully\n";
+%% queue_config_callback(App, Key, Value) ->
+%%     {ok, Env} = emqx:env(App),
+%%     application:set_env(?APP, App, lists:keyreplace(Key, 1, Env, {Key, Value})),
+%%     " successfully\n".
 
 %%--------------------------------------------------------------------
 %% MQTT Broker
@@ -331,8 +332,8 @@ queue_config_callback(App, Key, Value) ->
 
 register_broker_config() ->
     ConfigKeys = ["mqtt.broker.sys_interval"],
-    [clique:register_config(Key , fun broker_config_callback/2) || Key <- ConfigKeys],
-    ok = register_config_whitelist(ConfigKeys).
+    [clique:register_config(Key , fun broker_config_callback/2) || Key <- ConfigKeys].
+    %% ok = register_config_whitelist(ConfigKeys).
 
 broker_config_callback([_, KeyStr0, KeyStr1], Value) ->
     KeyStr = lists:concat([KeyStr0, "_", KeyStr1]),
@@ -343,24 +344,24 @@ broker_config_callback([_, KeyStr0, KeyStr1], Value) ->
 %% MQTT Lager
 %%--------------------------------------------------------------------
 
-register_lager_formatter() ->
-    ConfigKeys = ["level"],
-    [clique:register_formatter(["log", "console", Key], fun lager_formatter_callback/2) || Key <- ConfigKeys].
+%% register_lager_formatter() ->
+%%     ConfigKeys = ["level"],
+%%     [clique:register_formatter(["log", "console", Key], fun lager_formatter_callback/2) || Key <- ConfigKeys].
 
-lager_formatter_callback(_, Params) ->
-    proplists:get_value(lager_console_backend, Params).
+%% lager_formatter_callback(_, Params) ->
+%%     proplists:get_value(lager_console_backend, Params).
 
-register_lager_config() ->
-    ConfigKeys = ["log.console.level"],
-    [clique:register_config(Key , fun lager_config_callback/2) || Key <- ConfigKeys],
-    ok = register_config_whitelist(ConfigKeys).
+%% register_lager_config() ->
+%%     ConfigKeys = ["log.console.level"],
+%%     [clique:register_config(Key , fun lager_config_callback/2) || Key <- ConfigKeys],
+%%     ok = register_config_whitelist(ConfigKeys).
 
-lager_config_callback(_, Value) ->
-    lager:set_loglevel(lager_console_backend, Value),
-    " successfully\n".
+%% lager_config_callback(_, Value) ->
+%%     lager:set_loglevel(lager_console_backend, Value),
+%%     " successfully\n".
 
-register_config_whitelist(ConfigKeys) ->
-  clique:register_config_whitelist(ConfigKeys, ?APP).
+%% register_config_whitelist(ConfigKeys) ->
+%%   clique:register_config_whitelist(ConfigKeys, ?APP).
 
 %%--------------------------------------------------------------------
 %% Inner Function

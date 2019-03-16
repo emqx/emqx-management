@@ -15,6 +15,7 @@
 -module(emqx_mgmt_SUITE).
 
 -compile(export_all).
+-compile(nowarn_export_all).
 
 -include_lib("emqx/include/emqx.hrl").
 
@@ -49,19 +50,19 @@ groups() ->
         t_vm_cmd,
         t_trace_cmd,
         t_router_cmd,
-        t_subscriptions_cmd
-       ]}].
+        t_subscriptions_cmd]}].
+
+apps() ->
+    [emqx, emqx_management].
 
 init_per_suite(Config) ->
     ekka_mnesia:start(),
     emqx_mgmt_auth:mnesia(boot),
-    [run_setup_steps(App) || App <- [emqx, emqx_management]],
+    emqx_mgmt_helper:start_apps(apps()),
     Config.
 
 end_per_suite(_Config) ->
-    application:stop(mnesia),
-    application:stop(emqx_management),
-    emqx:shutdown().
+    emqx_mgmt_helper:stop_apps(apps()).
 
 t_add_app(_Config) ->
     {ok, AppSecret} = emqx_mgmt_auth:add_app(<<"app_id">>, <<"app_name">>),
@@ -71,6 +72,23 @@ t_add_app(_Config) ->
                    <<"app_name">>, <<"Application user">>,
                    true, undefined}],
                  emqx_mgmt_auth:list_apps()),
+    emqx_mgmt_auth:del_app(<<"app_id">>),
+
+    %% Use the default application secret
+    application:set_env(emqx_management, application, [{default_secret, <<"public">>}]),
+    {ok, AppSecret1} = emqx_mgmt_auth:add_app(<<"app_id">>, <<"app_name">>, <<"app_desc">>, true, undefined),
+    ?assert(emqx_mgmt_auth:is_authorized(<<"app_id">>, AppSecret1)),
+    ?assertEqual(AppSecret1, emqx_mgmt_auth:get_appsecret(<<"app_id">>)),
+    ?assertEqual(AppSecret1, <<"public">>),
+    ?assertEqual([{<<"app_id">>, AppSecret1, <<"app_name">>, <<"app_desc">>, true, undefined}], emqx_mgmt_auth:list_apps()),
+    emqx_mgmt_auth:del_app(<<"app_id">>),
+    application:set_env(emqx_management, application, []),
+
+    %% Specify the application secret
+    {ok, AppSecret2} = emqx_mgmt_auth:add_app(<<"app_id">>, <<"app_name">>, <<"secret">>, <<"app_desc">>, true, undefined),
+    ?assert(emqx_mgmt_auth:is_authorized(<<"app_id">>, AppSecret2)),
+    ?assertEqual(AppSecret2, emqx_mgmt_auth:get_appsecret(<<"app_id">>)),
+    ?assertEqual([{<<"app_id">>, AppSecret2, <<"app_name">>, <<"app_desc">>, true, undefined}], emqx_mgmt_auth:list_apps()),
     emqx_mgmt_auth:del_app(<<"app_id">>),
     ok.
 
@@ -119,9 +137,9 @@ t_clients_cmd(_) ->
     ct:pal("start testing the client command"),
     process_flag(trap_exit, true),
     {ok, T} = emqx_client:start_link([{host, "localhost"},
-                                       {client_id, <<"client12">>},
-                                       {username, <<"testuser1">>},
-                                       {password, <<"pass1">>}]),
+                                      {client_id, <<"client12">>},
+                                      {username, <<"testuser1">>},
+                                      {password, <<"pass1">>}]),
     {ok, _} = emqx_client:connect(T),
     emqx_mgmt_cli:clients(["list"]),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:clients(["show", "client12"]), "client12")),
@@ -205,44 +223,6 @@ t_subscriptions_cmd(_) ->
     {ok, _, _} = emqx_client:subscribe(T3, <<"b/b/c">>),
     timer:sleep(300),
     [?assertMatch({match, _} , re:run(Result, "b/b/c"))
-        || Result <- emqx_mgmt_cli:subscriptions(["show", <<"client">>])],
+     || Result <- emqx_mgmt_cli:subscriptions(["show", <<"client">>])],
     ?assertEqual(emqx_mgmt_cli:subscriptions(["add", "client", "b/b/c", "0"]), "\"ok~n\""),
     ?assertEqual(emqx_mgmt_cli:subscriptions(["del", "client", "b/b/c"]), "\"ok~n\"").
-
-run_setup_steps(App) ->
-    NewConfig = generate_config(App),
-    lists:foreach(fun set_app_env/1, NewConfig),
-                      application:ensure_all_started(App),
-                      ct:log("Applications: ~p", [application:loaded_applications()]).
-
-generate_config(emqx) ->
-    Schema = cuttlefish_schema:files([local_path(["deps", "emqx", "priv", "emqx.schema"])]),
-    Conf = conf_parse:file([local_path(["deps", "emqx", "etc", "emqx.conf"])]),
-    cuttlefish_generator:map(Schema, Conf);
-
-generate_config(emqx_management) ->
-    Schema = cuttlefish_schema:files([local_path(["priv", "emqx_management.schema"])]),
-    Conf = conf_parse:file([local_path(["etc", "emqx_management.conf"])]),
-    cuttlefish_generator:map(Schema, Conf).
-
-local_path(Components, Module) ->
-    filename:join([get_base_dir(Module) | Components]).
-
-get_base_dir(Module) ->
-    {file, Here} = code:is_loaded(Module),
-    filename:dirname(filename:dirname(Here)).
-
-get_base_dir() ->
-    get_base_dir(?MODULE).
-
-local_path(Components) ->
-    local_path(Components, ?MODULE).
-
-set_app_env({App, Lists}) ->
-    lists:foreach(fun({acl_file, _Var}) ->
-                      application:set_env(App, acl_file, local_path(["deps", "emqx", "etc", "acl.conf"]));
-                      ({plugins_loaded_file, _Var}) ->
-                          application:set_env(App, plugins_loaded_file, local_path(["deps","emqx", "test", "emqx_SUITE_data", "loaded_plugins"]));
-                      ({Par, Var}) ->
-                          application:set_env(App, Par, Var)
-                  end, Lists).
