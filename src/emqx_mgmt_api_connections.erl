@@ -99,7 +99,9 @@ get_emqx_conn_stats(TabKey) ->
 adjust_format(Data) when is_map(Data)->
     {IpAddr, Port} = maps:get(peername, Data),
     ConnectedAt = maps:get(connected_at, Data),
-    maps:remove(peername, Data#{node         => node(),
-                                ipaddress    => iolist_to_binary(ntoa(IpAddr)),
-                                port         => Port,
-                                connected_at => iolist_to_binary(strftime(ConnectedAt))}).
+    maps:remove(peername,
+        maps:remove(credentials,
+            Data#{node         => node(),
+                  ipaddress    => iolist_to_binary(ntoa(IpAddr)),
+                  port         => Port,
+                  connected_at => iolist_to_binary(strftime(ConnectedAt))})).
