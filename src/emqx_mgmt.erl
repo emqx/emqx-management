@@ -22,29 +22,61 @@
 
 -import(proplists, [get_value/2]).
 
+-export([register_config/2,
+         unregister_config/2
+        ]).
+
 %% Nodes and Brokers API
--export([list_nodes/0, lookup_node/1, list_brokers/0, lookup_broker/1, node_info/1, broker_info/1]).
+-export([list_nodes/0,
+         lookup_node/1,
+         list_brokers/0,
+         lookup_broker/1,
+         node_info/1,
+         broker_info/1
+        ]).
 
 %% Metrics and Stats
--export([get_metrics/0, get_metrics/1, get_stats/0, get_stats/1]).
+-export([get_metrics/0,
+         get_metrics/1,
+         get_stats/0,
+         get_stats/1
+        ]).
 
 %% Clients, Sessions
--export([list_conns/1, lookup_conn/2, lookup_conn/3,
-         kickout_conn/1, kickout_conn/2]).
+-export([list_conns/1,
+         lookup_conn/2,
+         lookup_conn/3,
+         kickout_conn/1,
+         kickout_conn/2
+        ]).
 
--export([list_sessions/1, lookup_session/1, lookup_session/2]).
+-export([list_sessions/1,
+         lookup_session/1,
+         lookup_session/2
+        ]).
 
 %% Subscriptions
--export([list_subscriptions/1, lookup_subscriptions/1, lookup_subscriptions/2]).
+-export([list_subscriptions/1,
+         lookup_subscriptions/1,
+         lookup_subscriptions/2
+        ]).
 
 %% Routes
--export([list_routes/0, lookup_routes/1]).
+-export([list_routes/0,
+         lookup_routes/1
+        ]).
 
 %% PubSub
--export([subscribe/2, publish/1, unsubscribe/2]).
+-export([subscribe/2,
+         publish/1,
+         unsubscribe/2
+        ]).
 
 %% Plugins
--export([list_plugins/0, list_plugins/1, load_plugin/2, unload_plugin/2]).
+-export([list_plugins/0, list_plugins/1,
+         load_plugin/2,
+         unload_plugin/2
+        ]).
 
 %% Listeners
 -export([list_listeners/0, list_listeners/1]).
@@ -70,6 +102,25 @@
 -define(MAX_ROW_LIMIT, 10000).
 
 -define(APP, emqx_management).
+
+%%--------------------------------------------------------------------
+%% Register HotConfig
+%%--------------------------------------------------------------------
+
+-spec(register_config(App :: atom(), Keys :: list(string())) -> ok).
+register_config(App, Keys) ->
+    clique_config:load_schema([code:priv_dir(App)], App),
+    Callback = fun(Key, Value) ->
+                       application:set_env(App, Key, Value), " successfully\n"
+               end,
+    [clique:register_config(Key, Callback) || Key <- Keys],
+    clique:register_config_whitelist(Keys, App).
+
+-spec(unregister_config(App :: atom(), Keys :: list(string())) -> ok).
+unregister_config(App, Keys) ->
+    [clique:unregister_config(Key) || Key <- Keys],
+    clique:unregister_config_whitelist(Keys, App),
+    clique_config:unload_schema(App).
 
 %%--------------------------------------------------------------------
 %% Node Info
