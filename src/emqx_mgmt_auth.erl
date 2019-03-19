@@ -92,8 +92,7 @@ add_app(AppId, Name, Secret, Desc, Status, Expired) when is_binary(AppId) ->
     end.
 
 -spec(generate_appsecret_if_need(binary() | undefined) -> binary()).
-generate_appsecret_if_need(InSecrt) when is_binary(InSecrt)
-                                 andalso byte_size(InSecrt) > 0 ->
+generate_appsecret_if_need(InSecrt) when is_binary(InSecrt), byte_size(InSecrt) > 0 ->
     InSecrt;
 generate_appsecret_if_need(_) ->
     AppConf = application:get_env(?APP, application, []),

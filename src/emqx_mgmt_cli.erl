@@ -23,7 +23,7 @@
 
 -import(proplists, [get_value/2]).
 
--export([load/0, unload/0]).
+-export([load/0]).
 
 -export([status/1, broker/1, cluster/1, clients/1, sessions/1,
          routes/1, subscriptions/1, plugins/1, bridges/1,
@@ -46,11 +46,6 @@ load() ->
     Cmds = [Fun || {Fun, _} <- ?MODULE:module_info(exports), is_cmd(Fun)],
     lists:foreach(fun(Cmd) -> emqx_ctl:register_command(Cmd, {?MODULE, Cmd}, []) end, Cmds),
     emqx_mgmt_cli_cfg:register_config().
-
--spec(unload() -> ok).
-unload() ->
-    Cmds = [Fun || {Fun, _} <- ?MODULE:module_info(exports), is_cmd(Fun)],
-    lists:foreach(fun(Cmd) -> emqx_ctl:unregister_command(Cmd) end, Cmds).
 
 is_cmd(Fun) ->
     not lists:member(Fun, [init, load, module_info]).
@@ -324,6 +319,9 @@ plugins(["load", Name]) ->
             emqx_cli:print("load plugin error: ~p~n", [Reason])
     end;
 
+plugins(["unload", "emqx_management"])->
+    emqx_cli:print("Plugin emqx_management can not be unloaded ~n");
+
 plugins(["unload", Name]) ->
     case emqx_plugins:unload(list_to_atom(Name)) of
         ok ->
@@ -341,7 +339,7 @@ plugins(["reload", Name]) ->
             false ->
                 load_plugin(PluginName, Config);
             true ->
-                case emqx_plugins:unload(Plugin) of
+                case emqx_plugins:unload(PluginName) of
                     ok ->
                         load_plugin(PluginName, Config);
                     {error, Reason} ->
