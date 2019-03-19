@@ -92,9 +92,9 @@ add_app(AppId, Name, Secret, Desc, Status, Expired) when is_binary(AppId) ->
     end.
 
 -spec(generate_appsecret_if_need(binary() | undefined) -> binary()).
-generate_appsecret_if_need(InSecrt) when is_binary(InSecrt) ->
+generate_appsecret_if_need(InSecrt) when is_binary(InSecrt), byte_size(InSecrt) > 0 ->
     InSecrt;
-generate_appsecret_if_need(undefined) ->
+generate_appsecret_if_need(_) ->
     AppConf = application:get_env(?APP, application, []),
     case proplists:get_value(default_secret,  AppConf) of
        undefined -> emqx_guid:to_base62(emqx_guid:gen());

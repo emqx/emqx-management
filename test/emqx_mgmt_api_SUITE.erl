@@ -54,7 +54,6 @@ apps() ->
     [emqx, emqx_management, emqx_reloader].
 
 init_per_suite(Config) ->
-    application:load(emqx_reloader),
     emqx_mgmt_helper:start_apps(apps()),
     ekka_mnesia:start(),
     emqx_mgmt_auth:mnesia(boot),
@@ -279,7 +278,7 @@ plugins(_) ->
                                           erlang:atom_to_list(node()),
                                           "plugins"]),
                                 auth_header_()),
-    [Plugin3] = get(data, Result3),
+    [Plugin3] = filter(get(data, Result3), <<"emqx_reloader">>),
     ?assertEqual(<<"emqx_reloader">>, proplists:get_value(<<"name">>, Plugin3)),
     ?assertNot(proplists:get_value(<<"active">>, Plugin3)),
 
@@ -293,7 +292,7 @@ plugins(_) ->
     
     {ok, Result} = request_api(get, api_path(["plugins"]), auth_header_()),
     [Plugins] = get(data, Result),
-    [Plugin] = proplists:get_value(<<"plugins">>, Plugins),
+    [Plugin] = filter(proplists:get_value(<<"plugins">>, Plugins), <<"emqx_reloader">>),
     ?assertEqual(<<"emqx_reloader">>, proplists:get_value(<<"name">>, Plugin)),
     ?assert(proplists:get_value(<<"active">>, Plugin)),
 
@@ -302,7 +301,7 @@ plugins(_) ->
                                           erlang:atom_to_list(node()),
                                           "plugins"]),
                                 auth_header_()),
-    [Plugin] = get(data, Result2).
+    [Plugin] = filter(get(data, Result2), <<"emqx_reloader">>).
 
     
 
@@ -470,3 +469,8 @@ raw_send_serialize(Packet, Opts) ->
 raw_recv_parse(P, ProtoVersion) ->
     emqx_frame:parse(P, {none, #{max_packet_size => ?MAX_PACKET_SIZE,
                                  version         => ProtoVersion}}).
+
+filter(List, Name) ->
+    lists:filter(fun(Item) ->
+        proplists:get_value(<<"name">>, Item) == Name
+    end, List).

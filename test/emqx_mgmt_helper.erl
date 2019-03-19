@@ -62,7 +62,9 @@ read_schema_configs(App, SchemaFile, ConfigFile) ->
     [application:set_env(App, Par, Value) || {Par, Value} <- Vals].
 
 set_special_configs(emqx) ->
-    PluginsEtcDir = deps_path(emqx_reloader, "etc/"),
+    application:load(emqx_management),
+    application:load(emqx_reloader),
+    PluginsEtcDir = deps_path(emqx_management, "test/etc/"),
     application:set_env(emqx, plugins_etc_dir, PluginsEtcDir);
 set_special_configs(_App) ->
     ok.
