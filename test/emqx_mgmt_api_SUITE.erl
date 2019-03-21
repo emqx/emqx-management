@@ -50,18 +50,16 @@ groups() ->
        routes_and_subscriptions,
        stats]}].
 
-apps() ->
-    [emqx, emqx_management, emqx_reloader].
-
 init_per_suite(Config) ->
-    emqx_mgmt_helper:start_apps(apps()),
+    emqx_ct_helpers:start_apps([emqx, emqx_management, emqx_reloader],
+                               [{plugins_etc_dir, emqx_management, "test/etc/"}, {acl_file, emqx, "etc/acl.conf"}]),
     ekka_mnesia:start(),
     emqx_mgmt_auth:mnesia(boot),
     emqx_mgmt_auth:add_app(<<"myappid">>, <<"test">>),
     Config.
 
 end_per_suite(_Config) ->
-    emqx_mgmt_helper:stop_apps(apps()),
+    emqx_ct_helpers:stop_apps([emqx_reloader, emqx_management, emqx]),
     ekka_mnesia:ensure_stopped().
 
 batch_connect(NumberOfConnections) ->
@@ -136,7 +134,6 @@ banned(_) ->
 
     {ok, _} = request_api(delete, api_path(["banned", erlang:binary_to_list(Who)]), [], 
                           auth_header_(), [{<<"as">>, <<"client_id">>}]),
-
     {ok, Result2} = request_api(get, api_path(["banned"]), auth_header_()),
     ?assertEqual([], get(data, Result2)).
 
