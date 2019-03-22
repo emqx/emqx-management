@@ -28,43 +28,43 @@
 
 all() ->
     [{group, manage_apps},
-     {group, check_apps},
      {group, check_cli}].
 
 groups() ->
     [{manage_apps, [sequence],
-      [t_add_app,
-       t_del_app
-      ]},
-     {check_apps, [sequence],
-      [t_check_app,
-       t_check_app_acl,
-       t_log_cmd
+      [t_app
       ]},
       {check_cli, [sequence],
-       [t_log_cmd,
+       [t_cli,
+        t_log_cmd,
         t_mgmt_cmd,
         t_status_cmd,
         t_clients_cmd,
         t_sessions_cmd,
         t_vm_cmd,
+        t_plugins,
         t_trace_cmd,
+        t_broker_cmd,
         t_router_cmd,
-        t_subscriptions_cmd]}].
+        t_subscriptions_cmd,
+        t_acl,
+        t_listeners
+        ]}].
 
 apps() ->
-    [emqx, emqx_management].
+    [emqx, emqx_management, emqx_reloader].
 
 init_per_suite(Config) ->
     ekka_mnesia:start(),
     emqx_mgmt_auth:mnesia(boot),
-    emqx_mgmt_helper:start_apps(apps()),
+    emqx_ct_helpers:start_apps([emqx, emqx_management, emqx_reloader],
+                               [{plugins_etc_dir, emqx_management, "test/etc/"}, {acl_file, emqx, "etc/acl.conf"}]),
     Config.
 
 end_per_suite(_Config) ->
-    emqx_mgmt_helper:stop_apps(apps()).
+    emqx_ct_helpers:stop_apps([emqx_management, emqx_reloader, emqx]).
 
-t_add_app(_Config) ->
+t_app(_Config) ->
     {ok, AppSecret} = emqx_mgmt_auth:add_app(<<"app_id">>, <<"app_name">>),
     ?assert(emqx_mgmt_auth:is_authorized(<<"app_id">>, AppSecret)),
     ?assertEqual(AppSecret, emqx_mgmt_auth:get_appsecret(<<"app_id">>)),
@@ -73,7 +73,6 @@ t_add_app(_Config) ->
                    true, undefined}],
                  emqx_mgmt_auth:list_apps()),
     emqx_mgmt_auth:del_app(<<"app_id">>),
-
     %% Use the default application secret
     application:set_env(emqx_management, application, [{default_secret, <<"public">>}]),
     {ok, AppSecret1} = emqx_mgmt_auth:add_app(<<"app_id">>, <<"app_name">>, <<"app_desc">>, true, undefined),
@@ -83,22 +82,12 @@ t_add_app(_Config) ->
     ?assertEqual([{<<"app_id">>, AppSecret1, <<"app_name">>, <<"app_desc">>, true, undefined}], emqx_mgmt_auth:list_apps()),
     emqx_mgmt_auth:del_app(<<"app_id">>),
     application:set_env(emqx_management, application, []),
-
     %% Specify the application secret
     {ok, AppSecret2} = emqx_mgmt_auth:add_app(<<"app_id">>, <<"app_name">>, <<"secret">>, <<"app_desc">>, true, undefined),
     ?assert(emqx_mgmt_auth:is_authorized(<<"app_id">>, AppSecret2)),
     ?assertEqual(AppSecret2, emqx_mgmt_auth:get_appsecret(<<"app_id">>)),
     ?assertEqual([{<<"app_id">>, AppSecret2, <<"app_name">>, <<"app_desc">>, true, undefined}], emqx_mgmt_auth:list_apps()),
     emqx_mgmt_auth:del_app(<<"app_id">>),
-    ok.
-
-t_del_app(_Config) ->
-    ok.
-
-t_check_app(_Config) ->
-    ok.
-
-t_check_app_acl(_Config) ->
     ok.
 
 t_log_cmd(_) ->
@@ -130,8 +119,8 @@ t_status_cmd(_) ->
 
 t_broker_cmd(_) ->
     ct:pal("start testing the broker command"),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["stats"]), "clients/count")),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["metrice"]), "bytes/received")).
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["stats"]), "subscriptions/shared")),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["metrice"]), "broker")).
 
 t_clients_cmd(_) ->
     ct:pal("start testing the client command"),
@@ -226,3 +215,34 @@ t_subscriptions_cmd(_) ->
      || Result <- emqx_mgmt_cli:subscriptions(["show", <<"client">>])],
     ?assertEqual(emqx_mgmt_cli:subscriptions(["add", "client", "b/b/c", "0"]), "\"ok~n\""),
     ?assertEqual(emqx_mgmt_cli:subscriptions(["del", "client", "b/b/c"]), "\"ok~n\"").
+
+t_listeners(_) ->
+    ?assertEqual(emqx_mgmt_cli:listeners([]), ok),
+    ?assertEqual(emqx_mgmt_cli:listeners(["stop", "mqtt:wss", "8084"]), "Stop mqtt:wss listener on 8084 successfully.\n").
+
+t_acl(_) ->
+    ct:pal("Start testing the acl command"),
+    ?assertEqual(emqx_mgmt_cli:acl(["reload"]), ok).
+
+t_plugins(_) ->
+    ?assertEqual(emqx_mgmt_cli:plugins(["list"]), ok),
+    ?assertEqual(emqx_mgmt_cli:plugins(["unload", "emqx_reloader"]), "Plugin emqx_reloader unloaded successfully.\n"),
+    ?assertEqual(emqx_mgmt_cli:plugins(["load", "emqx_reloader"]),"Start apps: [emqx_reloader]\nPlugin emqx_reloader loaded successfully.\n"),
+    ?assertEqual(emqx_mgmt_cli:plugins(["unload", "emqx_management"]), "\"Plugin emqx_management can not be unloaded ~n\"").
+
+t_cli(_) ->
+    [?assertMatch({match, _}, re:run(Value, "status")) || Value <- emqx_mgmt_cli:status([""])],
+    [?assertMatch({match, _}, re:run(Value, "broker")) || Value <- emqx_mgmt_cli:broker([""])],
+    [?assertMatch({match, _}, re:run(Value, "cluster")) || Value <- emqx_mgmt_cli:cluster([""])],
+    [?assertMatch({match, _}, re:run(Value, "clients")) || Value <- emqx_mgmt_cli:clients([""])],
+    [?assertMatch({match, _}, re:run(Value, "sessions")) || Value <- emqx_mgmt_cli:sessions([""])],
+    [?assertMatch({match, _}, re:run(Value, "routes")) || Value <- emqx_mgmt_cli:routes([""])],
+    [?assertMatch({match, _}, re:run(Value, "subscriptions")) || Value <- emqx_mgmt_cli:subscriptions([""])],
+    [?assertMatch({match, _}, re:run(Value, "plugins")) || Value <- emqx_mgmt_cli:plugins([""])],
+    [?assertMatch({match, _}, re:run(Value, "bridges")) || Value <- emqx_mgmt_cli:bridges([""])],
+    [?assertMatch({match, _}, re:run(Value, "listeners")) || Value <- emqx_mgmt_cli:listeners([""])],
+    [?assertMatch({match, _}, re:run(Value, "vm")) || Value <- emqx_mgmt_cli:vm([""])],
+    [?assertMatch({match, _}, re:run(Value, "mnesia")) || Value <- emqx_mgmt_cli:mnesia([""])],
+    [?assertMatch({match, _}, re:run(Value, "trace")) || Value <- emqx_mgmt_cli:trace([""])],
+    [?assertMatch({match, _}, re:run(Value, "acl")) || Value <- emqx_mgmt_cli:acl([""])],
+    [?assertMatch({match, _}, re:run(Value, "mgmt")) || Value <- emqx_mgmt_cli:mgmt([""])].

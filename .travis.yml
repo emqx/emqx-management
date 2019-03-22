@@ -10,8 +10,6 @@ script:
   - make dep-vsn-check
   - make rebar-compile
   - make rebar-xref
-  - make rebar-eunit
-  - make rebar-ct
 
 after_success:
   - make coveralls
