@@ -17,6 +17,8 @@
 -compile(export_all).
 -compile(nowarn_export_all).
 
+-include_lib("proper/include/proper.hrl").
+
 -include_lib("emqx/include/emqx.hrl").
 
 -include_lib("eunit/include/eunit.hrl").
@@ -35,7 +37,8 @@ groups() ->
       [t_app
       ]},
       {check_cli, [sequence],
-       [t_log_cmd,
+       [t_cli,
+        t_log_cmd,
         t_mgmt_cmd,
         t_status_cmd,
         t_clients_cmd,
@@ -216,7 +219,6 @@ t_subscriptions_cmd(_) ->
     ?assertEqual(emqx_mgmt_cli:subscriptions(["del", "client", "b/b/c"]), "\"ok~n\"").
 
 t_listeners(_) ->
-    emqx_mgmt_cli:listeners([]),
     ?assertEqual(emqx_mgmt_cli:listeners([]), ok),
     ?assertEqual(emqx_mgmt_cli:listeners(["stop", "mqtt:wss", "8084"]), "Stop mqtt:wss listener on 8084 successfully.\n").
 
@@ -225,7 +227,31 @@ t_acl(_) ->
     ?assertEqual(emqx_mgmt_cli:acl(["reload"]), ok).
 
 t_plugins(_) ->
-    emqx_mgmt_cli:plugins(["list"]),
+    ?assertEqual(emqx_mgmt_cli:plugins(["list"]), ok),
     ?assertEqual(emqx_mgmt_cli:plugins(["unload", "emqx_reloader"]), "Plugin emqx_reloader unloaded successfully.\n"),
     ?assertEqual(emqx_mgmt_cli:plugins(["load", "emqx_reloader"]),"Start apps: [emqx_reloader]\nPlugin emqx_reloader loaded successfully.\n"),
     ?assertEqual(emqx_mgmt_cli:plugins(["unload", "emqx_management"]), "\"Plugin emqx_management can not be unloaded ~n\"").
+
+t_cli(_) ->
+    emqx_ct_proper_helpers:run_proper(
+                                     fun() ->
+                                        ?FORALL(Par, any(), t_cli_case(Par))
+                                     end, [], 10).
+
+t_cli_case(Par) ->
+    [?assertMatch({match, _}, re:run(Value, "status")) || Value <- emqx_mgmt_cli:status(Par)],
+    [?assertMatch({match, _}, re:run(Value, "broker")) || Value <- emqx_mgmt_cli:broker(Par)],
+    [?assertMatch({match, _}, re:run(Value, "cluster")) || Value <- emqx_mgmt_cli:cluster(Par)],
+    [?assertMatch({match, _}, re:run(Value, "clients")) || Value <- emqx_mgmt_cli:clients(Par)],
+    [?assertMatch({match, _}, re:run(Value, "sessions")) || Value <- emqx_mgmt_cli:sessions(Par)],
+    [?assertMatch({match, _}, re:run(Value, "routes")) || Value <- emqx_mgmt_cli:routes(Par)],
+    [?assertMatch({match, _}, re:run(Value, "subscriptions")) || Value <- emqx_mgmt_cli:subscriptions(Par)],
+    [?assertMatch({match, _}, re:run(Value, "plugins")) || Value <- emqx_mgmt_cli:plugins(Par)],
+    [?assertMatch({match, _}, re:run(Value, "bridges")) || Value <- emqx_mgmt_cli:bridges(Par)],
+    [?assertMatch({match, _}, re:run(Value, "listeners")) || Value <- emqx_mgmt_cli:listeners(Par)],
+    [?assertMatch({match, _}, re:run(Value, "vm")) || Value <- emqx_mgmt_cli:vm(Par)],
+    [?assertMatch({match, _}, re:run(Value, "mnesia")) || Value <- emqx_mgmt_cli:mnesia(Par)],
+    [?assertMatch({match, _}, re:run(Value, "trace")) || Value <- emqx_mgmt_cli:trace(Par)],
+    [?assertMatch({match, _}, re:run(Value, "acl")) || Value <- emqx_mgmt_cli:acl(Par)],
+    [?assertMatch({match, _}, re:run(Value, "mgmt")) || Value <- emqx_mgmt_cli:mgmt(Par)],
+    true.
