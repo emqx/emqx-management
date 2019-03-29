@@ -93,7 +93,7 @@ mgmt(["list"]) ->
                   end, emqx_mgmt_auth:list_apps());
 
 mgmt(_) ->
-    emqx_cli:usage([{"mgmt list",                   "List Applications"},
+    emqx_cli:usage([{"mgmt list",                    "List Applications"},
                     {"mgmt insert <AppId> <Name>",   "Add Application of REST API"},
                     {"mgmt update <AppId> <status>", "Update Application of REST API"},
                     {"mgmt lookup <AppId>",          "Get Application of REST API"},
@@ -133,7 +133,7 @@ broker([]) ->
     [emqx_cli:print("~-10s: ~s~n", [Fun, emqx_sys:Fun()]) || Fun <- Funs];
 
 broker(["stats"]) ->
-    [emqx_cli:print("~-20s: ~w~n", [Stat, Val]) || {Stat, Val} <- emqx_stats:getstats()];
+    [emqx_cli:print("~-30s: ~w~n", [Stat, Val]) || {Stat, Val} <- lists:sort(emqx_stats:getstats())];
 
 broker(["metrics"]) ->
     [emqx_cli:print("~-24s: ~w~n", [Metric, Val]) || {Metric, Val} <- lists:sort(emqx_metrics:all())];
@@ -799,8 +799,10 @@ bin(S) -> iolist_to_binary(S).
 gen_config(App) ->
     Schema = cuttlefish_schema:files([filename:join([code:priv_dir(App), App]) ++ ".schema"]),
     Conf = cuttlefish_conf:file(filename:join([emqx_config:get_env(plugins_etc_dir), App]) ++ ".conf"),
-    [{_, Config}] = cuttlefish_generator:map(Schema, Conf),
-    Config.
+    case cuttlefish_generator:map(Schema, Conf) of
+        [] -> [];
+        [{_, Config}] -> Config
+    end.
 
 load_plugin(Plugin, Config) ->
     lists:foreach(fun({Key, Val}) -> application:set_env(Plugin, Key, Val) end, Config),
