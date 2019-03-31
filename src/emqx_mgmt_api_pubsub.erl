@@ -20,6 +20,8 @@
 
 -import(proplists, [get_value/2, get_value/3]).
 
+-import(minirest, [return/0, return/1]).
+
 -rest_api(#{name   => mqtt_subscribe,
             method => 'POST',
             path   => "/mqtt/subscribe",
@@ -50,12 +52,12 @@ subscribe(_Bindings, Params) ->
             TopicTable = parse_topic_filters(Topics, QoS),
             case emqx_mgmt:subscribe(ClientId, TopicTable) of
                 {error, Reason} -> 
-                    emqx_mgmt:return({ok, ?ERROR12, Reason});
+                    return({ok, ?ERROR12, Reason});
                 _ ->
-                    emqx_mgmt:return()
+                    return()
             end;
         false ->
-            emqx_mgmt:return({ok, ?ERROR15, bad_topic})
+            return({ok, ?ERROR15, bad_topic})
     end.
 
 publish(_Bindings, Params) ->
@@ -71,9 +73,9 @@ publish(_Bindings, Params) ->
                 Msg = emqx_message:make(ClientId, Qos, Topic, Payload),
                 emqx_mgmt:publish(Msg#message{flags = #{retain => Retain}})
             end, Topics),
-            emqx_mgmt:return();
+            return();
         false ->
-            emqx_mgmt:return({ok, ?ERROR15, bad_topic})
+            return({ok, ?ERROR15, bad_topic})
     end.
 
 unsubscribe(_Bindings, Params) ->
@@ -84,12 +86,12 @@ unsubscribe(_Bindings, Params) ->
         true ->
             case emqx_mgmt:unsubscribe(ClientId, Topic) of
                 {error, Reason} -> 
-                    emqx_mgmt:return({ok, ?ERROR12, Reason});
+                    return({ok, ?ERROR12, Reason});
                 _ -> 
-                    emqx_mgmt:return()
+                    return()
             end;
         false ->
-            emqx_mgmt:return({ok, ?ERROR15, bad_topic})
+            return({ok, ?ERROR15, bad_topic})
     end.
 
 topics(Type, undefined, Topics0) ->

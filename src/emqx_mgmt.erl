@@ -65,8 +65,6 @@
 %% Common Table API
 -export([count/1, tables/1, query_handle/1, item/2, max_row_limit/0]).
 
--export([return/0, return/1]).
-
 -define(MAX_ROW_LIMIT, 10000).
 
 -define(APP, emqx_management).
@@ -448,29 +446,6 @@ item(route, #route{topic = Topic, dest = Node}) ->
     #{topic => Topic, node => Node};
 item(route, {Topic, Node}) ->
     #{topic => Topic, node => Node}.
-
-return() ->
-    {ok, [{code, ?SUCCESS}]}.
-
-return({ok, #{data := Data, meta := Meta}}) ->
-    {ok, [{code, ?SUCCESS},
-          {data, Data},
-          {meta, Meta}]};
-return({ok, Data}) ->
-    {ok, [{code, ?SUCCESS},
-          {data, Data}]};
-return({ok, Code, Message}) when is_integer(Code) ->
-    {ok, [{code,    Code},
-          {message, Message}]};
-return({ok, Data, Meta}) ->
-    {ok, [{code, ?SUCCESS},
-          {data, Data},
-          {meta, Meta}]};
-return({error, Message}) ->
-    {ok, [{message, Message}]};
-return({error, Code, Message}) ->
-    {ok, [{code,    Code},
-          {message, Message}]}.
 
 %%--------------------------------------------------------------------
 %% Internel Functions.

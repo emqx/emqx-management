@@ -16,6 +16,8 @@
 
 -include_lib("emqx/include/emqx.hrl").
 
+-import(minirest, [return/0, return/1]).
+
 -rest_api(#{name   => list_routes,
             method => 'GET',
             path   => "/routes/",
@@ -31,10 +33,10 @@
 -export([list/2, lookup/2]).
 
 list(Bindings, Params) when map_size(Bindings) == 0 ->
-    emqx_mgmt:return({ok, emqx_mgmt_api:paginate(emqx_route, Params, fun format/1)}).
+    return({ok, emqx_mgmt_api:paginate(emqx_route, Params, fun format/1)}).
 
 lookup(#{topic := Topic}, _Params) ->
-    emqx_mgmt:return({ok, [format(R) || R <- emqx_mgmt:lookup_routes(http_uri:decode(Topic))]}).
+    return({ok, [format(R) || R <- emqx_mgmt:lookup_routes(http_uri:decode(Topic))]}).
 format(#route{topic = Topic, dest = {_, Node}}) ->
     #{topic => Topic, node => Node};
 format(#route{topic = Topic, dest = Node}) ->
