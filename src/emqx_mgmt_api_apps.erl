@@ -18,6 +18,8 @@
 
 -import(proplists, [get_value/2]).
 
+-import(minirest, [return/0, return/1]).
+
 -rest_api(#{name   => add_app,
             method => 'POST',
             path   => "/apps/",
@@ -58,14 +60,14 @@ add_app(_Bindings, Params) ->
     Status = get_value(<<"status">>, Params),
     Expired = get_value(<<"expired">>, Params),
     case emqx_mgmt_auth:add_app(AppId, Name, Secret, Desc, Status, Expired) of
-        {ok, AppSecret} -> emqx_mgmt:return({ok, [{secret, AppSecret}]});
-        {error, Reason} -> emqx_mgmt:return({error, ?ERROR2, Reason})
+        {ok, AppSecret} -> return({ok, [{secret, AppSecret}]});
+        {error, Reason} -> return({error, ?ERROR2, Reason})
     end.
 
 del_app(#{appid := AppId}, _Params) ->
     case emqx_mgmt_auth:del_app(AppId) of
-        ok -> emqx_mgmt:return();
-        {error, Reason} -> emqx_mgmt:return({error, ?ERROR2, Reason})
+        ok -> return();
+        {error, Reason} -> return({error, ?ERROR2, Reason})
     end.
 
 list_apps(_Bindings, _Params) ->
@@ -74,14 +76,14 @@ list_apps(_Bindings, _Params) ->
 lookup_app(#{appid := AppId}, _Params) ->
     case emqx_mgmt_auth:lookup_app(AppId) of
         {AppId, AppSecret, Name, Desc, Status, Expired} ->
-            emqx_mgmt:return({ok, [{app_id, AppId},
+            return({ok, [{app_id, AppId},
                                    {secret, AppSecret},
                                    {name, Name},
                                    {desc, Desc},
                                    {status, Status},
                                    {expired, Expired}]});
         undefined ->
-            emqx_mgmt:return({ok, []})
+            return({ok, []})
     end.
 
 update_app(#{appid := AppId}, Params) ->
@@ -90,8 +92,8 @@ update_app(#{appid := AppId}, Params) ->
     Status = get_value(<<"status">>, Params),
     Expired = get_value(<<"expired">>, Params),
     case emqx_mgmt_auth:update_app(AppId, Name, Desc, Status, Expired) of
-        ok -> emqx_mgmt:return();
-        {error, Reason} -> emqx_mgmt:return({error, ?ERROR2, Reason})
+        ok -> return();
+        {error, Reason} -> return({error, ?ERROR2, Reason})
     end.
 
 format({AppId, _AppSecret, Name, Desc, Status, Expired}) ->
