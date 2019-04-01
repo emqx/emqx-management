@@ -14,6 +14,8 @@
 
 -module(emqx_mgmt_api_listeners).
 
+-import(minirest, [return/0, return/1]).
+
 -rest_api(#{name   => list_listeners,
             method => 'GET',
             path   => "/listeners/",
@@ -30,11 +32,11 @@
 
 %% List listeners on a node.
 list(#{node := Node}, _Params) ->
-    emqx_mgmt:return({ok, format(emqx_mgmt:list_listeners(Node))});
+    return({ok, format(emqx_mgmt:list_listeners(Node))});
 
 %% List listeners in the cluster.
 list(_Binding, _Params) ->
-    emqx_mgmt:return({ok, [#{node => Node, listeners => format(Listeners)}
+    return({ok, [#{node => Node, listeners => format(Listeners)}
                               || {Node, Listeners} <- emqx_mgmt:list_listeners()]}).
 
 format(Listeners) when is_list(Listeners) ->

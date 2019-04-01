@@ -20,6 +20,8 @@
 
 -import(proplists, [get_value/2]).
 
+-import(minirest, [return/0, return/1]).
+
 -rest_api(#{name   => list_banned,
             method => 'GET',
             path   => "/banned/",
@@ -41,7 +43,7 @@
 -export([list/2, create/2, delete/2]).
 
 list(_Bindings, Params) ->
-    emqx_mgmt:return({ok, emqx_mgmt_api:paginate(emqx_banned, Params, fun format/1)}).
+    return({ok, emqx_mgmt_api:paginate(emqx_banned, Params, fun format/1)}).
 
 create(_Bindings, Params) ->
     case pipeline(Params, create, [fun ensure_required/2,
@@ -49,9 +51,9 @@ create(_Bindings, Params) ->
                                    fun pack_banned/2]) of
         {ok, Banned} ->
             ok = emqx_mgmt:create_banned(Banned),
-            emqx_mgmt:return({ok, Params});
+            return({ok, Params});
         {error, Code, Message} -> 
-            emqx_mgmt:return({error, Code, Message})
+            return({error, Code, Message})
     end.
 
 delete(#{who := Who}, Params) ->
@@ -60,15 +62,15 @@ delete(#{who := Who}, Params) ->
                                    fun fetch_as/2]) of
         {ok, <<"ip_address">>} ->
             emqx_mgmt:delete_banned({ip_address, inet:parse_address(str(Who))}),
-            emqx_mgmt:return();
+            return();
         {ok, <<"username">>} ->
             emqx_mgmt:delete_banned({username, bin(Who)}),
-            emqx_mgmt:return();
+            return();
         {ok, <<"client_id">>} ->
             emqx_mgmt:delete_banned({client_id, bin(Who)}),
-            emqx_mgmt:return();
+            return();
         {error, Code, Message} -> 
-            emqx_mgmt:return({error, Code, Message})
+            return({error, Code, Message})
     end.
 
 %% Go through plugs in pipeline

@@ -16,6 +16,8 @@
 
 -include_lib("emqx/include/emqx.hrl").
 
+-import(minirest, [return/0, return/1]).
+
 -rest_api(#{name   => list_subscriptions,
             method => 'GET',
             path   => "/subscriptions/",
@@ -47,28 +49,28 @@ list(Bindings, Params) when map_size(Bindings) == 0 ->
     list(#{node => node()}, Params);
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    emqx_mgmt:return({ok, emqx_mgmt_api:paginate(emqx_suboption, Params, fun format/1)});
+    return({ok, emqx_mgmt_api:paginate(emqx_suboption, Params, fun format/1)});
 
 list(#{node := Node} = Bindings, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
-        {badrpc, Reason} -> emqx_mgmt:return({error, Reason});
+        {badrpc, Reason} -> return({error, Reason});
         Res -> Res
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
     case ets:lookup(emqx_subid, http_uri:decode(ClientId)) of
         [] ->
-            emqx_mgmt:return({ok, []});
+            return({ok, []});
         [{_, Pid}] ->
-            emqx_mgmt:return({ok, format(emqx_mgmt:lookup_subscriptions(Node, Pid))})
+            return({ok, format(emqx_mgmt:lookup_subscriptions(Node, Pid))})
     end;
 
 lookup(#{clientid := ClientId}, _Params) ->
     case ets:lookup(emqx_subid, http_uri:decode(ClientId)) of
         [] ->
-            emqx_mgmt:return({ok, []});
+            return({ok, []});
         [{_, Pid}] ->
-            emqx_mgmt:return({ok, format(emqx_mgmt:lookup_subscriptions(Pid))})
+            return({ok, format(emqx_mgmt:lookup_subscriptions(Pid))})
     end.
 
 format(Items) when is_list(Items) ->
