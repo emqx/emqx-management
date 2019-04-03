@@ -77,7 +77,7 @@ lookup(#{clientid := ClientId}, _Params) ->
 kickout(#{clientid := ClientId}, _Params) ->
     case emqx_mgmt:kickout_conn(http_uri:decode(ClientId)) of
         ok -> return();
-        {error, Reason} -> return({error, Reason})
+        {error, Reason} -> return({error, ?ERROR12, Reason})
     end.
 
 format(ClientList) when is_list(ClientList) ->
