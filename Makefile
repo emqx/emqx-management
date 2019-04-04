@@ -53,6 +53,9 @@ rebar-compile: rebar-deps
 rebar-ct: app.config
 	rebar3 ct
 
+rebar-cover:
+	rebar3 cover
+
 rebar-eunit: $(CUTTLEFISH_SCRIPT)
 	@rebar3 eunit
 

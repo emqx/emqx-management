@@ -14,7 +14,7 @@
 
 -module(emqx_mgmt_api_nodes).
 
--import(minirest, [return/0, return/1]).
+-import(minirest, [return/1]).
 
 -rest_api(#{name   => list_nodes,
             method => 'GET',

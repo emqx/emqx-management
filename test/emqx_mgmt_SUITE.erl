@@ -26,8 +26,6 @@
 -define(LOG_LEVELS,["debug", "error", "info"]).
 -define(LOG_HANDLER_ID, [file, default]).
 
--import(emqx_ct_helpers, [deps_path/2]).
-
 all() ->
     [{group, manage_apps},
      {group, check_cli}].
