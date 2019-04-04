@@ -16,7 +16,7 @@
 
 -include_lib("emqx/include/emqx.hrl").
 
--import(minirest, [return/0, return/1]).
+-import(minirest, [return/1]).
 
 -rest_api(#{name   => list_routes,
             method => 'GET',

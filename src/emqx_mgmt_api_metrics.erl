@@ -14,7 +14,7 @@
 
 -module(emqx_mgmt_api_metrics).
 
--import(minirest, [return/0, return/1]).
+-import(minirest, [return/1]).
 
 -rest_api(#{name   => list_all_metrics,
             method => 'GET',

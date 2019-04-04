@@ -57,8 +57,7 @@ apps() ->
 init_per_suite(Config) ->
     ekka_mnesia:start(),
     emqx_mgmt_auth:mnesia(boot),
-    emqx_ct_helpers:start_apps([emqx, emqx_management, emqx_reloader],
-                               [{plugins_etc_dir, emqx_management, "test/etc/"}, {acl_file, emqx, "etc/acl.conf"}]),
+    emqx_ct_helpers:start_apps([emqx_management, emqx_reloader]),
     Config.
 
 end_per_suite(_Config) ->
