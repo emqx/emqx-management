@@ -3,7 +3,7 @@ PROJECT_DESCRIPTION = EMQ X Management API and CLI
 PROJECT_MOD = emqx_mgmt_app
 
 DEPS = minirest clique
-dep_minirest = git-emqx https://github.com/emqx/minirest v0.2.0
+dep_minirest = git-emqx https://github.com/emqx/minirest v0.2.2
 dep_clique   = git-emqx https://github.com/emqx/clique v0.3.11
 
 LOCAL_DEPS = mnesia
@@ -52,6 +52,9 @@ rebar-compile: rebar-deps
 
 rebar-ct: app.config
 	rebar3 ct
+
+rebar-cover:
+	rebar3 cover
 
 rebar-eunit: $(CUTTLEFISH_SCRIPT)
 	@rebar3 eunit

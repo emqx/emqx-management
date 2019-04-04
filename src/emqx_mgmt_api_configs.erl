@@ -20,6 +20,8 @@
 
 -import(proplists, [get_value/2]).
 
+-import(minirest, [return/0, return/1]).
+
 -rest_api(#{name   => get_all_configs,
             method => 'GET',
             path   => "/configs/",
@@ -59,11 +61,12 @@
 -export([get_configs/2, update_config/2, get_plugin_configs/2, update_plugin_configs/2]).
 
 get_configs(#{node := Node}, _Params) ->
-    emqx_mgmt:return({ok, format(emqx_mgmt:get_all_configs(Node))});
+    return({ok, format(emqx_mgmt:get_all_configs(Node))});
 
 get_configs(_Binding, _Params) ->
-    emqx_mgmt:return({ok, 
-                      [#{node => Node,  config => format(Configs)} || {Node, Configs} <- emqx_mgmt:get_all_configs()]}).
+    return({ok, [#{node => Node,
+                   config => format(Configs)}
+                 || {Node, Configs} <- emqx_mgmt:get_all_configs()]}).
 
 update_config(Binding = #{app := App}, Params) ->
     Key   = binary_to_list(get_value(<<"key">>, Params)),
@@ -76,25 +79,25 @@ update_config(Binding = #{app := App}, Params) ->
     end,
     case Result of
         ok -> 
-            emqx_mgmt:return();
+            return();
         {error, Reason} ->
-            emqx_mgmt:return({error, ?ERROR2, Reason})
+            return({error, ?ERROR2, Reason})
     end.
 
 get_plugin_configs(#{node := Node, plugin := Plugin}, _Params) ->
     {ok, Configs} = emqx_mgmt:get_plugin_configs(Node, Plugin),
-    emqx_mgmt:return({ok, [format_plugin_config(Config) || Config <- Configs]}).
+    return({ok, [format_plugin_config(Config) || Config <- Configs]}).
 
 update_plugin_configs(#{node := Node, plugin := Plugin}, Params) ->
     case emqx_mgmt:update_plugin_configs(Node, Plugin, Params) of
         ok  ->
             case ensure_reload_plugin(Plugin) of
-                ok -> emqx_mgmt:return();
-                _ -> emqx_mgmt:return({error, ?ERROR2, unknown_error})
+                ok -> return();
+                _ -> return({error, ?ERROR2, unknown_error})
             end;
         Error ->
             logger:error("MGMT update_plugin_configs error:~p~n", [Error]),
-            emqx_mgmt:return({error, ?ERROR2, unknown_error})
+            return({error, ?ERROR2, unknown_error})
     end.
 
 ensure_reload_plugin(Plugin) ->

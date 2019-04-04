@@ -19,6 +19,8 @@
 -include_lib("emqx/include/emqx_mqtt.hrl").
 -include_lib("emqx/include/emqx.hrl").
 
+-import(minirest, [return/0, return/1]).
+
 -rest_api(#{name   => list_connections,
             method => 'GET',
             path   => "/connections/",
@@ -58,24 +60,24 @@ list(Bindings, Params) when map_size(Bindings) == 0 ->
     list(#{node => node()}, Params);
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    emqx_mgmt:return({ok, emqx_mgmt_api:paginate(emqx_conn, Params, fun format/1)});
+    return({ok, emqx_mgmt_api:paginate(emqx_conn, Params, fun format/1)});
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
-        {badrpc, Reason} -> emqx_mgmt:return({error, ?ERROR2, Reason});
+        {badrpc, Reason} -> return({error, ?ERROR2, Reason});
         Res -> Res
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    emqx_mgmt:return({ok, emqx_mgmt:lookup_conn(Node, http_uri:decode(ClientId), fun format/1)});
+    return({ok, emqx_mgmt:lookup_conn(Node, http_uri:decode(ClientId), fun format/1)});
 
 lookup(#{clientid := ClientId}, _Params) ->
-    emqx_mgmt:return({ok, emqx_mgmt:lookup_conn(http_uri:decode(ClientId), fun format/1)}).
+    return({ok, emqx_mgmt:lookup_conn(http_uri:decode(ClientId), fun format/1)}).
 
 kickout(#{clientid := ClientId}, _Params) ->
     case emqx_mgmt:kickout_conn(http_uri:decode(ClientId)) of
-        ok -> emqx_mgmt:return();
-        {error, Reason} -> emqx_mgmt:return({error, Reason})
+        ok -> return();
+        {error, Reason} -> return({error, ?ERROR12, Reason})
     end.
 
 format(ClientList) when is_list(ClientList) ->
