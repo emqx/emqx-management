@@ -49,7 +49,7 @@ groups() ->
         t_subscriptions_cmd,
         t_acl,
         t_listeners
-        ]}].
+       ]}].
 
 apps() ->
     [emqx, emqx_management, emqx_reloader].
@@ -170,6 +170,7 @@ t_vm_cmd(_) ->
 
 t_trace_cmd(_) ->
     ct:pal("start testing the trace command"),
+    logger:set_primary_config(level, debug),
     {ok, T} = emqx_client:start_link([{host, "localhost"},
                                       {client_id, <<"client">>},
                                       {username, <<"testuser">>},
