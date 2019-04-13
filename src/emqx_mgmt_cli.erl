@@ -21,13 +21,25 @@
 
 -import(lists, [foreach/2]).
 
--import(proplists, [get_value/2]).
-
 -export([load/0]).
 
--export([status/1, broker/1, cluster/1, clients/1, sessions/1,
-         routes/1, subscriptions/1, plugins/1, bridges/1,
-         listeners/1, vm/1, mnesia/1, trace/1, log/1, acl/1, mgmt/1]).
+-export([ status/1
+        , broker/1
+        , cluster/1
+        , clients/1
+        , sessions/1
+        , routes/1
+        , subscriptions/1
+        , plugins/1
+        , bridges/1
+        , listeners/1
+        , vm/1
+        , mnesia/1
+        , trace/1
+        , log/1
+        , acl/1
+        , mgmt/1
+        ]).
 
 -define(PROC_INFOKEYS, [status,
                         memory,
@@ -524,7 +536,7 @@ vm(["process"]) ->
 
 vm(["io"]) ->
     IoInfo = lists:usort(lists:flatten(erlang:system_info(check_io))),
-    [emqx_cli:print("io/~-21s: ~w~n", [Key, get_value(Key, IoInfo)]) || Key <- [max_fds, active_fds]];
+    [emqx_cli:print("io/~-21s: ~w~n", [Key, proplists:get_value(Key, IoInfo)]) || Key <- [max_fds, active_fds]];
 
 vm(["ports"]) ->
     [emqx_cli:print("ports/~-16s: ~w~n", [Name, erlang:system_info(Key)]) || {Name, Key} <- [{count, port_count}, {limit, port_limit}]];
@@ -743,7 +755,7 @@ print({emqx_conn, Key}) ->
                 peername,
                 connected_at],
     emqx_cli:print("Connection(~s, clean_start=~s, username=~s, peername=~s, connected_at=~p)~n",
-                   [format(K, get_value(K, Attrs)) || K <- InfoKeys]);
+                   [format(K, maps:get(K, Attrs)) || K <- InfoKeys]);
 
 print({emqx_session, Key}) ->
     [{_, Attrs}] = ets:lookup(emqx_session_attrs, Key),
@@ -765,7 +777,7 @@ print({emqx_session, Key}) ->
                     "subscriptions_count=~w, max_inflight=~w, inflight=~w, "
                     "mqueue_len=~w, mqueue_dropped=~w, awaiting_rel=~w, "
                     "deliver_msg=~w, enqueue_msg=~w, created_at=~w)~n",
-                    [format(K, get_value(K, Attrs++Stats)) || K <- InfoKeys]);
+                    [format(K, proplists:get_value(K, Attrs++Stats)) || K <- InfoKeys]);
 
 print({emqx_route, #route{topic = Topic, dest = {_, Node}}}) ->
     emqx_cli:print("~s -> ~s~n", [Topic, Node]);

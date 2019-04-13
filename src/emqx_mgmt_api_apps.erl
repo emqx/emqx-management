@@ -18,7 +18,9 @@
 
 -import(proplists, [get_value/2]).
 
--import(minirest, [return/0, return/1]).
+-import(minirest, [ return/0
+                  , return/1
+                  ]).
 
 -rest_api(#{name   => add_app,
             method => 'POST',
@@ -50,7 +52,12 @@
             func   => update_app,
             descr  => "Update Application"}).
 
--export([add_app/2, del_app/2, list_apps/2, lookup_app/2, update_app/2]).
+-export([ add_app/2
+        , del_app/2
+        , list_apps/2
+        , lookup_app/2
+        , update_app/2
+        ]).
 
 add_app(_Bindings, Params) ->
     AppId = get_value(<<"app_id">>, Params),
@@ -98,8 +105,3 @@ update_app(#{appid := AppId}, Params) ->
 
 format({AppId, _AppSecret, Name, Desc, Status, Expired}) ->
     [{app_id, AppId}, {name, Name}, {desc, Desc}, {status, Status}, {expired, Expired}].
-
-
-
-
-

@@ -20,7 +20,9 @@
 
 -import(proplists, [get_value/2]).
 
--import(minirest, [return/0, return/1]).
+-import(minirest, [ return/0
+                  , return/1
+                  ]).
 
 -rest_api(#{name   => get_all_configs,
             method => 'GET',
@@ -58,7 +60,11 @@
             func   => update_plugin_configs,
             descr  => "Update configurations of a plugin on the node"}).
 
--export([get_configs/2, update_config/2, get_plugin_configs/2, update_plugin_configs/2]).
+-export([ get_configs/2
+        , update_config/2
+        , get_plugin_configs/2
+        , update_plugin_configs/2
+        ]).
 
 get_configs(#{node := Node}, _Params) ->
     return({ok, format(emqx_mgmt:get_all_configs(Node))});

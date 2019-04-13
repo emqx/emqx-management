@@ -28,7 +28,9 @@
             func   => lookup,
             descr  => "A list of stats of a node"}).
 
--export([list/2, lookup/2]).
+-export([ list/2
+        , lookup/2
+        ]).
 
 %% List stats of all nodes
 list(Bindings, _Params) when map_size(Bindings) == 0 ->

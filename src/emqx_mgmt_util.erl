@@ -16,7 +16,11 @@
 
 -author("Feng Lee <feng@emqtt.io>").
 
--export([strftime/1, datetime/1, kmg/1, ntoa/1]).
+-export([ strftime/1
+        , datetime/1
+        , kmg/1
+        , ntoa/1
+        ]).
 
 -define(KB, 1024).
 -define(MB, (1024*1024)).
