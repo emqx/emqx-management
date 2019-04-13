@@ -20,7 +20,8 @@
 
 -import(proplists, [get_value/2]).
 
--import(minirest, [return/0, return/1]).
+-import(minirest, [ return/0
+                  , return/1]).
 
 -rest_api(#{name   => get_all_configs,
             method => 'GET',

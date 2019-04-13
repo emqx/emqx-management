@@ -52,7 +52,7 @@ rebar-compile: rebar-deps
 	rebar3 compile
 
 rebar-ct: app.config
-	rebar3 ct
+	rebar3 ct -v
 
 rebar-cover:
 	rebar3 cover
