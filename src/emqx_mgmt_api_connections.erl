@@ -108,8 +108,9 @@ kickout(#{clientid := ClientId}, _Params) ->
 format(ClientList) when is_list(ClientList) ->
     [format(Client) || Client <- ClientList];
 format(Client = {_ClientId, _Pid}) ->
-    Data = get_emqx_conn_attrs(Client) ++ get_emqx_conn_stats(Client),
-    adjust_format(maps:from_list(Data)).
+    Data = maps:merge(get_emqx_conn_attrs(Client),
+                      maps:from_list(get_emqx_conn_stats(Client))),
+    adjust_format(Data).
 
 get_emqx_conn_attrs(TabKey) ->
     case ets:lookup(emqx_conn_attrs, TabKey) of

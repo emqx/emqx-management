@@ -225,7 +225,7 @@ kickout_conn(Node, ClientId) when Node =:= node() ->
     case emqx_cm:get_conn_attrs(ClientId, Cpid) of
         [] -> {error, not_found};
         Attrs ->
-            Module = proplists:get_value(conn_mod, Attrs),
+            Module = maps:get(conn_mod, Attrs),
             Module:kick(Cpid)
     end;
 
