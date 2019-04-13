@@ -43,7 +43,8 @@
             descr  => "A list of subscriptions of a client on the node"}).
 
 -export([ list/2
-        , lookup/2]).
+        , lookup/2
+        ]).
 
 list(Bindings, Params) when map_size(Bindings) == 0 ->
     %%TODO: across nodes?

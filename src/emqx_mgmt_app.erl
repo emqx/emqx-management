@@ -19,7 +19,8 @@
 -emqx_plugin(?MODULE).
 
 -export([ start/2
-        , stop/1]).
+        , stop/1
+        ]).
 
 start(_Type, _Args) ->
     {ok, Sup} = emqx_mgmt_sup:start_link(),

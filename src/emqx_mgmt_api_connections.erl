@@ -20,7 +20,8 @@
 -include_lib("emqx/include/emqx.hrl").
 
 -import(minirest, [ return/0
-                  , return/1]).
+                  , return/1
+                  ]).
 
 -rest_api(#{name   => list_connections,
             method => 'GET',
@@ -67,12 +68,14 @@
             descr  => "Kick out a connection"}).
 
 -import(emqx_mgmt_util, [ ntoa/1
-                        , strftime/1]).
+                        , strftime/1
+                        ]).
 
 -export([ list/2
         , lookup/2
         , kickout/2
-        , lookup_via_username/2]).
+        , lookup_via_username/2
+        ]).
 
 list(Bindings, Params) when map_size(Bindings) == 0 ->
     %%TODO: across nodes?

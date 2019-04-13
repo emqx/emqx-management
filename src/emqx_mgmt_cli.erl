@@ -38,7 +38,8 @@
         , trace/1
         , log/1
         , acl/1
-        , mgmt/1]).
+        , mgmt/1
+        ]).
 
 -define(PROC_INFOKEYS, [status,
                         memory,

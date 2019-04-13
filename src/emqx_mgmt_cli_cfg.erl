@@ -22,7 +22,8 @@
          , get_cfg/2
          , get_cfg/3
          , read_config/1
-         , write_config/2]).
+         , write_config/2
+         ]).
 
 -define(APP, emqx).
 

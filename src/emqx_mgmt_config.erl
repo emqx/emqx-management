@@ -29,7 +29,8 @@
         , reload/1
         , get/2
         , get/3
-        , set/3]).
+        , set/3
+        ]).
 
 -type(env() :: {atom(), term()}).
 

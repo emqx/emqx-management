@@ -19,7 +19,8 @@
 -import(proplists, [get_value/2]).
 
 -import(minirest, [ return/0
-                  , return/1]).
+                  , return/1
+                  ]).
 
 -rest_api(#{name   => add_app,
             method => 'POST',
@@ -55,7 +56,8 @@
         , del_app/2
         , list_apps/2
         , lookup_app/2
-        , update_app/2]).
+        , update_app/2
+        ]).
 
 add_app(_Bindings, Params) ->
     AppId = get_value(<<"app_id">>, Params),
