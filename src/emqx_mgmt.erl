@@ -35,7 +35,8 @@
 -export([ get_metrics/0
         , get_metrics/1
         , get_stats/0
-        , get_stats/1]).
+        , get_stats/1
+        ]).
 
 %% Clients, Sessions
 -export([ list_conns/1
@@ -44,39 +45,47 @@
         , lookup_conn_via_username/2
         , lookup_conn_via_username/3
         , kickout_conn/1
-        , kickout_conn/2]).
+        , kickout_conn/2
+        ]).
 
 -export([ list_sessions/1
         , lookup_session/1
-        , lookup_session/2]).
+        , lookup_session/2
+        ]).
 
 %% Subscriptions
 -export([ list_subscriptions/1
         , lookup_subscriptions/1
-        , lookup_subscriptions/2]).
+        , lookup_subscriptions/2
+        ]).
 
 %% Routes
 -export([ list_routes/0
-        , lookup_routes/1]).
+        , lookup_routes/1
+        ]).
 
 %% PubSub
 -export([ subscribe/2
         , publish/1
-        , unsubscribe/2]).
+        , unsubscribe/2
+        ]).
 
 %% Plugins
 -export([ list_plugins/0
         , list_plugins/1
         , load_plugin/2
-        , unload_plugin/2]).
+        , unload_plugin/2
+        ]).
 
 %% Listeners
 -export([ list_listeners/0
-        , list_listeners/1]).
+        , list_listeners/1
+        ]).
 
 %% Alarms
 -export([ get_alarms/0
-        , get_alarms/1]).
+        , get_alarms/1
+        ]).
 
 %% Configs
 -export([ update_configs/2
@@ -87,18 +96,21 @@
         , get_plugin_configs/1
         , get_plugin_configs/2
         , update_plugin_configs/2
-        , update_plugin_configs/3]).
+        , update_plugin_configs/3
+        ]).
 
 %% Banned
 -export([ create_banned/1
-        , delete_banned/1]).
+        , delete_banned/1
+        ]).
 
 %% Common Table API
 -export([ count/1
         , tables/1
         , query_handle/1
         , item/2
-        , max_row_limit/0]).
+        , max_row_limit/0
+        ]).
 
 -define(MAX_ROW_LIMIT, 10000).
 
