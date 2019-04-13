@@ -20,7 +20,8 @@
 
 -export([ start_listeners/0
         , handle_request/2
-        , stop_listeners/0]).
+        , stop_listeners/0
+        ]).
 
 -export([init/2]).
 

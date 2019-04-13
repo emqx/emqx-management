@@ -30,7 +30,8 @@
         , update_app/2
         , update_app/5
         , del_app/1
-        , list_apps/0]).
+        , list_apps/0
+        ]).
 
 %% APP Auth/ACL API
 -export([is_authorized/2]).

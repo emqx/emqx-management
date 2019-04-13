@@ -44,7 +44,10 @@
             func   => unload,
             descr  => "Unload a plugin"}).
 
--export([list/2, load/2, unload/2]).
+-export([ list/2
+        , load/2
+        , unload/2
+        ]).
 
 list(#{node := Node}, _Params) ->
     return({ok, [format(Plugin) || Plugin <- emqx_mgmt:list_plugins(Node)]});

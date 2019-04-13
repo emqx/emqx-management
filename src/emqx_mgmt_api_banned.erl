@@ -21,7 +21,8 @@
 -import(proplists, [get_value/2]).
 
 -import(minirest, [ return/0
-                  , return/1]).
+                  , return/1
+                  ]).
 
 -rest_api(#{name   => list_banned,
             method => 'GET',
@@ -41,7 +42,10 @@
             func   => delete,
             descr  => "Delete banned"}).
 
--export([list/2, create/2, delete/2]).
+-export([ list/2
+        , create/2
+        , delete/2
+        ]).
 
 list(_Bindings, Params) ->
     return({ok, emqx_mgmt_api:paginate(emqx_banned, Params, fun format/1)}).

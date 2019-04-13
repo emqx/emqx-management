@@ -43,7 +43,8 @@
             descr  => "Lookup a session on the node"}).
 
 -export([ list/2
-        , lookup/2]).
+        , lookup/2
+        ]).
 
 list(Bindings, Params) when map_size(Bindings) =:= 0 ->
     %%TODO: across nodes?

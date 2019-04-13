@@ -30,7 +30,9 @@
             func   => get,
             descr  => "Get broker info of a node"}).
 
--export([list/2, get/2]).
+-export([ list/2
+        , get/2
+        ]).
 
 list(_Bindings, _Params) ->
     return({ok, [Info#{node => Node} || {Node, Info} <- emqx_mgmt:list_brokers()]}).
