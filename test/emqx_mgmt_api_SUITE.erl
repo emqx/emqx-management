@@ -137,14 +137,20 @@ configs(_) ->
 
 connections_and_sessions(_) ->
     process_flag(trap_exit, true),
-    Options = #{username => <<"Gilbert">>},
+    Username = <<"Gilbert">>,
+    Options = #{username => Username},
     ClientId1 = <<"client1">>,
     ClientId2 = <<"client2">>,
     {ok, C1} = emqx_client:start_link(Options#{client_id => ClientId1}),
     {ok, _} = emqx_client:connect(C1),
     {ok, C2} = emqx_client:start_link(Options#{client_id => ClientId2}),
     {ok, _} = emqx_client:connect(C2),
-    
+
+    {ok, ConsViaUsername} = request_api(get, api_path(["nodes", atom_to_list(node()),
+                                                      "connection",
+                                                      "username", binary_to_list(Username)])
+                                      , auth_header_()),
+    ?assertEqual(2, length(get(data, ConsViaUsername))),
     {ok, Conns} = request_api(get, api_path(["connections"]), "_limit=100&_page=1", 
                               auth_header_()),
     ?assertEqual(2, proplists:get_value(<<"count">>, get(meta, Conns))),

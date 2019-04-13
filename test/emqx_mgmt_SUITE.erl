@@ -98,8 +98,7 @@ t_log_cmd(_) ->
                      emqx_mgmt_cli:log(["set-level", Level]),
                      ?assertEqual(Level++"\n", emqx_mgmt_cli:log(["primary-level"]))
                   end, ?LOG_LEVELS),
-    [
-        lists:foreach(fun(Level) ->
+    [lists:foreach(fun(Level) ->
                          ?assertEqual(Level++"\n", emqx_mgmt_cli:log(["handlers", "set-level",
                                                                       atom_to_list(Id), Level]))
                       end, ?LOG_LEVELS)

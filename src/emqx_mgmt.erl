@@ -205,10 +205,8 @@ lookup_conn_via_username(Username, FormatFun) ->
                   || Node <- ekka_mnesia:running_nodes()]).
 
 lookup_conn_via_username(Node, Username, FormatFun) when Node =:= node() ->
-    MsFun = fun({Key, #{username := Username0}}) when Username0 =:= Username -> Key end,
-    MatchSpec = ets:fun2ms(MsFun),
-    ets:select(emqx_conn, MatchSpec),
-    FormatFun(ets:lookup(emqx_conn, Username));
+    MatchSpec = [{{'$1',#{username => '$2'}}, [{'=:=','$2', Username}], ['$1']}],
+    FormatFun(ets:select(emqx_conn_attrs, MatchSpec));
 
 lookup_conn_via_username(Node, Username, FormatFun) ->
     rpc_call(Node, lookup_conn_via_username, [Node, Username, FormatFun]).
