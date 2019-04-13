@@ -25,9 +25,22 @@
 
 -export([load/0]).
 
--export([status/1, broker/1, cluster/1, clients/1, sessions/1,
-         routes/1, subscriptions/1, plugins/1, bridges/1,
-         listeners/1, vm/1, mnesia/1, trace/1, log/1, acl/1, mgmt/1]).
+-export([ status/1
+        , broker/1
+        , cluster/1
+        , clients/1
+        , sessions/1
+        , routes/1
+        , subscriptions/1
+        , plugins/1
+        , bridges/1
+        , listeners/1
+        , vm/1
+        , mnesia/1
+        , trace/1
+        , log/1
+        , acl/1
+        , mgmt/1]).
 
 -define(PROC_INFOKEYS, [status,
                         memory,

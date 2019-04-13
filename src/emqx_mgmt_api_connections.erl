@@ -19,7 +19,8 @@
 -include_lib("emqx/include/emqx_mqtt.hrl").
 -include_lib("emqx/include/emqx.hrl").
 
--import(minirest, [return/0, return/1]).
+-import(minirest, [ return/0
+                  , return/1]).
 
 -rest_api(#{name   => list_connections,
             method => 'GET',
@@ -45,15 +46,33 @@
             func   => lookup,
             descr  => "Lookup a connection in the cluster"}).
 
+-rest_api(#{name   => lookup_node_connection_via_username,
+            method => 'GET',
+            path   => "/nodes/:atom:node/connection/username/:bin:username",
+            func   => lookup_via_username,
+            descr  => "Lookup a connection via username in the cluster "
+           }).
+
+-rest_api(#{name   => lookup_connection_via_username,
+            method => 'GET',
+            path   => "/connection/username/:bin:username",
+            func   => lookup_via_username,
+            descr  => "Lookup a connection via username on a node "
+           }).
+
 -rest_api(#{name   => kickout_connection,
             method => 'DELETE',
             path   => "/connections/:bin:clientid",
             func   => kickout,
             descr  => "Kick out a connection"}).
 
--import(emqx_mgmt_util, [ntoa/1, strftime/1]).
+-import(emqx_mgmt_util, [ ntoa/1
+                        , strftime/1]).
 
--export([list/2, lookup/2, kickout/2]).
+-export([ list/2
+        , lookup/2
+        , kickout/2
+        , lookup_via_username/2]).
 
 list(Bindings, Params) when map_size(Bindings) == 0 ->
     %%TODO: across nodes?
@@ -73,6 +92,12 @@ lookup(#{node := Node, clientid := ClientId}, _Params) ->
 
 lookup(#{clientid := ClientId}, _Params) ->
     return({ok, emqx_mgmt:lookup_conn(http_uri:decode(ClientId), fun format/1)}).
+
+lookup_via_username(#{node := Node, username := Username}, _Params) ->
+    return({ok, emqx_mgmt:lookup_conn_via_username(Node, http_uri:decode(Username), fun format/1)});
+
+lookup_via_username(#{username := Username}, _Params) ->
+    return({ok, emqx_mgmt:lookup_conn_via_username(http_uri:decode(Username), fun format/1)}).
 
 kickout(#{clientid := ClientId}, _Params) ->
     case emqx_mgmt:kickout_conn(http_uri:decode(ClientId)) of

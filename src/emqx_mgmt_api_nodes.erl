@@ -28,7 +28,8 @@
             func   => get,
             descr  => "Lookup a node in the cluster"}).
 
--export([list/2, get/2]).
+-export([ list/2
+        , get/2]).
 
 list(_Bindings, _Params) ->
     return({ok, [format(Node, Info) || {Node, Info} <- emqx_mgmt:list_nodes()]}).
