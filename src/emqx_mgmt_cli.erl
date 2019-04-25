@@ -660,7 +660,7 @@ listeners([]) ->
                         end, Info)
             end, esockd:listeners()),
     foreach(fun({Protocol, Opts}) ->
-                Info = [{acceptors,      proplists:get_value(num_acceptors, Opts)},
+                Info = [{acceptors,      maps:get(num_acceptors, proplists:get_value(transport_options, Opts, #{}), 0)},
                         {max_conns,      proplists:get_value(max_connections, Opts)},
                         {current_conn,   proplists:get_value(all_connections, Opts)},
                         {shutdown_count, []}],

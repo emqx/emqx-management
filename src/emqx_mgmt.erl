@@ -380,7 +380,7 @@ list_listeners(Node) when Node =:= node() ->
     Http = lists:map(fun({Protocol, Opts}) ->
         #{protocol        => Protocol,
           listen_on       => proplists:get_value(port, Opts),
-          acceptors       => proplists:get_value(num_acceptors, Opts),
+          acceptors       => maps:get(num_acceptors, proplists:get_value(transport_options, Opts, #{}), 0),
           max_conns       => proplists:get_value(max_connections, Opts),
           current_conns   => proplists:get_value(all_connections, Opts),
           shutdown_count  => []}
