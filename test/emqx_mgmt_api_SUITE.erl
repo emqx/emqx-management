@@ -51,8 +51,7 @@ groups() ->
        stats]}].
 
 init_per_suite(Config) ->
-    emqx_ct_helpers:start_apps([emqx, emqx_management, emqx_reloader],
-                               [{plugins_etc_dir, emqx_management, "test/etc/"}, {acl_file, emqx, "etc/acl.conf"}]),
+    emqx_ct_helpers:start_apps([emqx, emqx_management, emqx_reloader]),
     ekka_mnesia:start(),
     emqx_mgmt_auth:mnesia(boot),
     emqx_mgmt_auth:add_app(<<"myappid">>, <<"test">>),
@@ -61,30 +60,6 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     emqx_ct_helpers:stop_apps([emqx_reloader, emqx_management, emqx]),
     ekka_mnesia:ensure_stopped().
-
-batch_connect(NumberOfConnections) ->
-    batch_connect([], NumberOfConnections).
-
-batch_connect(Socks, 0) ->
-    Socks;
-batch_connect(Socks, NumberOfConnections) ->
-    {ok, Sock} = emqx_client_sock:connect({127, 0, 0, 1}, 1883,
-                                          [binary, {packet, raw}, {active, false}], 
-                                          3000),
-    batch_connect([Sock | Socks], NumberOfConnections - 1).
-
-with_connection(DoFun, NumberOfConnections) ->
-    Socks = batch_connect(NumberOfConnections),
-    try
-        DoFun(Socks)
-    after
-        lists:foreach(fun(Sock) ->
-                         emqx_client_sock:close(Sock) 
-                      end, Socks)
-    end.
-
-with_connection(DoFun) ->
-    with_connection(DoFun, 1).
 
 get(data, ResponseBody) ->
     proplists:get_value(<<"data">>, jsx:decode(list_to_binary(ResponseBody)));
@@ -97,7 +72,7 @@ alarms(_) ->
     [{_AlarmId, AlarmDesc}] = emqx_alarm_handler:get_alarms(),
     ?assertEqual(error, AlarmDesc#alarm.severity),
     {ok, _} = request_api(get, api_path(["alarms"]), auth_header_()),
-    {ok, _} = request_api(get, api_path(["alarms", erlang:atom_to_list(node())]), auth_header_()).
+    {ok, _} = request_api(get, api_path(["alarms", atom_to_list(node())]), auth_header_()).
 
 apps(_) ->
     AppId = <<"123456">>,
@@ -107,13 +82,13 @@ apps(_) ->
                                            {<<"status">>, true}]),
 
     {ok, _} = request_api(get, api_path(["apps"]), auth_header_()),
-    {ok, _} = request_api(get, api_path(["apps", erlang:binary_to_list(AppId)]), auth_header_()),
-    {ok, _} = request_api(put, api_path(["apps", erlang:binary_to_list(AppId)]), [],
+    {ok, _} = request_api(get, api_path(["apps", binary_to_list(AppId)]), auth_header_()),
+    {ok, _} = request_api(put, api_path(["apps", binary_to_list(AppId)]), [],
                           auth_header_(), [{<<"name">>, <<"test 2">>},
                                            {<<"status">>, true}]),
-    {ok, AppInfo} = request_api(get, api_path(["apps", erlang:binary_to_list(AppId)]), auth_header_()),
+    {ok, AppInfo} = request_api(get, api_path(["apps", binary_to_list(AppId)]), auth_header_()),
     ?assertEqual(<<"test 2">>, proplists:get_value(<<"name">>, get(data, AppInfo))),
-    {ok, _} = request_api(delete, api_path(["apps", erlang:binary_to_list(AppId)]), auth_header_()),
+    {ok, _} = request_api(delete, api_path(["apps", binary_to_list(AppId)]), auth_header_()),
     {ok, Result} = request_api(get, api_path(["apps"]), auth_header_()),
     [App] = get(data, Result),
     ?assertEqual(<<"myappid">>, proplists:get_value(<<"app_id">>, App)).
@@ -132,35 +107,28 @@ banned(_) ->
     [Banned] = get(data, Result),
     ?assertEqual(Who, proplists:get_value(<<"who">>, Banned)),
 
-    {ok, _} = request_api(delete, api_path(["banned", erlang:binary_to_list(Who)]), [], 
+    {ok, _} = request_api(delete, api_path(["banned", binary_to_list(Who)]), [], 
                           auth_header_(), [{<<"as">>, <<"client_id">>}]),
     {ok, Result2} = request_api(get, api_path(["banned"]), auth_header_()),
     ?assertEqual([], get(data, Result2)).
 
 brokers(_) ->
     {ok, _} = request_api(get, api_path(["brokers"]), auth_header_()),
-    {ok, _} = request_api(get, api_path(["brokers", erlang:atom_to_list(node())]), auth_header_()).
+    {ok, _} = request_api(get, api_path(["brokers", atom_to_list(node())]), auth_header_()).
 
 configs(_) ->
     {ok, _} = request_api(get, api_path(["configs"]), auth_header_()),
 
-    {ok, _} = request_api(get, api_path(["nodes",
-                                         erlang:atom_to_list(node()),
-                                         "configs"]), auth_header_()),
+    {ok, _} = request_api(get, api_path(["nodes", atom_to_list(node()), "configs"]), auth_header_()),
 
-    {ok, _} = request_api(put, api_path(["nodes", 
-                                         erlang:atom_to_list(node()),
-                                         "plugin_configs",
-                                         erlang:atom_to_list(emqx_reloader)]), [], 
+    {ok, _} = request_api(put, api_path(["nodes", atom_to_list(node()), "plugin_configs", atom_to_list(emqx_reloader)]), [], 
                           auth_header_(), [{<<"reloader.interval">>, <<"60s">>},
                                            {<<"reloader.logfile">>, <<"reloader.log">>}]),
 
-    {ok, Result} = request_api(get, api_path(["nodes",
-                                              erlang:atom_to_list(node()),
-                                              "plugin_configs",
-                                              erlang:atom_to_list(emqx_reloader)]), auth_header_()),
+    {ok, Result} = request_api(get, api_path(["nodes", atom_to_list(node()), "plugin_configs", atom_to_list(emqx_reloader)]),
+                               auth_header_()),
     ?assert(lists:any(fun(Elem) -> 
-                          case proplists:get_value(<<"key">>, Elem) of
+                              case proplists:get_value(<<"key">>, Elem) of
                               <<"reloader.interval">> -> 
                                   <<"60s">> == proplists:get_value(<<"value">>, Elem);
                               _ -> false
@@ -168,249 +136,160 @@ configs(_) ->
                       end, get(data, Result))).
 
 connections_and_sessions(_) ->
-    with_connection(fun([Sock]) ->
-                        ClientId = <<"myclient">>,
-                        emqx_client_sock:send(Sock, raw_send_serialize(
-                                                        ?CONNECT_PACKET(
-                                                            #mqtt_packet_connect{
-                                                                proto_ver   = ?MQTT_PROTO_V5,
-                                                                clean_start = true,
-                                                                client_id   = ClientId})
-                                                    )),
-                        {ok, Data} = gen_tcp:recv(Sock, 0),
-                        {ok, ?CONNACK_PACKET(?RC_SUCCESS, 0), _} = raw_recv_parse(Data, ?MQTT_PROTO_V5),
+    process_flag(trap_exit, true),
+    Username = <<"Gilbert">>,
+    Options = #{username => Username},
+    ClientId1 = <<"client1">>,
+    ClientId2 = <<"client2">>,
+    {ok, C1} = emqx_client:start_link(Options#{client_id => ClientId1}),
+    {ok, _} = emqx_client:connect(C1),
+    {ok, C2} = emqx_client:start_link(Options#{client_id => ClientId2}),
+    {ok, _} = emqx_client:connect(C2),
 
-                        {ok, Conns} = request_api(get, 
-                                                  api_path(["connections"]), 
-                                                  "_limit=100&_page=1", 
-                                                  auth_header_()),
-                        ?assertEqual(1, proplists:get_value(<<"count">>, get(meta, Conns))),
-                        {ok, Conns} = request_api(get, 
-                                                  api_path(["nodes", 
-                                                            erlang:atom_to_list(node()), 
-                                                            "connections"]), 
-                                                  "_limit=100&_page=1", 
-                                                  auth_header_()),
+    {ok, ConsViaUsername} = request_api(get, api_path(["nodes", atom_to_list(node()),
+                                                      "connection",
+                                                      "username", binary_to_list(Username)])
+                                      , auth_header_()),
+    ?assertEqual(2, length(get(data, ConsViaUsername))),
+    {ok, Conns} = request_api(get, api_path(["connections"]), "_limit=100&_page=1", 
+                              auth_header_()),
+    ?assertEqual(2, proplists:get_value(<<"count">>, get(meta, Conns))),
+    {ok, Conns} = request_api(get, api_path(["nodes", atom_to_list(node()), "connections"]), "_limit=100&_page=1", 
+                              auth_header_()),
+    {ok, Result} = request_api(get, api_path(["nodes", atom_to_list(node()), "connections", binary_to_list(ClientId1)]), auth_header_()),
+    [Conn] = get(data, Result),
+    ?assertEqual(ClientId1, proplists:get_value(<<"client_id">>, Conn)),
 
-                        {ok, Result} = request_api(get, 
-                                                   api_path(["nodes", 
-                                                             erlang:atom_to_list(node()), 
-                                                             "connections", 
-                                                             erlang:binary_to_list(ClientId)]), 
-                                                   auth_header_()),
-                        [Conn] = get(data, Result),
-                        ?assertEqual(ClientId, proplists:get_value(<<"client_id">>, Conn)),
+    {ok, Result} = request_api(get, api_path(["connections", 
+                                              binary_to_list(ClientId1)]), 
+                               auth_header_()),
 
-                        {ok, Result} = request_api(get, 
-                                                   api_path(["connections", 
-                                                             erlang:binary_to_list(ClientId)]), 
-                                                   auth_header_()),
+    {ok, Result2} = request_api(get, api_path(["sessions"]), auth_header_()),
+    [Session1, Session2] = get(data, Result2),
+    ?assertEqual(ClientId1, proplists:get_value(<<"client_id">>, Session1)),
+    ?assertEqual(ClientId2, proplists:get_value(<<"client_id">>, Session2)),
+    {ok, Result2} = request_api(get, api_path(["nodes", atom_to_list(node()), "sessions"]), auth_header_()),
 
-                        {ok, Result2} = request_api(get, 
-                                                    api_path(["sessions"]),
-                                                    auth_header_()),
-                        [Session] = get(data, Result2),
-                        ?assertEqual(ClientId, proplists:get_value(<<"client_id">>, Session)),
+    {ok, Result3} = request_api(get, api_path(["sessions", binary_to_list(ClientId1)]), auth_header_()),
+    {ok, Result3} = request_api(get, api_path(["nodes", atom_to_list(node()),
+                                               "sessions", binary_to_list(ClientId1)]),
+                                auth_header_()),
 
-                        {ok, Result2} = request_api(get, 
-                                                    api_path(["nodes", 
-                                                              erlang:atom_to_list(node()),
-                                                              "sessions"]),
-                                                    auth_header_()),
-                        
-                        {ok, Result3} = request_api(get, 
-                                                    api_path(["sessions", 
-                                                              erlang:binary_to_list(ClientId)]),
-                                                    auth_header_()),
-                        [Session] = get(data, Result3),
+    {ok, _} = request_api(delete, api_path(["connections", binary_to_list(ClientId1)]), auth_header_()),
+    {ok, _} = request_api(delete, api_path(["connections", binary_to_list(ClientId2)]), auth_header_()),
+    receive_exit(2),
+    {ok, NonConn} = request_api(
+                      get, api_path(["connections"]), "_limit=100&_page=1", auth_header_()),
+    ?assertEqual([], get(data, NonConn)),
+    {ok, NonSession} = request_api(get, api_path(["sessions"]), auth_header_()),
+    ?assertEqual([], get(data, NonSession)).
 
-                        {ok, Result3} = request_api(get, 
-                                                    api_path(["nodes", 
-                                                              erlang:atom_to_list(node()),
-                                                              "sessions",
-                                                              erlang:binary_to_list(ClientId)]),
-                                                    auth_header_()),
-
-                        {ok, _} = request_api(delete, 
-                                              api_path(["connections", 
-                                                        erlang:binary_to_list(ClientId)]), 
-                                              auth_header_()),
-
-                        {ok, NonConn} = request_api(get, 
-                                                    api_path(["connections"]), 
-                                                    "_limit=100&_page=1", 
-                                                    auth_header_()),
-
-                        ?assertEqual([], get(data, NonConn)),
-
-                        {ok, NonSession} = request_api(get, 
-                                                       api_path(["sessions"]),
-                                                       auth_header_()),
-                        ?assertEqual([], get(data, NonSession))
-                    end).
+receive_exit(0) ->
+    ok;
+receive_exit(Count) ->
+    receive 
+        {'EXIT', Client, {shutdown, tcp_closed}} ->
+            ct:log("receive exit signal, Client: ~p", [Client]),
+            receive_exit(Count - 1);
+        {'EXIT', Client, _Reason} ->
+            ct:log("receive exit signal, Client: ~p", [Client]),
+            receive_exit(Count - 1)
+    after 1000 ->
+            ct:log("timeout")
+    end.
 
 listeners(_) ->
     {ok, _} = request_api(get, api_path(["listeners"]), auth_header_()),
-    {ok, _} = request_api(get, api_path(["nodes", erlang:atom_to_list(node()), "listeners"]), auth_header_()).
+    {ok, _} = request_api(get, api_path(["nodes", atom_to_list(node()), "listeners"]), auth_header_()).
 
 metrics(_) ->
     {ok, _} = request_api(get, api_path(["metrics"]), auth_header_()),
-    {ok, _} = request_api(get, api_path(["nodes", erlang:atom_to_list(node()), "metrics"]), auth_header_()).
+    {ok, _} = request_api(get, api_path(["nodes", atom_to_list(node()), "metrics"]), auth_header_()).
 
 nodes(_) ->
     {ok, _} = request_api(get, api_path(["nodes"]), auth_header_()),
-    {ok, _} = request_api(get, api_path(["nodes", erlang:atom_to_list(node())]), auth_header_()).
+    {ok, _} = request_api(get, api_path(["nodes", atom_to_list(node())]), auth_header_()).
 
 plugins(_) ->
-    {ok, _} = request_api(put, 
-                          api_path(["nodes",
-                                    erlang:atom_to_list(node()),
-                                    "plugins",
-                                    erlang:atom_to_list(emqx_reloader),
-                                    "unload"]), 
+    {ok, _} = request_api(put, api_path([ "nodes", atom_to_list(node()), "plugins", atom_to_list(emqx_reloader), "unload"]),
                           auth_header_()),
 
-    {ok, Result3} = request_api(get, 
-                                api_path(["nodes",
-                                          erlang:atom_to_list(node()),
-                                          "plugins"]),
+    {ok, Result3} = request_api(get, api_path([ "nodes", atom_to_list(node()), "plugins"]),
                                 auth_header_()),
     [Plugin3] = filter(get(data, Result3), <<"emqx_reloader">>),
     ?assertEqual(<<"emqx_reloader">>, proplists:get_value(<<"name">>, Plugin3)),
     ?assertNot(proplists:get_value(<<"active">>, Plugin3)),
-
-    {ok, _} = request_api(put, 
-                          api_path(["nodes",
-                                    erlang:atom_to_list(node()),
-                                    "plugins",
-                                    erlang:atom_to_list(emqx_reloader),
-                                    "load"]), 
+    {ok, _} = request_api(put, api_path([ "nodes", atom_to_list(node()), "plugins", atom_to_list(emqx_reloader), "load"]), 
                           auth_header_()),
-    
     {ok, Result} = request_api(get, api_path(["plugins"]), auth_header_()),
     [Plugins] = get(data, Result),
     [Plugin] = filter(proplists:get_value(<<"plugins">>, Plugins), <<"emqx_reloader">>),
     ?assertEqual(<<"emqx_reloader">>, proplists:get_value(<<"name">>, Plugin)),
     ?assert(proplists:get_value(<<"active">>, Plugin)),
-
-    {ok, Result2} = request_api(get, 
-                                api_path(["nodes",
-                                          erlang:atom_to_list(node()),
-                                          "plugins"]),
-                                auth_header_()),
+    {ok, Result2} = request_api(get, api_path([ "nodes", atom_to_list(node()), "plugins"]), auth_header_()),
     [Plugin] = filter(get(data, Result2), <<"emqx_reloader">>).
 
-    
-
 pubsub(_) ->
-    with_connection(fun([Sock]) ->
-                        ClientId = <<"myclient">>,
-                        Topic = <<"mytopic">>,
-                        emqx_client_sock:send(Sock, raw_send_serialize(
-                                                        ?CONNECT_PACKET(
-                                                            #mqtt_packet_connect{
-                                                                proto_ver   = ?MQTT_PROTO_V5,
-                                                                clean_start = true,
-                                                                client_id   = ClientId})
-                                                    )),
-                        {ok, Data} = gen_tcp:recv(Sock, 0),
-                        {ok, ?CONNACK_PACKET(?RC_SUCCESS, 0), _} = raw_recv_parse(Data, ?MQTT_PROTO_V5),
-
-                        emqx_client_sock:send(Sock, raw_send_serialize(?SUBSCRIBE_PACKET(1, [{Topic, #{rh  => 1,
-                                                                                                       qos => ?QOS_2,
-                                                                                                       rap => 0,
-                                                                                                       nl  => 0,
-                                                                                                       rc  => 0}}]),
-                                                                        #{version => ?MQTT_PROTO_V5})),
-
-                        {ok, SubData} = gen_tcp:recv(Sock, 0),
-                        {ok, ?SUBACK_PACKET(1, #{}, [2]), _} = raw_recv_parse(SubData, ?MQTT_PROTO_V5),
-
-                        {ok, Code} = request_api(post, 
-                                                 api_path(["mqtt/subscribe"]), 
-                                                 [], 
-                                                 auth_header_(),
-                                                 [{<<"client_id">>, ClientId},
-                                                  {<<"topic">>, Topic},
-                                                  {<<"qos">>, 2}]),
-                        ?assertEqual(0, proplists:get_value(<<"code">>, jsx:decode(list_to_binary(Code)))),
-
-                        {ok, Code} = request_api(post, 
-                                                 api_path(["mqtt/publish"]), 
-                                                 [], 
-                                                 auth_header_(),
-                                                 [{<<"client_id">>, ClientId},
-                                                  {<<"topic">>, <<"mytopic">>},
-                                                  {<<"qos">>, 1},
-                                                  {<<"payload">>, <<"hello">>}]),
-
-                        {ok, PubData} = gen_tcp:recv(Sock, 0),
-                        {ok, ?PUBLISH_PACKET(?QOS_1, Topic, _, <<"hello">>), _} = raw_recv_parse(PubData, ?MQTT_PROTO_V5),
-
-                        {ok, Code} = request_api(post, 
-                                                 api_path(["mqtt/unsubscribe"]), 
-                                                 [], 
-                                                 auth_header_(),
-                                                 [{<<"client_id">>, ClientId},
-                                                  {<<"topic">>, Topic}])
-                    end).
-
+    ClientId = <<"client1">>,
+    Options = #{client_id => ClientId,
+                proto_ver => 5},
+    Topic = <<"mytopic">>,
+    {ok, C1} = emqx_client:start_link(Options),
+    {ok, _} = emqx_client:connect(C1),
+    {ok, _, [2]} = emqx_client:subscribe(C1, Topic, 2),
+    {ok, Code} = request_api(post, api_path(["mqtt/subscribe"]), [], auth_header_(),
+                             [{<<"client_id">>, ClientId},
+                              {<<"topic">>, Topic},
+                              {<<"qos">>, 2}]),
+    ?assertEqual(0, proplists:get_value(<<"code">>, jsx:decode(list_to_binary(Code)))),
+    {ok, Code} = request_api(post, api_path(["mqtt/publish"]), [], auth_header_(),
+                             [{<<"client_id">>, ClientId},
+                              {<<"topic">>, <<"mytopic">>},
+                              {<<"qos">>, 1},
+                              {<<"payload">>, <<"hello">>}]),
+    ?assert(receive
+                {publish, #{payload := <<"hello">>}} ->
+                    true
+            after 100 ->
+                    false
+            end),
+    {ok, Code} = request_api(post, api_path(["mqtt/unsubscribe"]), [], auth_header_(),
+                             [{<<"client_id">>, ClientId},
+                              {<<"topic">>, Topic}]).
+     
 routes_and_subscriptions(_) ->
-    with_connection(fun([Sock]) ->
-                        {ok, NonRoute} = request_api(get, api_path(["routes"]), auth_header_()),
-                        ?assertEqual([], get(data, NonRoute)),
-
-                        ClientId = <<"myclient">>,
-                        Topic = <<"mytopic">>,
-                        emqx_client_sock:send(Sock, raw_send_serialize(
-                                                        ?CONNECT_PACKET(
-                                                            #mqtt_packet_connect{
-                                                                proto_ver   = ?MQTT_PROTO_V5,
-                                                                clean_start = true,
-                                                                client_id   = ClientId})
-                                                    )),
-                        {ok, Data} = gen_tcp:recv(Sock, 0),
-                        {ok, ?CONNACK_PACKET(?RC_SUCCESS, 0), _} = raw_recv_parse(Data, ?MQTT_PROTO_V5),
-
-                        emqx_client_sock:send(Sock, raw_send_serialize(?SUBSCRIBE_PACKET(1, [{Topic, #{rh  => 1,
-                                                                                                       qos => ?QOS_2,
-                                                                                                       rap => 0,
-                                                                                                       nl  => 0,
-                                                                                                       rc  => 0}}]),
-                                                                        #{version => ?MQTT_PROTO_V5})),
-
-                        {ok, SubData} = gen_tcp:recv(Sock, 0),
-                        {ok, ?SUBACK_PACKET(1, #{}, [2]), _} = raw_recv_parse(SubData, ?MQTT_PROTO_V5),
-
-                        {ok, Result} = request_api(get, api_path(["routes"]), auth_header_()),
-                        [Route] = get(data, Result),
-                        ?assertEqual(Topic, proplists:get_value(<<"topic">>, Route)),
+    {ok, NonRoute} = request_api(get, api_path(["routes"]), auth_header_()),
+    ?assertEqual([], get(data, NonRoute)),
+    ClientId = <<"myclient">>,
+    Options = #{client_id => <<"myclient">>},
+    Topic = <<"mytopic">>,
+    {ok, C1} = emqx_client:start_link(Options#{clean_start => true,
+                                               client_id   => ClientId,
+                                               proto_ver   => ?MQTT_PROTO_V5}),
+    {ok, _} = emqx_client:connect(C1),
+    {ok, _, [2]} = emqx_client:subscribe(C1, Topic, qos2),
+    {ok, Result} = request_api(get, api_path(["routes"]), auth_header_()),
+    [Route] = get(data, Result),
+    ?assertEqual(Topic, proplists:get_value(<<"topic">>, Route)),
                         
-                        {ok, Result2} = request_api(get, api_path(["routes", erlang:binary_to_list(Topic)]), auth_header_()),
-                        [Route] = get(data, Result2),
+    {ok, Result2} = request_api(get, api_path(["routes", binary_to_list(Topic)]), auth_header_()),
+    [Route] = get(data, Result2),
 
-                        {ok, Result3} = request_api(get, api_path(["subscriptions"]), auth_header_()),
-                        [Subscription] = get(data, Result3),
-                        ?assertEqual(Topic, proplists:get_value(<<"topic">>, Subscription)),
-                        ?assertEqual(ClientId, proplists:get_value(<<"client_id">>, Subscription)),
+    {ok, Result3} = request_api(get, api_path(["subscriptions"]), auth_header_()),
+    [Subscription] = get(data, Result3),
+    ?assertEqual(Topic, proplists:get_value(<<"topic">>, Subscription)),
+    ?assertEqual(ClientId, proplists:get_value(<<"client_id">>, Subscription)),
 
-                        {ok, Result3} = request_api(get, api_path(["nodes",
-                                                                   erlang:atom_to_list(node()),
-                                                                   "subscriptions"]), auth_header_()),
+    {ok, Result3} = request_api(get, api_path(["nodes", atom_to_list(node()), "subscriptions"]), auth_header_()),
 
-                        {ok, Result4} = request_api(get, api_path(["subscriptions",
-                                                                         erlang:binary_to_list(ClientId)]), auth_header_()),
-                        [Subscription] = get(data, Result4),
-
-                        {ok, Result4} = request_api(get, api_path(["nodes",
-                                                                   erlang:atom_to_list(node()),
-                                                                   "subscriptions",
-                                                                   erlang:binary_to_list(ClientId)]), auth_header_())
-                    end).
+    {ok, Result4} = request_api(get, api_path(["subscriptions", binary_to_list(ClientId)]), auth_header_()),
+    [Subscription] = get(data, Result4),
+    {ok, Result4} = request_api(get, api_path(["nodes", atom_to_list(node()), "subscriptions", binary_to_list(ClientId)])
+                               , auth_header_()).
 
 stats(_) ->
     {ok, _} = request_api(get, api_path(["stats"]), auth_header_()),
-    {ok, _} = request_api(get, api_path(["nodes", erlang:atom_to_list(node()), "stats"]), auth_header_()).
+    {ok, _} = request_api(get, api_path(["nodes", atom_to_list(node()), "stats"]), auth_header_()).
 
 request_api(Method, Url, Auth) ->
     request_api(Method, Url, [], Auth, []).
@@ -418,20 +297,14 @@ request_api(Method, Url, Auth) ->
 request_api(Method, Url, QueryParams, Auth) ->
     request_api(Method, Url, QueryParams, Auth, []).
 
+request_api(Method, Url, [], Auth, []) ->
+    do_request_api(Method, {Url, [Auth]});
+request_api(Method, Url, QueryParams, Auth, []) ->
+    NewUrl = Url ++ "?" ++ QueryParams,
+    do_request_api(Method, {NewUrl, [Auth]});
 request_api(Method, Url, QueryParams, Auth, Body) ->
-    NewUrl = case QueryParams of
-                 [] ->
-                     Url;
-                 _ ->
-                     Url ++ "?" ++ QueryParams
-             end,
-    Request = case Body of
-                  [] ->
-                      {NewUrl, [Auth]};
-                  _ ->
-                      {NewUrl, [Auth], "application/json", emqx_json:encode(Body)}
-              end,
-    do_request_api(Method, Request).
+    NewUrl = Url ++ "?" ++ QueryParams,
+    do_request_api(Method, {NewUrl, [Auth], "application/json", emqx_json:encode(Body)}).
 
 do_request_api(Method, Request)->
     ct:pal("Method: ~p, Request: ~p", [Method, Request]),
@@ -448,7 +321,7 @@ do_request_api(Method, Request)->
 auth_header_() ->
     AppId = <<"myappid">>,
     AppSecret = emqx_mgmt_auth:get_appsecret(AppId),
-    auth_header_(erlang:binary_to_list(AppId), erlang:binary_to_list(AppSecret)).
+    auth_header_(binary_to_list(AppId), binary_to_list(AppSecret)).
 
 auth_header_(User, Pass) ->
     Encoded = base64:encode_to_string(lists:append([User,":",Pass])),
@@ -456,16 +329,6 @@ auth_header_(User, Pass) ->
 
 api_path(Parts)->
     ?HOST ++ filename:join([?BASE_PATH, ?API_VERSION] ++ Parts).
-
-raw_send_serialize(Packet) ->
-    emqx_frame:serialize(Packet).
-
-raw_send_serialize(Packet, Opts) ->
-    emqx_frame:serialize(Packet, Opts).
-
-raw_recv_parse(P, ProtoVersion) ->
-    emqx_frame:parse(P, {none, #{max_packet_size => ?MAX_PACKET_SIZE,
-                                 version         => ProtoVersion}}).
 
 filter(List, Name) ->
     lists:filter(fun(Item) ->

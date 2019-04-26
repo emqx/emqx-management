@@ -18,9 +18,13 @@
 -include_lib("emqx/include/emqx_mqtt.hrl").
 -include("emqx_mgmt.hrl").
 
--import(proplists, [get_value/2, get_value/3]).
+-import(proplists, [ get_value/2
+                   , get_value/3
+                   ]).
 
--import(minirest, [return/0, return/1]).
+-import(minirest, [ return/0
+                  , return/1
+                  ]).
 
 -rest_api(#{name   => mqtt_subscribe,
             method => 'POST',
@@ -40,7 +44,10 @@
             func   => unsubscribe,
             descr  => "Unsubscribe a topic"}).
 
--export([subscribe/2, publish/2, unsubscribe/2]).
+-export([ subscribe/2
+        , publish/2
+        , unsubscribe/2
+        ]).
 
 subscribe(_Bindings, Params) ->
     logger:debug("API subscribe Params:~p", [Params]),

@@ -22,15 +22,16 @@
 -copy_mnesia({mnesia, [copy]}).
 
 %% APP Management API
--export([add_app/2,
-         add_app/5,
-         add_app/6,
-         lookup_app/1,
-         get_appsecret/1,
-         update_app/2,
-         update_app/5,
-         del_app/1,
-         list_apps/0]).
+-export([ add_app/2
+        , add_app/5
+        , add_app/6
+        , lookup_app/1
+        , get_appsecret/1
+        , update_app/2
+        , update_app/5
+        , del_app/1
+        , list_apps/0
+        ]).
 
 %% APP Auth/ACL API
 -export([is_authorized/2]).

@@ -14,15 +14,16 @@
 
 -module (emqx_mgmt_cli_cfg).
 
--export ([register_config_cli/0,
-          register_config/0,
-          run/1,
-          set_usage/0,
-          all_cfgs/0,
-          get_cfg/2,
-          get_cfg/3,
-          read_config/1,
-          write_config/2]).
+-export ([ register_config_cli/0
+         , register_config/0
+         , run/1
+         , set_usage/0
+         , all_cfgs/0
+         , get_cfg/2
+         , get_cfg/3
+         , read_config/1
+         , write_config/2
+         ]).
 
 -define(APP, emqx).
 

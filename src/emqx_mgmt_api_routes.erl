@@ -30,7 +30,9 @@
             func   => lookup,
             descr  => "Lookup routes to a topic"}).
 
--export([list/2, lookup/2]).
+-export([ list/2
+        , lookup/2
+        ]).
 
 list(Bindings, Params) when map_size(Bindings) == 0 ->
     return({ok, emqx_mgmt_api:paginate(emqx_route, Params, fun format/1)}).
