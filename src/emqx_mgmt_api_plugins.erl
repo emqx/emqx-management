@@ -44,9 +44,16 @@
             func   => unload,
             descr  => "Unload a plugin"}).
 
+-rest_api(#{name   => reload_plugin,
+            method => 'PUT',
+            path   => "/nodes/:atom:node/plugins/:atom:plugin/reload",
+            func   => reload,
+            descr  => "Reload a plugin"}).
+
 -export([ list/2
         , load/2
         , unload/2
+        , reload/2
         ]).
 
 list(#{node := Node}, _Params) ->
@@ -60,6 +67,9 @@ load(#{node := Node, plugin := Plugin}, _Params) ->
 
 unload(#{node := Node, plugin := Plugin}, _Params) ->
     return(emqx_mgmt:unload_plugin(Node, Plugin)).
+
+reload(#{node := Node, plugin := Plugin}, _Params) ->
+    return(emqx_mgmt:reload_plugin(Node, Plugin)).
 
 format({Node, Plugins}) ->
     [{node, Node}, {plugins, [format(Plugin) || Plugin <- Plugins]}];
