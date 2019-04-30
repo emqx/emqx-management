@@ -132,7 +132,7 @@
 ]}.
 
 {mapping, "management.listener.https.verify", "emqx_management.listeners", [
-  {datatype, string}
+  {datatype, atom}
 ]}.
 
 {mapping, "management.listener.https.fail_if_no_peer_cert", "emqx_management.listeners", [
