@@ -52,11 +52,20 @@ groups() ->
 
 init_per_suite(Config) ->
     emqx_ct_helpers:start_apps([emqx, emqx_management, emqx_reloader],
-                               [{plugins_etc_dir, emqx_management, "test/etc/"}, {acl_file, emqx, "etc/acl.conf"}]),
+                               fun set_more_configs/1),
     ekka_mnesia:start(),
     emqx_mgmt_auth:mnesia(boot),
     emqx_mgmt_auth:add_app(<<"myappid">>, <<"test">>),
     Config.
+
+set_more_configs(emqx = App) ->
+    application:set_env(App, acl_file,
+                        emqx_ct_helpers:deps_path(App, "etc/acl.conf"));
+set_more_configs(emqx_management = App) ->
+    application:set_env(App, plugins_etc_dir,
+                        emqx_ct_helpers:deps_path(App, "test/etc"));
+set_more_configs(_) ->
+    ok.
 
 end_per_suite(_Config) ->
     emqx_ct_helpers:stop_apps([emqx_reloader, emqx_management, emqx]),
