@@ -7,5 +7,4 @@ CONFIG1 = case os:getenv("TRAVIS") of
               _ ->
                   CONFIG
           end,
-
 CONFIG1.
