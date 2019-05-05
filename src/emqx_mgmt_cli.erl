@@ -343,9 +343,7 @@ plugins(["unload", Name]) ->
     end;
 
 plugins(["reload", Name]) ->
-    case catch list_to_existing_atom(Name) of
-        {'EXIT', _} ->
-            emqx_cli:print("Reload plugin error: plugin_not_exist~n");
+    try list_to_existing_atom(Name) of
         PluginName ->
             case emqx_mgmt:reload_plugin(node(), PluginName) of
                 ok ->
@@ -353,6 +351,9 @@ plugins(["reload", Name]) ->
                 {error, Reason} ->
                     emqx_cli:print("Reload plugin error: ~p~n", [Reason])
             end
+    catch
+        error:badarg ->
+            emqx_cli:print("Reload plugin error: plugin_not_exist~n")
     end;
 
 % plugins(["add", Name]) ->
