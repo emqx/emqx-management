@@ -51,6 +51,8 @@
 -export([ list_sessions/1
         , lookup_session/1
         , lookup_session/2
+        , clean_session/1
+        , clean_session/2
         ]).
 
 %% Subscriptions
@@ -282,6 +284,29 @@ lookup_session(Node, ClientId) when Node =:= node() ->
 
 lookup_session(Node, ClientId) ->
     rpc_call(Node, lookup_session, [Node, ClientId]).
+
+clean_session(ClientId) ->
+    Results = [clean_session(Node, ClientId) || Node <- ekka_mnesia:running_nodes()],
+    lists:foldl(fun({error, running_session}, _Acc) -> {error, running_session};
+                   (ok, _Acc) -> ok;
+                   (_, Acc) -> Acc
+                end, {error, not_found}, Results).
+
+clean_session(Node, ClientId) when Node =:= node() ->
+    case ets:lookup(emqx_session, ClientId) of
+        [] -> {error, not_found};
+        [{_, SPid}] ->
+            case proplists:get_value(conn_pid, emqx_session:info(SPid)) of
+                undefined ->
+                    emqx_session:close(SPid),
+                    ok;
+                _ ->
+                    {error, running_session}
+            end
+    end;
+
+clean_session(Node, ClientId) ->
+    rpc_call(Node, clean_session, [Node, ClientId]).
 
 %%--------------------------------------------------------------------
 %% Subscriptions
