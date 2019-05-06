@@ -42,8 +42,21 @@
             func   => lookup,
             descr  => "Lookup a session on the node"}).
 
+-rest_api(#{name   => clean_presisent_session,
+            method => 'DELETE',
+            path   => "/sessions/persistent/:bin:clientid",
+            func   => clean,
+            descr  => "Clean a persistent session in the cluster"}).
+
+-rest_api(#{name   => clean_node_presisent_session,
+            method => 'DELETE',
+            path   => "nodes/:atom:node/sessions/persistent/:bin:clientid",
+            func   => clean,
+            descr  => "Clean a persistent session on the node"}).
+
 -export([ list/2
         , lookup/2
+        , clean/2
         ]).
 
 list(Bindings, Params) when map_size(Bindings) =:= 0 ->
@@ -64,6 +77,12 @@ lookup(#{node := Node, clientid := ClientId}, _Params) ->
 
 lookup(#{clientid := ClientId}, _Params) ->
     return({ok, format(emqx_mgmt:lookup_session(http_uri:decode(ClientId)))}).
+
+clean(#{node := Node, clientid := ClientId}, _Params) ->
+    return(emqx_mgmt:clean_session(Node, http_uri:decode(ClientId)));
+
+clean(#{clientid := ClientId}, _Params) ->
+    return(emqx_mgmt:clean_session(http_uri:decode(ClientId))).
 
 format([]) ->
     [];
