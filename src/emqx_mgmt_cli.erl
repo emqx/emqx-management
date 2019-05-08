@@ -343,23 +343,17 @@ plugins(["unload", Name]) ->
     end;
 
 plugins(["reload", Name]) ->
-    try
-        PluginName = list_to_existing_atom(Name),
-        Config = gen_config(PluginName),
-        Plugin = emqx_plugins:find_plugin(PluginName),
-        case Plugin#plugin.active of
-            false ->
-                load_plugin(PluginName, Config);
-            true ->
-                case emqx_plugins:unload(PluginName) of
-                    ok ->
-                        load_plugin(PluginName, Config);
-                    {error, Reason} ->
-                        emqx_cli:print("Reload plugin error: ~p~n", [Reason])
-                end
-        end
-    catch _ : _Error : Stacktrace ->
-        emqx_cli:print("Reload plugin error:~p~n", [Stacktrace])
+    try list_to_existing_atom(Name) of
+        PluginName ->
+            case emqx_mgmt:reload_plugin(node(), PluginName) of
+                ok ->
+                    emqx_cli:print("Plugin ~p reloaded successfully.~n", [PluginName]);
+                {error, Reason} ->
+                    emqx_cli:print("Reload plugin error: ~p~n", [Reason])
+            end
+    catch
+        error:badarg ->
+            emqx_cli:print("Reload plugin error: plugin_not_exist~n")
     end;
 
 % plugins(["add", Name]) ->
@@ -808,19 +802,3 @@ format(_, Val) ->
 
 bin(S) -> iolist_to_binary(S).
 
-gen_config(App) ->
-    Schema = cuttlefish_schema:files([filename:join([code:priv_dir(App), App]) ++ ".schema"]),
-    Conf = cuttlefish_conf:file(filename:join([emqx_config:get_env(plugins_etc_dir), App]) ++ ".conf"),
-    case cuttlefish_generator:map(Schema, Conf) of
-        [] -> [];
-        [{_, Config}] -> Config
-    end.
-
-load_plugin(Plugin, Config) ->
-    lists:foreach(fun({Key, Val}) -> application:set_env(Plugin, Key, Val) end, Config),
-    case emqx_plugins:load(Plugin) of
-        {ok, _StartedApp} ->
-            emqx_cli:print("Plugin ~p reloaded successfully.~n", [Plugin]);
-        {error, Reason1}   ->
-            emqx_cli:print("Reload plugin error: ~p~n", [Reason1])
-    end.
