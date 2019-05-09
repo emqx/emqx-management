@@ -147,13 +147,17 @@ broker([]) ->
 broker(["stats"]) ->
     [emqx_cli:print("~-30s: ~w~n", [Stat, Val]) || {Stat, Val} <- lists:sort(emqx_stats:getstats())];
 
+broker(["metrics", "topic", Topic]) ->
+    [emqx_cli:print("~-48s: ~w~n", [Metric, Val]) || {Metric, Val} <- lists:sort(emqx_metrics:all(topic, bin(Topic)))];
+
 broker(["metrics"]) ->
-    [emqx_cli:print("~-24s: ~w~n", [Metric, Val]) || {Metric, Val} <- lists:sort(emqx_metrics:all())];
+    [emqx_cli:print("~-48s: ~w~n", [Metric, Val]) || {Metric, Val} <- lists:sort(emqx_metrics:all())];
 
 broker(_) ->
-    emqx_cli:usage([{"broker",         "Show broker version, uptime and description"},
-                    {"broker stats",   "Show broker statistics of clients, topics, subscribers"},
-                    {"broker metrics", "Show broker metrics"}]).
+    emqx_cli:usage([{"broker",                       "Show broker version, uptime and description"},
+                    {"broker stats",                 "Show broker statistics of clients, topics, subscribers"},
+                    {"broker metrics",               "Show broker metrics"},
+                    {"broker metrics topic <Topic>", "Show broker topic metrics"}]).
 
 %%-----------------------------------------------------------------------------
 %% @doc Cluster with other nodes
