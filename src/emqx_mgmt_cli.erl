@@ -249,8 +249,8 @@ sessions(["clean-persistent", ClientId]) ->
         [{_, SessPid}] -> 
             case proplists:get_value(conn_pid, emqx_session:info(SessPid)) of
                 undefined ->
-                    emqx_cli:print("Clean persistent session successfully.~n"),
-                    emqx_session:close(SessPid);
+                    emqx_session:close(SessPid),
+                    emqx_cli:print("Clean persistent session successfully.~n");
                 _ ->
                     emqx_cli:print("Couldn't clean a session with a valid connection.~n")
             end
