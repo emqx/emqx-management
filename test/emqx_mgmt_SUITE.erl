@@ -156,7 +156,13 @@ t_sessions_cmd(_) ->
                                        {clean_start, true}]),
     {ok, _} = emqx_client:connect(T2),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["list"]), "Session")),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["show", "client2"]), "client2")).
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["show", "client2"]), "client2")),
+    ok = emqx_client:disconnect(T1),
+    ok = emqx_client:disconnect(T2),
+    timer:sleep(100),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["clean-persistent", "client1"]), "successfully")),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["clean-persistent", "client2"]), "Not Found")).
+
 
 t_vm_cmd(_) ->
     ct:pal("start testing the vm command"),
