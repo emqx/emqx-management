@@ -156,7 +156,7 @@ broker(["topic-metrics", Topic]) ->
 broker(["topic-metrics"]) ->
     TopicMetrics = lists:sort(emqx_metrics:all(topic_metrics)),
     lists:foreach(fun({Topic, Metrics}) ->
-                      emqx_cli:print("topic ~s~n", [Topic]),
+                      emqx_cli:print("~s:~n", [Topic]),
                       [emqx_cli:print("  ~-24s: ~w~n", [Metric, Val]) || {Metric, Val} <- lists:sort(Metrics)]
                   end, TopicMetrics);
 
