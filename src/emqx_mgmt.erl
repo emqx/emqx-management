@@ -34,6 +34,12 @@
 %% Metrics and Stats
 -export([ get_metrics/0
         , get_metrics/1
+        , get_metrics/2
+        , get_metrics/3
+        , add_metrics/2
+        , add_metrics/3
+        , del_metrics/2
+        , del_metrics/3
         , get_stats/0
         , get_stats/1
         ]).
@@ -179,6 +185,34 @@ get_metrics(Node) when Node =:= node() ->
     emqx_metrics:all();
 get_metrics(Node) ->
     rpc_call(Node, get_metrics, [Node]).
+
+get_metrics(topic_metrics, Topic) ->
+    [{Node, get_metrics(Node, topic_metrics, Topic)} || Node <- ekka_mnesia:running_nodes()].
+
+get_metrics(Node, topic_metrics, Topic) when Node =:= node() ->
+    emqx_metrics:all(topic_metrics, Topic);
+get_metrics(Node, topic_metrics, Topic) ->
+    rpc_call(Node, get_metrics, [Node, topic_metrics, Topic]).
+
+add_metrics(topic_metrics, Topic) ->
+    lists:foreach(fun(Node) ->
+                      add_metrics(Node, topic_metrics, Topic)
+                  end, ekka_mnesia:running_nodes()).
+
+add_metrics(Node, topic_metrics, Topic) when Node =:= node() ->
+    emqx_metrics:add_metrics(topic_metrics, Topic);
+add_metrics(Node, topic_metrics, Topic) ->
+    rpc_call(Node, add_metrics, [Node, topic_metrics, Topic]).
+
+del_metrics(topic_metrics, Topic) ->
+    lists:foreach(fun(Node) ->
+                      del_metrics(Node, topic_metrics, Topic)
+                  end, ekka_mnesia:running_nodes()).
+
+del_metrics(Node, topic_metrics, Topic) when Node =:= node() ->
+    emqx_metrics:del_metrics(topic_metrics, Topic);
+del_metrics(Node, topic_metrics, Topic) ->
+    rpc_call(Node, del_metrics, [Node, topic_metrics, Topic]).
 
 get_stats() ->
     [{Node, get_stats(Node)} || Node <- ekka_mnesia:running_nodes()].

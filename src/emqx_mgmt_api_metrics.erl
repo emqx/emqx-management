@@ -22,21 +22,65 @@
             func   => list,
             descr  => "A list of metrics of all nodes in the cluster"}).
 
+-rest_api(#{name   => list_all_topic_metrics,
+            method => 'GET',
+            path   => "/metrics/topic/:bin:topic",
+            func   => list,
+            descr  => "A list of topic metrics of all nodes in the cluster"}).
+
 -rest_api(#{name   => list_node_metrics,
             method => 'GET',
             path   => "/nodes/:atom:node/metrics/",
             func   => list,
             descr  => "A list of metrics of a node"}).
 
--export([list/2]).
+-rest_api(#{name   => list_node_topic_metrics,
+            method => 'GET',
+            path   => "/nodes/:atom:node/metrics/topic/:bin:topic",
+            func   => list,
+            descr  => "A list of topic metrics of a node"}).
+
+-rest_api(#{name   => add_topic_metrics,
+            method => 'POST',
+            path   => "/metrics/topic",
+            func   => add_metrics,
+            descr  => "Add a series of metrics"}).
+
+-rest_api(#{name   => del_topic_metrics,
+            method => 'DELETE',
+            path   => "/metrics/topic/:bin:topic",
+            func   => del_metrics,
+            descr  => "Delete a series of metrics"}).
+
+-export([ list/2
+        , add_metrics/2
+        , del_metrics/2
+        ]).
 
 list(Bindings, _Params) when map_size(Bindings) == 0 ->
     return({ok, [[{node, Node}, {metrics, Metrics}]
                               || {Node, Metrics} <- emqx_mgmt:get_metrics()]});
+
+list(#{node := Node, topic := Topic}, _Params) ->
+    case emqx_mgmt:get_metrics(Node, topic_metrics, http_uri:decode(Topic)) of
+        {error, Reason} -> return({error, Reason});
+        Metrics         -> return({ok, Metrics})
+    end;
+
+list(#{topic := Topic}, _Params) ->
+    return({ok, [[{node, Node}, {metrics, Metrics}]
+                              || {Node, Metrics} <- emqx_mgmt:get_metrics(topic_metrics, http_uri:decode(Topic))]});
 
 list(#{node := Node}, _Params) ->
     case emqx_mgmt:get_metrics(Node) of
         {error, Reason} -> return({error, Reason});
         Metrics         -> return({ok, Metrics})
     end.
+
+add_metrics(_Binding, Params) ->
+    Topic = proplists:get_value(<<"topic">>, Params),
+    return(emqx_mgmt:add_metrics(topic_metrics, Topic)).
+
+del_metrics(#{topic := Topic}, _Params) ->
+    return(emqx_mgmt:del_metrics(topic_metrics, http_uri:decode(Topic))).
 
