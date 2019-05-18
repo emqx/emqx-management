@@ -49,7 +49,7 @@ groups() ->
         t_subscriptions_cmd,
         t_acl,
         t_listeners
-        ]}].
+       ]}].
 
 apps() ->
     [emqx, emqx_management, emqx_reloader].
@@ -98,10 +98,9 @@ t_log_cmd(_) ->
                      emqx_mgmt_cli:log(["set-level", Level]),
                      ?assertEqual(Level++"\n", emqx_mgmt_cli:log(["primary-level"]))
                   end, ?LOG_LEVELS),
-    [
-        lists:foreach(fun(Level) ->
+    [lists:foreach(fun(Level) ->
                          ?assertEqual(Level++"\n", emqx_mgmt_cli:log(["handlers", "set-level",
-                                                               atom_to_list(Id), Level]))
+                                                                      atom_to_list(Id), Level]))
                       end, ?LOG_LEVELS)
         || {Id, _Level, _Dst} <- emqx_logger:get_log_handlers()].
 
@@ -157,7 +156,13 @@ t_sessions_cmd(_) ->
                                        {clean_start, true}]),
     {ok, _} = emqx_client:connect(T2),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["list"]), "Session")),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["show", "client2"]), "client2")).
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["show", "client2"]), "client2")),
+    ok = emqx_client:disconnect(T1),
+    ok = emqx_client:disconnect(T2),
+    timer:sleep(100),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["clean-persistent", "client1"]), "successfully")),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["clean-persistent", "client2"]), "Not Found")).
+
 
 t_vm_cmd(_) ->
     ct:pal("start testing the vm command"),
@@ -170,6 +175,7 @@ t_vm_cmd(_) ->
 
 t_trace_cmd(_) ->
     ct:pal("start testing the trace command"),
+    logger:set_primary_config(level, debug),
     {ok, T} = emqx_client:start_link([{host, "localhost"},
                                       {client_id, <<"client">>},
                                       {username, <<"testuser">>},
@@ -182,7 +188,8 @@ t_trace_cmd(_) ->
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:trace(["stop", "client", "client"]), "successfully")),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:trace(["start", "topic", "a/b/c", "log/clientid_trace.log"]), "successfully")),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:trace(["stop", "topic", "a/b/c"]), "successfully")),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:trace(["start", "topic", "a/b/c", "log/clientid_trace.log", "error"]), "successfully")).
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:trace(["start", "topic", "a/b/c", "log/clientid_trace.log", "error"]), "successfully")),
+    logger:set_primary_config(level, error).
 
 t_router_cmd(_) ->
     ct:pal("start testing the router command"),

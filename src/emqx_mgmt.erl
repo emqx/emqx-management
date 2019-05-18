@@ -23,47 +23,97 @@
 -import(proplists, [get_value/2]).
 
 %% Nodes and Brokers API
--export([list_nodes/0, lookup_node/1, list_brokers/0, lookup_broker/1, node_info/1, broker_info/1]).
+-export([ list_nodes/0
+        , lookup_node/1
+        , list_brokers/0
+        , lookup_broker/1
+        , node_info/1
+        , broker_info/1
+        ]).
 
 %% Metrics and Stats
--export([get_metrics/0, get_metrics/1, get_stats/0, get_stats/1]).
+-export([ get_metrics/0
+        , get_metrics/1
+        , get_stats/0
+        , get_stats/1
+        ]).
 
 %% Clients, Sessions
--export([list_conns/1, lookup_conn/2, lookup_conn/3,
-         kickout_conn/1, kickout_conn/2]).
+-export([ list_conns/1
+        , lookup_conn/2
+        , lookup_conn/3
+        , lookup_conn_via_username/2
+        , lookup_conn_via_username/3
+        , kickout_conn/1
+        , kickout_conn/2
+        ]).
 
--export([list_sessions/1, lookup_session/1, lookup_session/2]).
+-export([ list_sessions/1
+        , lookup_session/1
+        , lookup_session/2
+        , clean_session/1
+        , clean_session/2
+        ]).
 
 %% Subscriptions
--export([list_subscriptions/1, lookup_subscriptions/1, lookup_subscriptions/2]).
+-export([ list_subscriptions/1
+        , lookup_subscriptions/1
+        , lookup_subscriptions/2
+        ]).
 
 %% Routes
--export([list_routes/0, lookup_routes/1]).
+-export([ list_routes/0
+        , lookup_routes/1
+        ]).
 
 %% PubSub
--export([subscribe/2, publish/1, unsubscribe/2]).
+-export([ subscribe/2
+        , publish/1
+        , unsubscribe/2
+        ]).
 
 %% Plugins
--export([list_plugins/0, list_plugins/1, load_plugin/2, unload_plugin/2]).
+-export([ list_plugins/0
+        , list_plugins/1
+        , load_plugin/2
+        , unload_plugin/2
+        , reload_plugin/2
+        ]).
 
 %% Listeners
--export([list_listeners/0, list_listeners/1]).
+-export([ list_listeners/0
+        , list_listeners/1
+        ]).
 
 %% Alarms
--export([get_alarms/0, get_alarms/1]).
+-export([ get_alarms/0
+        , get_alarms/1
+        ]).
 
 %% Configs
--export([update_configs/2, update_config/3, update_config/4,
-         get_all_configs/0, get_all_configs/1,
-         get_plugin_configs/1, get_plugin_configs/2,
-         update_plugin_configs/2, update_plugin_configs/3]).
+-export([ update_configs/2
+        , update_config/3
+        , update_config/4
+        , get_all_configs/0
+        , get_all_configs/1
+        , get_plugin_configs/1
+        , get_plugin_configs/2
+        , update_plugin_configs/2
+        , update_plugin_configs/3
+        ]).
 
 %% Banned
--export([create_banned/1,
-         delete_banned/1]).
+-export([ create_banned/1
+        , delete_banned/1
+        ]).
 
 %% Common Table API
--export([count/1, tables/1, query_handle/1, item/2, max_row_limit/0]).
+-export([ count/1
+        , tables/1
+        , query_handle/1
+        , item/2
+        , max_row_limit/0
+        ]).
 
 -define(MAX_ROW_LIMIT, 10000).
 
@@ -165,6 +215,17 @@ lookup_conn(Node, ClientId, FormatFun) when Node =:= node() ->
 lookup_conn(Node, ClientId, FormatFun) ->
     rpc_call(Node, lookup_conn, [Node, ClientId, FormatFun]).
 
+lookup_conn_via_username(Username, FormatFun) ->
+    lists:append([lookup_conn_via_username(Node, Username, FormatFun)
+                  || Node <- ekka_mnesia:running_nodes()]).
+
+lookup_conn_via_username(Node, Username, FormatFun) when Node =:= node() ->
+    MatchSpec = [{{'$1',#{username => '$2'}}, [{'=:=','$2', Username}], ['$1']}],
+    FormatFun(ets:select(emqx_conn_attrs, MatchSpec));
+
+lookup_conn_via_username(Node, Username, FormatFun) ->
+    rpc_call(Node, lookup_conn_via_username, [Node, Username, FormatFun]).
+
 kickout_conn(ClientId) ->
     Results = [kickout_conn(Node, ClientId) || Node <- ekka_mnesia:running_nodes()],
     case lists:any(fun(Item) -> Item =:= ok end, Results) of
@@ -177,7 +238,7 @@ kickout_conn(Node, ClientId) when Node =:= node() ->
     case emqx_cm:get_conn_attrs(ClientId, Cpid) of
         [] -> {error, not_found};
         Attrs ->
-            Module = proplists:get_value(conn_mod, Attrs),
+            Module = maps:get(conn_mod, Attrs, emqx_connection),
             Module:kick(Cpid)
     end;
 
@@ -224,6 +285,29 @@ lookup_session(Node, ClientId) when Node =:= node() ->
 
 lookup_session(Node, ClientId) ->
     rpc_call(Node, lookup_session, [Node, ClientId]).
+
+clean_session(ClientId) ->
+    Results = [clean_session(Node, ClientId) || Node <- ekka_mnesia:running_nodes()],
+    lists:foldl(fun({error, running_session}, _Acc) -> {error, running_session};
+                   (ok, _Acc) -> ok;
+                   (_, Acc) -> Acc
+                end, {error, not_found}, Results).
+
+clean_session(Node, ClientId) when Node =:= node() ->
+    case ets:lookup(emqx_session, ClientId) of
+        [] -> {error, not_found};
+        [{_, SPid}] ->
+            case proplists:get_value(conn_pid, emqx_session:info(SPid)) of
+                undefined ->
+                    emqx_session:close(SPid),
+                    ok;
+                _ ->
+                    {error, running_session}
+            end
+    end;
+
+clean_session(Node, ClientId) ->
+    rpc_call(Node, clean_session, [Node, ClientId]).
 
 %%--------------------------------------------------------------------
 %% Subscriptions
@@ -303,6 +387,44 @@ unload_plugin(Node, Plugin) when Node =:= node() ->
 unload_plugin(Node, Plugin) ->
     rpc_call(Node, unload_plugin, [Node, Plugin]).
 
+reload_plugin(Node, Name) when Node =:= node() ->
+    try
+        Config = gen_config(Name),
+        Plugin = emqx_plugins:find_plugin(Name),
+        case Plugin#plugin.active of
+            false ->
+                load_plugin_with_config(Name, Config);
+            true ->
+                case emqx_plugins:unload(Name) of
+                    ok ->
+                        load_plugin_with_config(Name, Config);
+                    {error, Reason} ->
+                        {error, Reason}
+                end
+        end
+    catch _ : Error : Stacktrace ->
+        logger:error("[MGMT] Reload plugin crashed by error ~p, stacktrace: ~p~n", [Error, Stacktrace]),
+        {error, parse_config_file_failed}
+    end;
+
+reload_plugin(Node, Name) ->
+    rpc_call(Node, reload_plugin, [Node, Name]).
+
+gen_config(App) ->
+    Schema = cuttlefish_schema:files([filename:join([code:priv_dir(App), App]) ++ ".schema"]),
+    Conf = cuttlefish_conf:file(filename:join([emqx_config:get_env(plugins_etc_dir), App]) ++ ".conf"),
+    case cuttlefish_generator:map(Schema, Conf) of
+        [] -> [];
+        [{_, Config}] -> Config
+    end.
+
+load_plugin_with_config(Plugin, Config) ->
+    lists:foreach(fun({Key, Val}) -> application:set_env(Plugin, Key, Val) end, Config),
+    case emqx_plugins:load(Plugin) of
+        {ok, _StartedApp} -> ok;
+        {error, Reason}  -> {error, Reason}
+    end.
+
 %%--------------------------------------------------------------------
 %% Listeners
 %%--------------------------------------------------------------------
@@ -322,7 +444,7 @@ list_listeners(Node) when Node =:= node() ->
     Http = lists:map(fun({Protocol, Opts}) ->
         #{protocol        => Protocol,
           listen_on       => proplists:get_value(port, Opts),
-          acceptors       => proplists:get_value(num_acceptors, Opts),
+          acceptors       => maps:get(num_acceptors, proplists:get_value(transport_options, Opts, #{}), 0),
           max_conns       => proplists:get_value(max_connections, Opts),
           current_conns   => proplists:get_value(all_connections, Opts),
           shutdown_count  => []}

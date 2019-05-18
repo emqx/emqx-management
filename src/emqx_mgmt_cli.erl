@@ -21,13 +21,25 @@
 
 -import(lists, [foreach/2]).
 
--import(proplists, [get_value/2]).
-
 -export([load/0]).
 
--export([status/1, broker/1, cluster/1, clients/1, sessions/1,
-         routes/1, subscriptions/1, plugins/1, bridges/1,
-         listeners/1, vm/1, mnesia/1, trace/1, log/1, acl/1, mgmt/1]).
+-export([ status/1
+        , broker/1
+        , cluster/1
+        , clients/1
+        , sessions/1
+        , routes/1
+        , subscriptions/1
+        , plugins/1
+        , bridges/1
+        , listeners/1
+        , vm/1
+        , mnesia/1
+        , trace/1
+        , log/1
+        , acl/1
+        , mgmt/1
+        ]).
 
 -define(PROC_INFOKEYS, [status,
                         memory,
@@ -231,9 +243,23 @@ sessions(["show", ClientId]) ->
         [SessInfo] -> print({emqx_session, SessInfo})
     end;
 
+sessions(["clean-persistent", ClientId]) ->
+    case ets:lookup(emqx_session, bin(ClientId)) of
+        [] -> emqx_cli:print("Not Found.~n");
+        [{_, SessPid}] -> 
+            case proplists:get_value(conn_pid, emqx_session:info(SessPid)) of
+                undefined ->
+                    emqx_session:close(SessPid),
+                    emqx_cli:print("Clean persistent session successfully.~n");
+                _ ->
+                    emqx_cli:print("Couldn't clean a session with a valid connection.~n")
+            end
+    end;
+
 sessions(_) ->
-    emqx_cli:usage([{"sessions list",            "List all sessions"},
-                    {"sessions show <ClientId>", "Show a session"}]).
+    emqx_cli:usage([{"sessions list",                        "List all sessions"},
+                    {"sessions show <ClientId>",             "Show a session"},
+                    {"sessions clean-persistent <ClientId>",  "Clean a persistent session"}]).
 
 %%--------------------------------------------------------------------
 %% @doc Routes Command
@@ -331,23 +357,17 @@ plugins(["unload", Name]) ->
     end;
 
 plugins(["reload", Name]) ->
-    try
-        PluginName = list_to_existing_atom(Name),
-        Config = gen_config(PluginName),
-        Plugin = emqx_plugins:find_plugin(PluginName),
-        case Plugin#plugin.active of
-            false ->
-                load_plugin(PluginName, Config);
-            true ->
-                case emqx_plugins:unload(PluginName) of
-                    ok ->
-                        load_plugin(PluginName, Config);
-                    {error, Reason} ->
-                        emqx_cli:print("Reload plugin error: ~p~n", [Reason])
-                end
-        end
-    catch _ : _Error : Stacktrace ->
-        emqx_cli:print("Reload plugin error:~p~n", [Stacktrace])
+    try list_to_existing_atom(Name) of
+        PluginName ->
+            case emqx_mgmt:reload_plugin(node(), PluginName) of
+                ok ->
+                    emqx_cli:print("Plugin ~p reloaded successfully.~n", [PluginName]);
+                {error, Reason} ->
+                    emqx_cli:print("Reload plugin error: ~p~n", [Reason])
+            end
+    catch
+        error:badarg ->
+            emqx_cli:print("Reload plugin error: plugin_not_exist~n")
     end;
 
 % plugins(["add", Name]) ->
@@ -524,7 +544,7 @@ vm(["process"]) ->
 
 vm(["io"]) ->
     IoInfo = lists:usort(lists:flatten(erlang:system_info(check_io))),
-    [emqx_cli:print("io/~-21s: ~w~n", [Key, get_value(Key, IoInfo)]) || Key <- [max_fds, active_fds]];
+    [emqx_cli:print("io/~-21s: ~w~n", [Key, proplists:get_value(Key, IoInfo)]) || Key <- [max_fds, active_fds]];
 
 vm(["ports"]) ->
     [emqx_cli:print("ports/~-16s: ~w~n", [Name, erlang:system_info(Key)]) || {Name, Key} <- [{count, port_count}, {limit, port_limit}]];
@@ -648,7 +668,7 @@ listeners([]) ->
                         end, Info)
             end, esockd:listeners()),
     foreach(fun({Protocol, Opts}) ->
-                Info = [{acceptors,      proplists:get_value(num_acceptors, Opts)},
+                Info = [{acceptors,      maps:get(num_acceptors, proplists:get_value(transport_options, Opts, #{}), 0)},
                         {max_conns,      proplists:get_value(max_connections, Opts)},
                         {current_conn,   proplists:get_value(all_connections, Opts)},
                         {shutdown_count, []}],
@@ -743,7 +763,7 @@ print({emqx_conn, Key}) ->
                 peername,
                 connected_at],
     emqx_cli:print("Connection(~s, clean_start=~s, username=~s, peername=~s, connected_at=~p)~n",
-                   [format(K, get_value(K, Attrs)) || K <- InfoKeys]);
+                   [format(K, maps:get(K, Attrs)) || K <- InfoKeys]);
 
 print({emqx_session, Key}) ->
     [{_, Attrs}] = ets:lookup(emqx_session_attrs, Key),
@@ -765,7 +785,7 @@ print({emqx_session, Key}) ->
                     "subscriptions_count=~w, max_inflight=~w, inflight=~w, "
                     "mqueue_len=~w, mqueue_dropped=~w, awaiting_rel=~w, "
                     "deliver_msg=~w, enqueue_msg=~w, created_at=~w)~n",
-                    [format(K, get_value(K, Attrs++Stats)) || K <- InfoKeys]);
+                    [format(K, proplists:get_value(K, Attrs++Stats)) || K <- InfoKeys]);
 
 print({emqx_route, #route{topic = Topic, dest = {_, Node}}}) ->
     emqx_cli:print("~s -> ~s~n", [Topic, Node]);
@@ -796,19 +816,3 @@ format(_, Val) ->
 
 bin(S) -> iolist_to_binary(S).
 
-gen_config(App) ->
-    Schema = cuttlefish_schema:files([filename:join([code:priv_dir(App), App]) ++ ".schema"]),
-    Conf = cuttlefish_conf:file(filename:join([emqx_config:get_env(plugins_etc_dir), App]) ++ ".conf"),
-    case cuttlefish_generator:map(Schema, Conf) of
-        [] -> [];
-        [{_, Config}] -> Config
-    end.
-
-load_plugin(Plugin, Config) ->
-    lists:foreach(fun({Key, Val}) -> application:set_env(Plugin, Key, Val) end, Config),
-    case emqx_plugins:load(Plugin) of
-        {ok, _StartedApp} ->
-            emqx_cli:print("Plugin ~p reloaded successfully.~n", [Plugin]);
-        {error, Reason1}   ->
-            emqx_cli:print("Reload plugin error: ~p~n", [Reason1])
-    end.

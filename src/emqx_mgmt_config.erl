@@ -23,7 +23,14 @@
 
 -module(emqx_mgmt_config).
 
--export([read/1, write/2, dump/2, reload/1, get/2, get/3, set/3]).
+-export([ read/1
+        , write/2
+        , dump/2
+        , reload/1
+        , get/2
+        , get/3
+        , set/3
+        ]).
 
 -type(env() :: {atom(), term()}).
 
