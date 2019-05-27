@@ -243,9 +243,23 @@ sessions(["show", ClientId]) ->
         [SessInfo] -> print({emqx_session, SessInfo})
     end;
 
+sessions(["clean-persistent", ClientId]) ->
+    case ets:lookup(emqx_session, bin(ClientId)) of
+        [] -> emqx_cli:print("Not Found.~n");
+        [{_, SessPid}] -> 
+            case proplists:get_value(conn_pid, emqx_session:info(SessPid)) of
+                undefined ->
+                    emqx_session:close(SessPid),
+                    emqx_cli:print("Clean persistent session successfully.~n");
+                _ ->
+                    emqx_cli:print("Couldn't clean a session with a valid connection.~n")
+            end
+    end;
+
 sessions(_) ->
-    emqx_cli:usage([{"sessions list",            "List all sessions"},
-                    {"sessions show <ClientId>", "Show a session"}]).
+    emqx_cli:usage([{"sessions list",                        "List all sessions"},
+                    {"sessions show <ClientId>",             "Show a session"},
+                    {"sessions clean-persistent <ClientId>",  "Clean a persistent session"}]).
 
 %%--------------------------------------------------------------------
 %% @doc Routes Command

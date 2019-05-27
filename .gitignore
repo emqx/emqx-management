@@ -23,3 +23,4 @@ ct.coverdata
 eunit.coverdata
 logs/
 test/ct.cover.spec
+*.conf.rendered

@@ -42,6 +42,7 @@ groups() ->
        brokers,
        configs,
        connections_and_sessions,
+       connections_and_sessions_2,
        listeners,
        metrics,
        nodes,
@@ -183,6 +184,26 @@ connections_and_sessions(_) ->
     ?assertEqual([], get(data, NonConn)),
     {ok, NonSession} = request_api(get, api_path(["sessions"]), auth_header_()),
     ?assertEqual([], get(data, NonSession)).
+
+connections_and_sessions_2(_) ->
+    process_flag(trap_exit, true),
+    ClientId1 = <<"client1">>,
+    ClientId2 = <<"client2">>,
+    {ok, C1} = emqx_client:start_link(#{client_id => ClientId1, clean_start => false}),
+    {ok, C2} = emqx_client:start_link(#{client_id => ClientId2, clean_start => false}),
+    {ok, _} = emqx_client:connect(C1),
+    {ok, _} = emqx_client:connect(C2),
+
+    {ok, Result1} = request_api(get, api_path(["sessions"]), auth_header_()),
+    emqx_client:disconnect(C1),
+    emqx_client:disconnect(C2),
+    {ok, Result1} = request_api(get, api_path(["sessions"]), auth_header_()),
+    {ok, Result2} = request_api(delete, api_path(["sessions", "persistent", binary_to_list(ClientId1)]), auth_header_()),
+    {ok, Result2} = request_api(delete, api_path(["nodes", atom_to_list(node()),
+                                                  "sessions", "persistent", binary_to_list(ClientId2)]), auth_header_()),
+    ?assertEqual(0, proplists:get_value(<<"code">>, jsx:decode(list_to_binary(Result2)))),
+    {ok, Result3} = request_api(get, api_path(["sessions"]), auth_header_()),
+    ?assertEqual([], get(data, Result3)).
 
 receive_exit(0) ->
     ok;
