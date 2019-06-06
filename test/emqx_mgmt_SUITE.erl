@@ -117,7 +117,7 @@ t_status_cmd(_) ->
 
 t_broker_cmd(_) ->
     ct:pal("start testing the broker command"),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["stats"]), "subscriptions/shared")),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["stats"]), "subscriptions.shared")),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["metrice"]), "broker")).
 
 t_clients_cmd(_) ->
