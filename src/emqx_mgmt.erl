@@ -238,7 +238,7 @@ kickout_conn(Node, ClientId) when Node =:= node() ->
     case emqx_cm:get_conn_attrs(ClientId, Cpid) of
         [] -> {error, not_found};
         Attrs ->
-            Module = maps:get(conn_mod, Attrs, emqx_connection),
+            Module = maps:get(conn_mod, Attrs, emqx_channel),
             Module:kick(Cpid)
     end;
 
@@ -255,7 +255,7 @@ kickout_conn(Node, ClientId) ->
 %% clean_acl_cache(Node, ClientId, Topic) when Node =:= node() ->
 %%     case emqx_cm:lookup_conn_pid(ClientId) of
 %%         Pid when is_pid(Pid) ->
-%%             emqx_connection:clean_acl_cache(Pid, Topic);
+%%             emqx_channel:clean_acl_cache(Pid, Topic);
 %%         _ -> {error, not_found}
 %%     end;
 %% clean_acl_cache(Node, ClientId, Topic) ->

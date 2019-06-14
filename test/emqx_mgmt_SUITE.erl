@@ -18,7 +18,7 @@
 -compile(nowarn_export_all).
 
 -include_lib("emqx/include/emqx.hrl").
-
+-include_lib("emqx/include/emqx_mqtt.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -include_lib("common_test/include/ct.hrl").
@@ -139,7 +139,25 @@ t_clients_cmd(_) ->
     after
         500 ->
             erlang:error("Client is not kick")
-    end.
+    end,
+    WS = rfc6455_client:new("ws://127.0.0.1:8083" ++ "/mqtt", self()),
+    {ok, _} = rfc6455_client:open(WS),
+    Packet = raw_send_serialize(?CONNECT_PACKET(#mqtt_packet_connect{
+                                                   client_id = <<"client13">>})),
+    ok = rfc6455_client:send_binary(WS, Packet),
+    Connack = ?CONNACK_PACKET(?CONNACK_ACCEPT),
+    {binary, Bin} = rfc6455_client:recv(WS),
+    {ok, Connack, <<>>, _} = raw_recv_pase(Bin),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:clients(["show", "client13"]), "client13")),
+    emqx_mgmt_cli:clients(["kick", "client13"]),
+    timer:sleep(500),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:clients(["show", "client13"]), "Not Found")).
+
+raw_recv_pase(Packet) ->
+    emqx_frame:parse(Packet).
+
+raw_send_serialize(Packet) ->
+    emqx_frame:serialize(Packet).
 
 t_sessions_cmd(_) ->
     ct:pal("start testing the session command"),
