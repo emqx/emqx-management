@@ -218,7 +218,7 @@ clients(["show", ClientId]) ->
     if_client(ClientId, fun print/1);
 
 clients(["kick", ClientId]) ->
-    if_client(ClientId, fun({_, {_ClientId, Pid}}) -> emqx_connection:kick(Pid) end);
+    if_client(ClientId, fun({_, {_ClientId, Pid}}) -> Pid ! {shutdown, kicked} end);
 
 clients(_) ->
     emqx_cli:usage([{"clients list",            "List all clients"},
