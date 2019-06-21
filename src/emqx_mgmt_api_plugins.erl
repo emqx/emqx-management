@@ -74,6 +74,14 @@ reload(#{node := Node, plugin := Plugin}, _Params) ->
 format({Node, Plugins}) ->
     [{node, Node}, {plugins, [format(Plugin) || Plugin <- Plugins]}];
 
-format(#plugin{name = Name, version = Ver, descr = Descr, active = Active}) ->
-    [{name, Name}, {version, iolist_to_binary(Ver)}, {description, iolist_to_binary(Descr)}, {active, Active}].
+format(#plugin{name = Name,
+               version = Ver,
+               descr = Descr,
+               active = Active,
+               type = Type}) ->
+    [{name, Name},
+     {version, iolist_to_binary(Ver)},
+     {description, iolist_to_binary(Descr)},
+     {active, Active},
+     {type, Type}].
 
