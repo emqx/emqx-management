@@ -263,7 +263,6 @@ t_cli(_) ->
     [?assertMatch({match, _}, re:run(Value, "routes")) || Value <- emqx_mgmt_cli:routes([""])],
     [?assertMatch({match, _}, re:run(Value, "subscriptions")) || Value <- emqx_mgmt_cli:subscriptions([""])],
     [?assertMatch({match, _}, re:run(Value, "plugins")) || Value <- emqx_mgmt_cli:plugins([""])],
-    [?assertMatch({match, _}, re:run(Value, "bridges")) || Value <- emqx_mgmt_cli:bridges([""])],
     [?assertMatch({match, _}, re:run(Value, "listeners")) || Value <- emqx_mgmt_cli:listeners([""])],
     [?assertMatch({match, _}, re:run(Value, "vm")) || Value <- emqx_mgmt_cli:vm([""])],
     [?assertMatch({match, _}, re:run(Value, "mnesia")) || Value <- emqx_mgmt_cli:mnesia([""])],
