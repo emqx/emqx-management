@@ -86,8 +86,8 @@
         ]).
 
 %% Alarms
--export([ get_alarms/0
-        , get_alarms/1
+-export([ get_alarms/1
+        , get_alarms/2
         ]).
 
 %% Configs
@@ -456,13 +456,13 @@ list_listeners(Node) ->
 %% Get Alarms
 %%--------------------------------------------------------------------
 
-get_alarms() ->
-    [{Node, get_alarms(Node)} || Node <- ekka_mnesia:running_nodes()].
+get_alarms(Type) ->
+    [{Node, get_alarms(Node, Type)} || Node <- ekka_mnesia:running_nodes()].
 
-get_alarms(Node) when Node =:= node() ->
-    emqx_alarm_handler:get_alarms();
-get_alarms(Node) ->
-    rpc_call(Node, get_alarms, [Node]).
+get_alarms(Node, Type) when Node =:= node() ->
+    emqx_alarm_handler:get_alarms(Type);
+get_alarms(Node, Type) ->
+    rpc_call(Node, get_alarms, [Node, Type]).
 
 %%--------------------------------------------------------------------
 %% Config ENV
