@@ -30,12 +30,12 @@
 
 -define(BASE_PATH, "api").
 
-all() -> 
+all() ->
     [{group, rest_api}].
 
 groups() ->
     [{rest_api,
-      [sequence], 
+      [sequence],
       [alarms,
        apps,
        banned,
@@ -70,14 +70,17 @@ get(meta, ResponseBody) ->
 alarms(_) ->
     AlarmTest = #alarm{id = <<"1">>, severity = error, title="alarm title", summary="alarm summary"},
     alarm_handler:set_alarm({<<"1">>, AlarmTest}),
+    timer:sleep(100),
     [{_AlarmId, AlarmDesc}] = emqx_alarm_handler:get_alarms(),
     ?assertEqual(error, AlarmDesc#alarm.severity),
-    {ok, _} = request_api(get, api_path(["alarms"]), auth_header_()),
-    {ok, _} = request_api(get, api_path(["alarms", atom_to_list(node())]), auth_header_()).
+    {ok, _} = request_api(get, api_path(["alarms/present"]), auth_header_()),
+    {ok, _} = request_api(get, api_path(["alarms/present", atom_to_list(node())]), auth_header_()),
+    {ok, _} = request_api(get, api_path(["alarms/history"]), auth_header_()),
+    {ok, _} = request_api(get, api_path(["alarms/history", atom_to_list(node())]), auth_header_()).
 
 apps(_) ->
     AppId = <<"123456">>,
-    {ok, _} = request_api(post, api_path(["apps"]), [], 
+    {ok, _} = request_api(post, api_path(["apps"]), [],
                           auth_header_(), [{<<"app_id">>, AppId},
                                            {<<"name">>,   <<"test">>},
                                            {<<"status">>, true}]),
@@ -95,8 +98,8 @@ apps(_) ->
     ?assertEqual(<<"myappid">>, proplists:get_value(<<"app_id">>, App)).
 
 banned(_) ->
-    Who = <<"myclient">>,    
-    {ok, _} = request_api(post, api_path(["banned"]), [], 
+    Who = <<"myclient">>,
+    {ok, _} = request_api(post, api_path(["banned"]), [],
                           auth_header_(), [{<<"who">>, Who},
                                            {<<"as">>, <<"client_id">>},
                                            {<<"reason">>, <<"test">>},
@@ -108,7 +111,7 @@ banned(_) ->
     [Banned] = get(data, Result),
     ?assertEqual(Who, proplists:get_value(<<"who">>, Banned)),
 
-    {ok, _} = request_api(delete, api_path(["banned", binary_to_list(Who)]), [], 
+    {ok, _} = request_api(delete, api_path(["banned", binary_to_list(Who)]), [],
                           auth_header_(), [{<<"as">>, <<"client_id">>}]),
     {ok, Result2} = request_api(get, api_path(["banned"]), auth_header_()),
     ?assertEqual([], get(data, Result2)).
@@ -122,15 +125,15 @@ configs(_) ->
 
     {ok, _} = request_api(get, api_path(["nodes", atom_to_list(node()), "configs"]), auth_header_()),
 
-    {ok, _} = request_api(put, api_path(["nodes", atom_to_list(node()), "plugin_configs", atom_to_list(emqx_reloader)]), [], 
+    {ok, _} = request_api(put, api_path(["nodes", atom_to_list(node()), "plugin_configs", atom_to_list(emqx_reloader)]), [],
                           auth_header_(), [{<<"reloader.interval">>, <<"60s">>},
                                            {<<"reloader.logfile">>, <<"reloader.log">>}]),
 
     {ok, Result} = request_api(get, api_path(["nodes", atom_to_list(node()), "plugin_configs", atom_to_list(emqx_reloader)]),
                                auth_header_()),
-    ?assert(lists:any(fun(Elem) -> 
+    ?assert(lists:any(fun(Elem) ->
                               case proplists:get_value(<<"key">>, Elem) of
-                              <<"reloader.interval">> -> 
+                              <<"reloader.interval">> ->
                                   <<"60s">> == proplists:get_value(<<"value">>, Elem);
                               _ -> false
                           end
@@ -152,17 +155,17 @@ connections_and_sessions(_) ->
                                                       "username", binary_to_list(Username)])
                                       , auth_header_()),
     ?assertEqual(2, length(get(data, ConsViaUsername))),
-    {ok, Conns} = request_api(get, api_path(["connections"]), "_limit=100&_page=1", 
+    {ok, Conns} = request_api(get, api_path(["connections"]), "_limit=100&_page=1",
                               auth_header_()),
     ?assertEqual(2, proplists:get_value(<<"count">>, get(meta, Conns))),
-    {ok, Conns} = request_api(get, api_path(["nodes", atom_to_list(node()), "connections"]), "_limit=100&_page=1", 
+    {ok, Conns} = request_api(get, api_path(["nodes", atom_to_list(node()), "connections"]), "_limit=100&_page=1",
                               auth_header_()),
     {ok, Result} = request_api(get, api_path(["nodes", atom_to_list(node()), "connections", binary_to_list(ClientId1)]), auth_header_()),
     [Conn] = get(data, Result),
     ?assertEqual(ClientId1, proplists:get_value(<<"client_id">>, Conn)),
 
-    {ok, Result} = request_api(get, api_path(["connections", 
-                                              binary_to_list(ClientId1)]), 
+    {ok, Result} = request_api(get, api_path(["connections",
+                                              binary_to_list(ClientId1)]),
                                auth_header_()),
 
     {ok, Result2} = request_api(get, api_path(["sessions"]), auth_header_()),
@@ -208,7 +211,7 @@ connections_and_sessions_2(_) ->
 receive_exit(0) ->
     ok;
 receive_exit(Count) ->
-    receive 
+    receive
         {'EXIT', Client, {shutdown, tcp_closed}} ->
             ct:log("receive exit signal, Client: ~p", [Client]),
             receive_exit(Count - 1);
@@ -240,7 +243,7 @@ plugins(_) ->
     [Plugin3] = filter(get(data, Result3), <<"emqx_reloader">>),
     ?assertEqual(<<"emqx_reloader">>, proplists:get_value(<<"name">>, Plugin3)),
     ?assertNot(proplists:get_value(<<"active">>, Plugin3)),
-    {ok, _} = request_api(put, api_path([ "nodes", atom_to_list(node()), "plugins", atom_to_list(emqx_reloader), "load"]), 
+    {ok, _} = request_api(put, api_path([ "nodes", atom_to_list(node()), "plugins", atom_to_list(emqx_reloader), "load"]),
                           auth_header_()),
     {ok, Result} = request_api(get, api_path(["plugins"]), auth_header_()),
     [Plugins] = get(data, Result),
@@ -277,7 +280,7 @@ pubsub(_) ->
     {ok, Code} = request_api(post, api_path(["mqtt/unsubscribe"]), [], auth_header_(),
                              [{<<"client_id">>, ClientId},
                               {<<"topic">>, Topic}]).
-     
+
 routes_and_subscriptions(_) ->
     {ok, NonRoute} = request_api(get, api_path(["routes"]), auth_header_()),
     ?assertEqual([], get(data, NonRoute)),
@@ -292,7 +295,7 @@ routes_and_subscriptions(_) ->
     {ok, Result} = request_api(get, api_path(["routes"]), auth_header_()),
     [Route] = get(data, Result),
     ?assertEqual(Topic, proplists:get_value(<<"topic">>, Route)),
-                        
+
     {ok, Result2} = request_api(get, api_path(["routes", binary_to_list(Topic)]), auth_header_()),
     [Route] = get(data, Result2),
 
@@ -332,7 +335,7 @@ do_request_api(Method, Request)->
     case httpc:request(Method, Request, [], []) of
         {error, socket_closed_remotely} ->
             {error, socket_closed_remotely};
-        {ok, {{"HTTP/1.1", Code, _}, _, Return} } 
+        {ok, {{"HTTP/1.1", Code, _}, _, Return} }
             when Code =:= 200 orelse Code =:= 201 ->
             {ok, Return};
         {ok, {Reason, _, _}} ->
