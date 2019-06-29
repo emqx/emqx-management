@@ -31,7 +31,6 @@
         , routes/1
         , subscriptions/1
         , plugins/1
-        , bridges/1
         , listeners/1
         , vm/1
         , mnesia/1
@@ -449,80 +448,6 @@ plugins(_) ->
 %     {max_queue_len, list_to_integer(Len)};
 % parse_opt(_Cmd, Opt, _Val) ->
 %     emqx_cli:print("Bad Option: ~s~n", [Opt]).
-
-bridges(["list"]) ->
-    foreach(fun({Name, State0}) ->
-                State = case State0 of
-                            connected -> <<"Running">>;
-                            _ -> <<"Stopped">>
-                        end,
-                emqx_cli:print("name: ~s     status: ~s~n", [Name, State])
-            end, emqx_bridge_sup:bridges());
-
-bridges(["start", Name]) ->
-    emqx_cli:print("~s.~n", [try emqx_bridge:ensure_started(Name) of 
-                                 ok -> <<"Start bridge successfully">>;
-                                 connected -> <<"Bridge already started">>;
-                                 _ -> <<"Start bridge failed">>
-                             catch
-                                 _Error:_Reason ->
-                                     <<"Start bridge failed">>
-                             end]);
-
-bridges(["stop", Name]) ->
-    emqx_cli:print("~s.~n", [try emqx_bridge:ensure_stopped(Name) of
-                                 ok -> <<"Stop bridge successfully">>;
-                                 standing_by -> <<"Bridge already started">>;
-                                 _ -> <<"Stop bridge failed]">>
-                             catch
-                                 _Error:_Reason ->
-                                     <<"Stop bridge failed">>
-                             end]);
-
-bridges(["forwards", Name]) ->
-    foreach(fun(Topic) ->
-                emqx_cli:print("topic:   ~s~n", [Topic])
-            end, emqx_bridge:get_forwards(Name));
-
-bridges(["add-forward", Name, Topic]) ->
-    case emqx_bridge:ensure_forward_present(Name, iolist_to_binary(Topic)) of
-        ok -> emqx_cli:print("Add-forward topic successfully.~n");
-        {error, Reason} -> emqx_cli:print("Add-forward failed reason: ~p.~n", [Reason])
-    end;
-
-bridges(["del-forward", Name, Topic]) ->
-    case emqx_bridge:ensure_forward_absent(Name, iolist_to_binary(Topic)) of
-        ok -> emqx_cli:print("Del-forward topic successfully.~n");
-        {error, Reason} -> emqx_cli:print("Del-forward failed reason: ~p.~n", [Reason])
-    end;
-
-bridges(["subscriptions", Name]) ->
-    foreach(fun({Topic, Qos}) ->
-                emqx_cli:print("topic: ~s, qos: ~p~n", [Topic, Qos])
-            end, emqx_bridge:get_subscriptions(Name));
-
-bridges(["add-subscription", Name, Topic, Qos]) ->
-    case emqx_bridge:ensure_subscription_present(Name, Topic, list_to_integer(Qos)) of
-        ok -> emqx_cli:print("Add-subscription topic successfully.~n");
-        {error, Reason} -> emqx_cli:print("Add-subscription failed reason: ~p.~n", [Reason])
-    end;
-
-bridges(["del-subscription", Name, Topic]) ->
-    case emqx_bridge:ensure_subscription_absent(Name, Topic) of
-        ok -> emqx_cli:print("Del-subscription topic successfully.~n");
-        {error, Reason} -> emqx_cli:print("Del-subscription failed reason: ~p.~n", [Reason])
-    end;
-
-bridges(_) ->
-    emqx_cli:usage([{"bridges list",           "List bridges"},
-                    {"bridges start <Name>",   "Start a bridge"},
-                    {"bridges stop <Name>",    "Stop a bridge"},
-                    {"bridges forwards <Name>", "Show a bridge forward topic"},
-                    {"bridges add-forward <Name> <Topic>", "Add bridge forward topic"},
-                    {"bridges del-forward <Name> <Topic>", "Delete bridge forward topic"},
-                    {"bridges subscriptions <Name>", "Show a bridge subscriptions topic"},
-                    {"bridges add-subscription <Name> <Topic> <Qos>", "Add bridge subscriptions topic"},
-                    {"bridges del-subscription <Name> <Topic>", "Delete bridge subscriptions topic"}]).
 
 %%--------------------------------------------------------------------
 %% @doc vm command
