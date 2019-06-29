@@ -20,33 +20,55 @@
 
 -rest_api(#{name   => list_all_alarms,
             method => 'GET',
-            path   => "/alarms/",
-            func   => list,
+            path   => "/alarms/present",
+            func   => list_present,
             descr  => "List all alarms"}).
 
 -rest_api(#{name   => list_node_alarms,
             method => 'GET',
-            path   => "/alarms/:atom:node",
-            func   => list,
+            path   => "/alarms/present/:atom:node",
+            func   => list_present,
             descr  => "List alarms of a node"}).
 
--export([list/2]).
+-rest_api(#{name   => list_all_alarm_history,
+            method => 'GET',
+            path   => "/alarms/history",
+            func   => list_history,
+            descr  => "List all alarm history"}).
 
-list(Bindings, _Params) when map_size(Bindings) == 0 ->
-    {ok, #{code => ?SUCCESS,
-           data => [#{node => Node, alarms => format(Alarms)} || {Node, Alarms} <- emqx_mgmt:get_alarms()]}};
+-rest_api(#{name   => list_node_alarm_history,
+            method => 'GET',
+            path   => "/alarms/history/:atom:node",
+            func   => list_history,
+            descr  => "List alarm history of a node"}).
 
-list(#{node := Node}, _Params) ->
+-export([ list_present/2
+        , list_history/2
+        ]).
+
+list_present(Bindings, _Params) when map_size(Bindings) == 0 ->
     {ok, #{code => ?SUCCESS,
-           data => format(emqx_mgmt:get_alarms(Node))}}.
+           data => [#{node => Node, alarms => format(Alarms)} || {Node, Alarms} <- emqx_mgmt:get_alarms(present)]}};
+
+list_present(#{node := Node}, _Params) ->
+    {ok, #{code => ?SUCCESS,
+           data => format(emqx_mgmt:get_alarms(Node, present))}}.
+
+list_history(Bindings, _Params) when map_size(Bindings) == 0 ->
+    {ok, #{code => ?SUCCESS,
+           data => [#{node => Node, alarms => format(Alarms)} || {Node, Alarms} <- emqx_mgmt:get_alarms(history)]}};
+
+list_history(#{node := Node}, _Params) ->
+    {ok, #{code => ?SUCCESS,
+           data => format(emqx_mgmt:get_alarms(Node, history))}}.
 
 format(Alarms) when is_list(Alarms) ->
     [format(Alarm) || Alarm <- Alarms];
 
 format({AlarmId, #alarm{severity  = Severity, 
-                             title     = Title,
-                             summary   = Summary, 
-                             timestamp = Ts}}) ->
+                        title     = Title,
+                        summary   = Summary, 
+                        timestamp = Ts}}) ->
     #{id   => maybe_to_binary(AlarmId),
       desc => #{severity  => Severity,
                 title     => iolist_to_binary(Title),
@@ -54,7 +76,21 @@ format({AlarmId, #alarm{severity  = Severity,
                 timestamp => iolist_to_binary(emqx_mgmt_util:strftime(Ts))}};
 format({AlarmId, AlarmDesc}) ->
     #{id   => maybe_to_binary(AlarmId),
-      desc => maybe_to_binary(AlarmDesc)}.
+      desc => maybe_to_binary(AlarmDesc)};
+format({AlarmId, #alarm{severity  = Severity, 
+                        title     = Title,
+                        summary   = Summary, 
+                        timestamp = Ts}, ClearAt}) ->
+    #{id       => maybe_to_binary(AlarmId),
+      desc     => #{severity  => Severity,
+                    title     => iolist_to_binary(Title),
+                    summary   => iolist_to_binary(Summary),
+                    timestamp => iolist_to_binary(emqx_mgmt_util:strftime(Ts))},
+      clear_at => iolist_to_binary(emqx_mgmt_util:strftime(ClearAt))};
+format({AlarmId, AlarmDesc, ClearAt}) ->
+    #{id       => maybe_to_binary(AlarmId),
+      desc     => maybe_to_binary(AlarmDesc),
+      clear_at => iolist_to_binary(emqx_mgmt_util:strftime(ClearAt))}.
 
 maybe_to_binary(Data) when is_binary(Data) ->
     Data;
