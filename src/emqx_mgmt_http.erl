@@ -18,6 +18,8 @@
 
 -author("Feng Lee <feng@emqtt.io>").
 
+-import(proplists, [get_value/3]).
+
 -export([ start_listeners/0
         , handle_request/2
         , stop_listeners/0
@@ -48,12 +50,26 @@ stop_listeners() ->
 start_listener({Proto, Port, Options}) when Proto == http ->
     Dispatch = [{"/status", emqx_mgmt_http, []},
                 {"/api/v3/[...]", minirest, http_handlers()}],
-    minirest:start_http(listener_name(Proto), [{port, Port}] ++ Options, Dispatch);
+    minirest:start_http(listener_name(Proto), ranch_opts(Port, Options), Dispatch);
 
 start_listener({Proto, Port, Options}) when Proto == https ->
     Dispatch = [{"/status", emqx_mgmt_http, []},
                 {"/api/v3/[...]", minirest, http_handlers()}],
-    minirest:start_https(listener_name(Proto), [{port, Port}] ++ Options, Dispatch).
+    minirest:start_https(listener_name(Proto), ranch_opts(Port, Options), Dispatch).
+
+ranch_opts(Port, Options0) ->
+    NumAcceptors = get_value(num_acceptors, Options0, 4),
+    MaxConnections = get_value(max_connections, Options0, 512),
+    Options = lists:foldl(fun({K, _V}, Acc) when K =:= max_connections orelse K =:= num_acceptors->
+                                  Acc;
+                             ({K, V}, Acc)->
+                                  [{K, V} | Acc]
+                          end, [], Options0),
+
+    Res = #{num_acceptors => NumAcceptors,
+            max_connections => MaxConnections,
+            socket_opts => [{port, Port} | Options]},
+    Res.
 
 stop_listener({Proto, _Port, _}) ->
     minirest:stop_http(listener_name(Proto)).
