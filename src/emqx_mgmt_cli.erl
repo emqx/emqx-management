@@ -211,54 +211,54 @@ acl(_) ->
 %% @doc Query clients
 
 clients(["list"]) ->
-    dump(emqx_conn);
+    dump(emqx_channel, connection);
 
 clients(["show", ClientId]) ->
     if_client(ClientId, fun print/1);
 
-clients(["kick", ClientId]) ->
-    if_client(ClientId, fun({_, {_ClientId, Pid}}) -> Pid ! {shutdown, kicked} end);
+% clients(["kick", ClientId]) ->
+%     if_client(ClientId, fun({_, {_ClientId, Pid}}) -> Pid ! {shutdown, kicked} end);
 
 clients(_) ->
     emqx_cli:usage([{"clients list",            "List all clients"},
-                    {"clients show <ClientId>", "Show a client"},
-                    {"clients kick <ClientId>", "Kick out a client"}]).
+                    {"clients show <ClientId>", "Show a client"}]).
+                    % {"clients kick <ClientId>", "Kick out a client"}
 
 if_client(ClientId, Fun) ->
-    case ets:lookup(emqx_conn, (bin(ClientId))) of
+    case ets:lookup(emqx_channel, (bin(ClientId))) of
         [] -> emqx_cli:print("Not Found.~n");
-        [Client]    -> Fun({emqx_conn, Client})
+        [Channel]    -> Fun({connection, Channel})
     end.
 
 %%--------------------------------------------------------------------
 %% @doc Sessions Command
 
 sessions(["list"]) ->
-    dump(emqx_session);
+    dump(emqx_channel, session);
 
 sessions(["show", ClientId]) ->
-    case ets:lookup(emqx_session, bin(ClientId)) of
+    case ets:lookup(emqx_channel, bin(ClientId)) of
         []         -> emqx_cli:print("Not Found.~n");
-        [SessInfo] -> print({emqx_session, SessInfo})
+        [Channel] -> print({session, Channel})
     end;
 
-sessions(["clean-persistent", ClientId]) ->
-    case ets:lookup(emqx_session, bin(ClientId)) of
-        [] -> emqx_cli:print("Not Found.~n");
-        [{_, SessPid}] -> 
-            case proplists:get_value(conn_pid, emqx_session:info(SessPid)) of
-                undefined ->
-                    emqx_session:close(SessPid),
-                    emqx_cli:print("Clean persistent session successfully.~n");
-                _ ->
-                    emqx_cli:print("Couldn't clean a session with a valid connection.~n")
-            end
-    end;
+% sessions(["clean-persistent", ClientId]) ->
+%     case ets:lookup(emqx_session, bin(ClientId)) of
+%         [] -> emqx_cli:print("Not Found.~n");
+%         [{_, SessPid}] -> 
+%             case proplists:get_value(conn_pid, emqx_session:info(SessPid)) of
+%                 undefined ->
+%                     emqx_session:close(SessPid),
+%                     emqx_cli:print("Clean persistent session successfully.~n");
+%                 _ ->
+%                     emqx_cli:print("Couldn't clean a session with a valid connection.~n")
+%             end
+%     end;
 
 sessions(_) ->
     emqx_cli:usage([{"sessions list",                        "List all sessions"},
-                    {"sessions show <ClientId>",             "Show a session"},
-                    {"sessions clean-persistent <ClientId>",  "Clean a persistent session"}]).
+                    {"sessions show <ClientId>",             "Show a session"}]).
+                    % {"sessions clean-persistent <ClientId>",  "Clean a persistent session"}
 
 %%--------------------------------------------------------------------
 %% @doc Routes Command
@@ -665,23 +665,30 @@ listeners(_) ->
 %%--------------------------------------------------------------------
 
 dump(Table) ->
-    dump(Table, ets:first(Table), []).
+    dump(Table, Table, ets:first(Table), []).
 
-dump(_Table, '$end_of_table', Result) ->
+dump(Table, Tag) ->
+    dump(Table, Tag, ets:first(Table), []).
+
+dump(_Table, _, '$end_of_table', Result) ->
     Result;
 
-dump(Table, Key, Result) ->
+dump(Table, Tag, Key, Result) ->
     PrintValue = case ets:lookup(Table, Key) of
-                      [Record] -> print({Table, Record});
+                      [Record] -> print({Tag, Record});
                       [] -> ok
                   end,
-    dump(Table, ets:next(Table, Key), [Result | PrintValue]).
+    dump(Table, Tag, ets:next(Table, Key), [Result | PrintValue]).
 
 print({_, []}) ->
     ok;
 
-print({emqx_conn, Key}) ->
-    [{_, Attrs}] = ets:lookup(emqx_conn_attrs, Key),
+print({connection, Key}) ->
+    [{_, #{client := ClientAttrs,
+           connected_at := ConnectedAt,
+           session := #{clean_start := CleanStart}}}] = ets:lookup(emqx_channel_attrs, Key),
+    % Attrs = maps:to_list(ClientAttrs) ++ [{connected_at, ConnectedAt}, {clean_start, CleanStart}],
+    Attrs = ClientAttrs#{connected_at => ConnectedAt, clean_start => CleanStart},
     InfoKeys = [client_id,
                 clean_start,
                 username,
@@ -690,27 +697,26 @@ print({emqx_conn, Key}) ->
     emqx_cli:print("Connection(~s, clean_start=~s, username=~s, peername=~s, connected_at=~p)~n",
                    [format(K, maps:get(K, Attrs)) || K <- InfoKeys]);
 
-print({emqx_session, Key}) ->
-    [{_, Attrs}] = ets:lookup(emqx_session_attrs, Key),
-    [{_, Stats}] = ets:lookup(emqx_session_stats, Key),
+print({session, Key}) ->
+    [{{ClientId, _}, #{session := SessionAttrs}}] = ets:lookup(emqx_channel_attrs, Key),
+    Attrs = SessionAttrs#{client_id => ClientId, subscriptions := maps:size(maps:get(subscriptions, SessionAttrs))},
     InfoKeys = [client_id,
                 clean_start,
                 expiry_interval,
-                subscriptions_count,
+                subscriptions,
                 max_inflight,
-                inflight_len,
+                inflight,
                 mqueue_len,
                 mqueue_dropped,
-                awaiting_rel_len,
-                deliver_msg,
-                enqueue_msg,
+                awaiting_rel,
+                % deliver_msg,
+                % enqueue_msg,
                 created_at],
 
     emqx_cli:print("Session(~s, clean_start=~s, expiry_interval=~w, "
-                    "subscriptions_count=~w, max_inflight=~w, inflight=~w, "
-                    "mqueue_len=~w, mqueue_dropped=~w, awaiting_rel=~w, "
-                    "deliver_msg=~w, enqueue_msg=~w, created_at=~w)~n",
-                    [format(K, proplists:get_value(K, Attrs++Stats)) || K <- InfoKeys]);
+                    "subscriptions=~w, max_inflight=~w, inflight=~w, "
+                    "mqueue_len=~w, mqueue_dropped=~w, awaiting_rel=~w, created_at=~w)~n",
+                    [format(K, maps:get(K, Attrs)) || K <- InfoKeys]);
 
 print({emqx_route, #route{topic = Topic, dest = {_, Node}}}) ->
     emqx_cli:print("~s -> ~s~n", [Topic, Node]);

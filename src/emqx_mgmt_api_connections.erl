@@ -61,11 +61,11 @@
             descr  => "Lookup a connection via username on a node "
            }).
 
--rest_api(#{name   => kickout_connection,
-            method => 'DELETE',
-            path   => "/connections/:bin:clientid",
-            func   => kickout,
-            descr  => "Kick out a connection"}).
+% -rest_api(#{name   => kickout_connection,
+%             method => 'DELETE',
+%             path   => "/connections/:bin:clientid",
+%             func   => kickout,
+%             descr  => "Kick out a connection"}).
 
 -import(emqx_mgmt_util, [ ntoa/1
                         , strftime/1
@@ -73,7 +73,7 @@
 
 -export([ list/2
         , lookup/2
-        , kickout/2
+        % , kickout/2
         , lookup_via_username/2
         ]).
 
@@ -82,7 +82,7 @@ list(Bindings, Params) when map_size(Bindings) == 0 ->
     list(#{node => node()}, Params);
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    return({ok, emqx_mgmt_api:paginate(emqx_conn, Params, fun format/1)});
+    return({ok, emqx_mgmt_api:paginate(emqx_channel, Params, fun format/1)});
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
@@ -102,32 +102,21 @@ lookup_via_username(#{node := Node, username := Username}, _Params) ->
 lookup_via_username(#{username := Username}, _Params) ->
     return({ok, emqx_mgmt:lookup_conn_via_username(http_uri:decode(Username), fun format/1)}).
 
-kickout(#{clientid := ClientId}, _Params) ->
-    case emqx_mgmt:kickout_conn(http_uri:decode(ClientId)) of
-        ok -> return();
-        {error, Reason} -> return({error, ?ERROR12, Reason})
-    end.
+% kickout(#{clientid := ClientId}, _Params) ->
+%     case emqx_mgmt:kickout_conn(http_uri:decode(ClientId)) of
+%         ok -> return();
+%         {error, Reason} -> return({error, ?ERROR12, Reason})
+%     end.
 
-format(ClientList) when is_list(ClientList) ->
-    [format(Client) || Client <- ClientList];
-format(Client = {_ClientId, _Pid}) ->
-    Data = maps:merge(get_emqx_conn_attrs(Client),
-                      maps:from_list(get_emqx_conn_stats(Client))),
-    adjust_format(Data).
+format([]) ->
+    [];
+format(Items) when is_list(Items) ->
+    [format(Item) || Item <- Items];
 
-get_emqx_conn_attrs(TabKey) ->
-    case ets:lookup(emqx_conn_attrs, TabKey) of
-        [{_, Val}] -> Val;
-        _ -> []
-    end.
+format(Key) when is_tuple(Key) ->
+    format(emqx_mgmt:item(connection, Key));
 
-get_emqx_conn_stats(TabKey) ->
-    case ets:lookup(emqx_conn_stats, TabKey) of
-        [{_, Val1}] -> Val1;
-        _ -> []
-    end.
-
-adjust_format(Data) when is_map(Data)->
+format(Data) when is_map(Data)->
     {IpAddr, Port} = maps:get(peername, Data),
     ConnectedAt = maps:get(connected_at, Data),
     maps:remove(peername,
@@ -136,3 +125,4 @@ adjust_format(Data) when is_map(Data)->
                   ipaddress    => iolist_to_binary(ntoa(IpAddr)),
                   port         => Port,
                   connected_at => iolist_to_binary(strftime(ConnectedAt))})).
+
