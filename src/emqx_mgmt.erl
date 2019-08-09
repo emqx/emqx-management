@@ -321,21 +321,21 @@ lookup_routes(Topic) ->
 %% PubSub
 %%--------------------------------------------------------------------
 
-subscribe(ClientId, TopicTable) ->
-    case emqx_sm:lookup_session_pids(ClientId) of
-        [] -> {error, session_not_found};
-        [Pid | _] ->
-            emqx_session:subscribe(Pid, TopicTable)
+subscribe(ClientId, TopicTables) ->
+    case ets:lookup(emqx_channel, ClientId) of
+        [] -> {error, channel_not_found};
+        [{_, Pid}] ->
+            Pid ! {subscribe, TopicTables}
     end.
 
 %%TODO: ???
 publish(Msg) -> emqx:publish(Msg).
 
 unsubscribe(ClientId, Topic) ->
-    case emqx_sm:lookup_session_pids(ClientId) of
-        [] -> {error, session_not_found};
-        [Pid | _] ->
-            emqx_session:unsubscribe(Pid, [{Topic, []}])
+    case ets:lookup(emqx_channel, ClientId) of
+        [] -> {error, channel_not_found};
+        [{_, Pid}] ->
+            Pid ! {unsubscribe, [Topic]}
     end.
 
 %%--------------------------------------------------------------------
