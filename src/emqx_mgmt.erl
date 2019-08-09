@@ -39,20 +39,18 @@
         ]).
 
 %% Clients, Sessions
--export([ list_conns/1
-        , lookup_conn/2
+-export([ lookup_conn/2
         , lookup_conn/3
         , lookup_conn_via_username/2
         , lookup_conn_via_username/3
-        , kickout_conn/1
-        , kickout_conn/2
+        % , kickout_conn/1
+        % , kickout_conn/2
         ]).
 
--export([ list_sessions/1
-        , lookup_session/1
+-export([ lookup_session/1
         , lookup_session/2
-        , clean_session/1
-        , clean_session/2
+        % , clean_session/1
+        % , clean_session/2
         ]).
 
 %% Subscriptions
@@ -109,7 +107,6 @@
 
 %% Common Table API
 -export([ count/1
-        , tables/1
         , query_handle/1
         , item/2
         , max_row_limit/0
@@ -194,23 +191,11 @@ get_stats(Node) ->
 %% Clients
 %%--------------------------------------------------------------------
 
-list_conns(Node) when Node =:= node() ->
-    case check_row_limit([emqx_conn]) of
-        ok -> ets:tab2list(emqx_conn);
-        false -> throw(max_row_limit)
-    end;
-
-list_conns(Node) ->
-    case rpc_call(Node, list_conns, [Node]) of
-        max_row_limit -> throw(max_row_limit);
-        Res -> Res
-    end.
-
 lookup_conn(ClientId, FormatFun) ->
     lists:append([lookup_conn(Node, ClientId, FormatFun) || Node <- ekka_mnesia:running_nodes()]).
 
 lookup_conn(Node, ClientId, FormatFun) when Node =:= node() ->
-    FormatFun(ets:lookup(emqx_conn, ClientId));
+    FormatFun(ets:lookup(emqx_channel, ClientId));
 
 lookup_conn(Node, ClientId, FormatFun) ->
     rpc_call(Node, lookup_conn, [Node, ClientId, FormatFun]).
@@ -220,30 +205,30 @@ lookup_conn_via_username(Username, FormatFun) ->
                   || Node <- ekka_mnesia:running_nodes()]).
 
 lookup_conn_via_username(Node, Username, FormatFun) when Node =:= node() ->
-    MatchSpec = [{{'$1',#{username => '$2'}}, [{'=:=','$2', Username}], ['$1']}],
-    FormatFun(ets:select(emqx_conn_attrs, MatchSpec));
+    MatchSpec = [{{'$1', #{client => #{username => '$2'}}}, [{'=:=','$2', Username}], ['$1']}],
+    FormatFun(ets:select(emqx_channel_attrs, MatchSpec));
 
 lookup_conn_via_username(Node, Username, FormatFun) ->
     rpc_call(Node, lookup_conn_via_username, [Node, Username, FormatFun]).
 
-kickout_conn(ClientId) ->
-    Results = [kickout_conn(Node, ClientId) || Node <- ekka_mnesia:running_nodes()],
-    case lists:any(fun(Item) -> Item =:= ok end, Results) of
-        true  -> ok;
-        false -> lists:last(Results)
-    end.
+% kickout_conn(ClientId) ->
+%     Results = [kickout_conn(Node, ClientId) || Node <- ekka_mnesia:running_nodes()],
+%     case lists:any(fun(Item) -> Item =:= ok end, Results) of
+%         true  -> ok;
+%         false -> lists:last(Results)
+%     end.
 
-kickout_conn(Node, ClientId) when Node =:= node() ->
-    Cpid = emqx_cm:lookup_conn_pid(ClientId),
-    case emqx_cm:get_conn_attrs(ClientId, Cpid) of
-        [] -> {error, not_found};
-        Attrs ->
-            Module = maps:get(conn_mod, Attrs, emqx_channel),
-            Module:kick(Cpid)
-    end;
+% kickout_conn(Node, ClientId) when Node =:= node() ->
+%     Cpid = emqx_cm:lookup_conn_pid(ClientId),
+%     case emqx_cm:get_conn_attrs(ClientId, Cpid) of
+%         [] -> {error, not_found};
+%         Attrs ->
+%             Module = maps:get(conn_mod, Attrs, emqx_channel),
+%             Module:kick(Cpid)
+%     end;
 
-kickout_conn(Node, ClientId) ->
-    rpc_call(Node, kickout_conn, [Node, ClientId]).
+% kickout_conn(Node, ClientId) ->
+%     rpc_call(Node, kickout_conn, [Node, ClientId]).
 
 %% clean_acl_cache(ClientId, Topic) ->
 %%     Results = [clean_acl_cache(Node, ClientId, Topic) || Node <- ekka_mnesia:running_nodes()],
@@ -265,49 +250,37 @@ kickout_conn(Node, ClientId) ->
 %% Sessions
 %%--------------------------------------------------------------------
 
-list_sessions(Node) when Node =:= node() ->
-    case check_row_limit([emqx_session]) of
-        false -> throw(max_row_limit);
-        ok    -> [item(session, Item) || Item <- ets:tab2list(emqx_session)]
-    end;
-
-list_sessions(Node) ->
-    case rpc_call(Node, list_sessions, [Node]) of
-        max_row_limit -> throw(max_row_limit);
-        Res -> Res
-    end.
-
 lookup_session(ClientId) ->
     lists:append([lookup_session(Node, ClientId) || Node <- ekka_mnesia:running_nodes()]).
 
 lookup_session(Node, ClientId) when Node =:= node() ->
-    [item(session, Item) || Item <- ets:lookup(emqx_session, ClientId)];
+    [item(session, Item) || Item <- ets:lookup(emqx_channel, ClientId)];
 
 lookup_session(Node, ClientId) ->
     rpc_call(Node, lookup_session, [Node, ClientId]).
 
-clean_session(ClientId) ->
-    Results = [clean_session(Node, ClientId) || Node <- ekka_mnesia:running_nodes()],
-    lists:foldl(fun({error, running_session}, _Acc) -> {error, running_session};
-                   (ok, _Acc) -> ok;
-                   (_, Acc) -> Acc
-                end, {error, not_found}, Results).
+% clean_session(ClientId) ->
+%     Results = [clean_session(Node, ClientId) || Node <- ekka_mnesia:running_nodes()],
+%     lists:foldl(fun({error, running_session}, _Acc) -> {error, running_session};
+%                    (ok, _Acc) -> ok;
+%                    (_, Acc) -> Acc
+%                 end, {error, not_found}, Results).
 
-clean_session(Node, ClientId) when Node =:= node() ->
-    case ets:lookup(emqx_session, ClientId) of
-        [] -> {error, not_found};
-        [{_, SPid}] ->
-            case proplists:get_value(conn_pid, emqx_session:info(SPid)) of
-                undefined ->
-                    emqx_session:close(SPid),
-                    ok;
-                _ ->
-                    {error, running_session}
-            end
-    end;
+% clean_session(Node, ClientId) when Node =:= node() ->
+%     case ets:lookup(emqx_session, ClientId) of
+%         [] -> {error, not_found};
+%         [{_, SPid}] ->
+%             case proplists:get_value(conn_pid, emqx_session:info(SPid)) of
+%                 undefined ->
+%                     emqx_session:close(SPid),
+%                     ok;
+%                 _ ->
+%                     {error, running_session}
+%             end
+%     end;
 
-clean_session(Node, ClientId) ->
-    rpc_call(Node, clean_session, [Node, ClientId]).
+% clean_session(Node, ClientId) ->
+%     rpc_call(Node, clean_session, [Node, ClientId]).
 
 %%--------------------------------------------------------------------
 %% Subscriptions
@@ -336,9 +309,9 @@ lookup_subscriptions(Node, Key) ->
 %%--------------------------------------------------------------------
 
 list_routes() ->
-    case check_row_limit(tables(routes)) of
+    case check_row_limit(emqx_route) of
         false -> throw(max_row_limit);
-        ok    -> lists:append([ets:tab2list(Tab) || Tab <- tables(routes)])
+        ok    -> lists:append([ets:tab2list(Tab) || Tab <- emqx_route])
     end.
 
 lookup_routes(Topic) ->
@@ -348,21 +321,21 @@ lookup_routes(Topic) ->
 %% PubSub
 %%--------------------------------------------------------------------
 
-subscribe(ClientId, TopicTable) ->
-    case emqx_sm:lookup_session_pids(ClientId) of
-        [] -> {error, session_not_found};
-        [Pid | _] ->
-            emqx_session:subscribe(Pid, TopicTable)
+subscribe(ClientId, TopicTables) ->
+    case ets:lookup(emqx_channel, ClientId) of
+        [] -> {error, channel_not_found};
+        [{_, Pid}] ->
+            Pid ! {subscribe, TopicTables}
     end.
 
 %%TODO: ???
 publish(Msg) -> emqx:publish(Msg).
 
 unsubscribe(ClientId, Topic) ->
-    case emqx_sm:lookup_session_pids(ClientId) of
-        [] -> {error, session_not_found};
-        [Pid | _] ->
-            emqx_session:unsubscribe(Pid, [{Topic, []}])
+    case ets:lookup(emqx_channel, ClientId) of
+        [] -> {error, channel_not_found};
+        [{_, Pid}] ->
+            Pid ! {unsubscribe, [Topic]}
     end.
 
 %%--------------------------------------------------------------------
@@ -529,7 +502,7 @@ count(subscriptions) ->
     table_size(emqx_suboption);
 
 count(routes) ->
-    lists:sum([table_size(Tab) || Tab <- tables(routes)]).
+    lists:sum([table_size(Tab) || Tab <- emqx_route]).
 
 query_handle(conns) ->
     qlc:q([Client || Client <- ets:table(emqx_conn)]);
@@ -541,23 +514,63 @@ query_handle(subscriptions) ->
     qlc:q([E || E <- ets:table(emqx_suboption)]);
 
 query_handle(routes) ->
-    qlc:append([qlc:q([E || E <- ets:table(Tab)]) || Tab <- tables(routes)]).
+    qlc:append([qlc:q([E || E <- ets:table(Tab)]) || Tab <- emqx_route]).
 
-tables(conns) -> [emqx_conn];
-
-tables(sessions) -> [emqx_session];
-
-tables(routes) -> [emqx_route].
+item(connection, Key) ->
+    maps:merge(
+        case ets:lookup(emqx_channel_attrs, Key) of
+            [] -> #{};
+            [{_, #{client := Attrs,
+                session := #{clean_start := CleanStart},
+                connected_at := ConnectedAt,
+                keepalive := KeepAlive,
+                proto_name := ProtoName,
+                proto_ver := ProtoVer}}] ->
+                maps:merge(maps:with([client_id, conn_mod,
+                                      is_bridge, peercert,
+                                      peername, username, zone], Attrs),
+                        #{connected_at => ConnectedAt,
+                          clean_start => CleanStart,
+                          keepalive => KeepAlive,
+                          proto_name => ProtoName,
+                          proto_ver => ProtoVer})
+        end,
+        case ets:lookup(emqx_channel_stats, Key) of
+            [] -> #{};
+            [{_, Stats}] ->
+                %% missing send_pend
+                maps:with([heap_size, mailbox_len, reductions,
+                           recv_cnt, recv_msg, recv_oct, recv_pkt,
+                           send_cnt, send_msg, send_oct, send_pkt], maps:from_list(Stats))
+        end);
 
 item(session, Key) ->
-    List = case ets:lookup(emqx_session_attrs, Key) of
-        [] -> [];
-        [{_, Attrs0}] -> Attrs0
-    end ++ case ets:lookup(emqx_session_stats, Key) of
-        [] -> [];
-        [{_, Stats0}] -> Stats0
-    end,
-    maps:from_list(List);
+    maps:merge(
+        case ets:lookup(emqx_channel_attrs, Key) of
+            [] -> #{};
+            [{{ClientId, _}, #{client := #{username := Username}, session := Attrs}}] ->
+                % missing binding, deliver_msg, enqueue_msg
+                maps:with([awaiting_rel,
+                           clean_start,
+                           client_id,
+                           created_at,
+                           expiry_interval,
+                           inflight,
+                           max_awaiting_rel,
+                           max_inflight,
+                           max_mqueue,
+                           max_subscriptions,
+                           mqueue_dropped,
+                           mqueue_len,
+                           username], Attrs#{client_id => ClientId, username => Username})
+        end,
+        case ets:lookup(emqx_channel_stats, Key) of
+            [] -> #{};
+            [{_, Stats}] -> maps:with([heap_size,
+                                       mailbox_len,
+                                       reductions,
+                                       subscriptions], maps:from_list(Stats))
+        end);
 
 item(subscription, {{Topic, ClientId}, Options}) ->
     #{topic => Topic, clientid => ClientId, options => Options};
