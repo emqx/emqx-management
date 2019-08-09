@@ -176,11 +176,10 @@ t_sessions_cmd(_) ->
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["list"]), "Session")),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["show", "client2"]), "client2")),
     ok = emqx_client:disconnect(T1),
-    ok = emqx_client:disconnect(T2),
-    timer:sleep(100),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["clean-persistent", "client1"]), "successfully")),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["clean-persistent", "client2"]), "Not Found")).
-
+    ok = emqx_client:disconnect(T2).
+    % timer:sleep(100),
+    % ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["clean-persistent", "client1"]), "successfully")),
+    % ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["clean-persistent", "client2"]), "Not Found")).
 
 t_vm_cmd(_) ->
     ct:pal("start testing the vm command"),
@@ -242,7 +241,7 @@ t_subscriptions_cmd(_) ->
 
 t_listeners(_) ->
     ?assertEqual(emqx_mgmt_cli:listeners([]), ok),
-    ?assertEqual(emqx_mgmt_cli:listeners(["stop", "mqtt:wss", "8084"]), "Stop mqtt:wss listener on 8084 successfully.\n").
+    ?assertEqual(emqx_mgmt_cli:listeners(["stop", "wss", "8084"]), "Stop wss listener on 8084 successfully.\n").
 
 t_acl(_) ->
     ct:pal("Start testing the acl command"),

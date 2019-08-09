@@ -293,22 +293,35 @@ subscriptions(["show", ClientId]) ->
 
 subscriptions(["add", ClientId, Topic, QoS]) ->
    if_valid_qos(QoS, fun(IntQos) ->
-                        case emqx_sm:lookup_session_pids(bin(ClientId)) of
-                            [] -> emqx_cli:print("Error: Session not found!");
-                            [Pid | _] ->
+                        case ets:lookup(emqx_channel, bin(ClientId)) of
+                            [] -> emqx_cli:print("Error: Channel not found!");
+                            [{_, Pid}] ->
                                 {Topic1, Options} = emqx_topic:parse(bin(Topic)),
-                                emqx_session:subscribe(Pid, [{Topic1, Options#{qos => IntQos}}]),
+                                Pid ! {subscribe, [{Topic1, Options#{qos => IntQos}}]},
                                 emqx_cli:print("ok~n")
                         end
+                        % case emqx_sm:lookup_session_pids(bin(ClientId)) of
+                        %     [] -> emqx_cli:print("Error: Session not found!");
+                        %     [Pid | _] ->
+                        %         {Topic1, Options} = emqx_topic:parse(bin(Topic)),
+                        %         emqx_session:subscribe(Pid, [{Topic1, Options#{qos => IntQos}}]),
+                        %         emqx_cli:print("ok~n")
+                        % end
                      end);
 
 subscriptions(["del", ClientId, Topic]) ->
-    case emqx_sm:lookup_session_pids(bin(ClientId)) of
-        [] -> emqx_cli:print("Error: Session not found!");
-        [Pid | _] ->
-            emqx_session:unsubscribe(Pid, [emqx_topic:parse(bin(Topic))]),
+    case ets:lookup(emqx_channel, bin(ClientId)) of
+        [] -> emqx_cli:print("Error: Channel not found!");
+        [{_, Pid}] ->
+            Pid ! {unsubscribe, [emqx_topic:parse(bin(Topic))]},
             emqx_cli:print("ok~n")
     end;
+    % case emqx_sm:lookup_session_pids(bin(ClientId)) of
+    %     [] -> emqx_cli:print("Error: Session not found!");
+    %     [Pid | _] ->
+    %         emqx_session:unsubscribe(Pid, [emqx_topic:parse(bin(Topic))]),
+    %         emqx_cli:print("ok~n")
+    % end;
 
 subscriptions(_) ->
     emqx_cli:usage([{"subscriptions list",                         "List all subscriptions"},
