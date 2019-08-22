@@ -697,11 +697,16 @@ print({_, []}) ->
     ok;
 
 print({connection, Key}) ->
-    [{_, #{client := ClientAttrs,
+    [{_, #{client := #{client_id := ClientId,
+                       username := Username,
+                       peername := Peername},
            connected_at := ConnectedAt,
-           session := #{clean_start := CleanStart}}}] = ets:lookup(emqx_channel_attrs, Key),
-    % Attrs = maps:to_list(ClientAttrs) ++ [{connected_at, ConnectedAt}, {clean_start, CleanStart}],
-    Attrs = ClientAttrs#{connected_at => ConnectedAt, clean_start => CleanStart},
+           protocol := #{clean_start := CleanStart}}}] = ets:lookup(emqx_channel_attrs, Key),
+    Attrs = #{client_id => ClientId,
+              clean_start => CleanStart,
+              username => Username,
+              peername => Peername,
+              connected_at => ConnectedAt},
     InfoKeys = [client_id,
                 clean_start,
                 username,
@@ -711,8 +716,21 @@ print({connection, Key}) ->
                    [format(K, maps:get(K, Attrs)) || K <- InfoKeys]);
 
 print({session, Key}) ->
-    [{{ClientId, _}, #{session := SessionAttrs}}] = ets:lookup(emqx_channel_attrs, Key),
-    Attrs = SessionAttrs#{client_id => ClientId, subscriptions := maps:size(maps:get(subscriptions, SessionAttrs))},
+    [{{ClientId, _}, #{session := #{expiry_interval := ExpiryInterval,
+                                    created_at := CreatedAt},
+                       protocol := #{clean_start := CleanStart}}}] = ets:lookup(emqx_channel_attrs, Key),
+    Attrs =  maps:merge(case ets:lookup(emqx_channel_stats, Key) of
+                            [] -> #{};
+                            [{_, Stats}] -> maps:with([awaiting_rel,
+                                                        inflight,
+                                                        max_inflight,
+                                                        mqueue_dropped,
+                                                        mqueue_len,
+                                                        subscriptions], maps:from_list(Stats))
+                        end, #{client_id => ClientId,
+                               created_at => CreatedAt,
+                               expiry_interval => ExpiryInterval,
+                               clean_start => CleanStart}),                                    
     InfoKeys = [client_id,
                 clean_start,
                 expiry_interval,
