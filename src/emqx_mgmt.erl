@@ -521,19 +521,19 @@ item(connection, Key) ->
         case ets:lookup(emqx_channel_attrs, Key) of
             [] -> #{};
             [{_, #{client := Attrs,
-                session := #{clean_start := CleanStart},
-                connected_at := ConnectedAt,
-                keepalive := KeepAlive,
-                proto_name := ProtoName,
-                proto_ver := ProtoVer}}] ->
+                   protocol := #{clean_start := CleanStart,
+                                 keepalive := KeepAlive,
+                                 proto_name := ProtoName,
+                                 proto_ver := ProtoVer},
+                   connected_at := ConnectedAt}}] ->
                 maps:merge(maps:with([client_id, conn_mod,
                                       is_bridge, peercert,
                                       peername, username, zone], Attrs),
-                        #{connected_at => ConnectedAt,
-                          clean_start => CleanStart,
-                          keepalive => KeepAlive,
-                          proto_name => ProtoName,
-                          proto_ver => ProtoVer})
+                           #{connected_at => ConnectedAt,
+                             clean_start => CleanStart,
+                             keepalive => KeepAlive,
+                             proto_name => ProtoName,
+                             proto_ver => ProtoVer})
         end,
         case ets:lookup(emqx_channel_stats, Key) of
             [] -> #{};
@@ -548,26 +548,27 @@ item(session, Key) ->
     maps:merge(
         case ets:lookup(emqx_channel_attrs, Key) of
             [] -> #{};
-            [{{ClientId, _}, #{client := #{username := Username}, session := Attrs}}] ->
+            [{{ClientId, _}, #{client := #{username := Username},
+                               session := Attrs,
+                               protocol := #{clean_start := CleanStart}}}] ->
                 % missing binding, deliver_msg, enqueue_msg
-                maps:with([awaiting_rel,
-                           clean_start,
-                           client_id,
-                           created_at,
-                           expiry_interval,
-                           inflight,
-                           max_awaiting_rel,
-                           max_inflight,
-                           max_mqueue,
-                           max_subscriptions,
-                           mqueue_dropped,
-                           mqueue_len,
-                           username], Attrs#{client_id => ClientId, username => Username})
+                maps:merge(maps:with([created_at, expiry_interval], Attrs),
+                           #{clean_start => CleanStart,
+                             client_id => ClientId,
+                             username => Username})
         end,
         case ets:lookup(emqx_channel_stats, Key) of
             [] -> #{};
-            [{_, Stats}] -> maps:with([heap_size,
+            [{_, Stats}] -> maps:with([awaiting_rel,
+                                       heap_size,
+                                       inflight,
                                        mailbox_len,
+                                       max_awaiting_rel,
+                                       max_inflight,
+                                       max_mqueue,
+                                       max_subscriptions,
+                                       mqueue_dropped,
+                                       mqueue_len,
                                        reductions,
                                        subscriptions], maps:from_list(Stats))
         end);
