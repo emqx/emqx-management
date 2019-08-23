@@ -722,11 +722,11 @@ print({session, Key}) ->
     Attrs =  maps:merge(case ets:lookup(emqx_channel_stats, Key) of
                             [] -> #{};
                             [{_, Stats}] -> maps:with([awaiting_rel,
-                                                        inflight,
-                                                        max_inflight,
-                                                        mqueue_dropped,
-                                                        mqueue_len,
-                                                        subscriptions], maps:from_list(Stats))
+                                                       inflight,
+                                                       max_inflight,
+                                                       mqueue_dropped,
+                                                       mqueue_len,
+                                                       subscriptions], maps:from_list(Stats))
                         end, #{client_id => ClientId,
                                created_at => CreatedAt,
                                expiry_interval => ExpiryInterval,
@@ -747,7 +747,7 @@ print({session, Key}) ->
     emqx_cli:print("Session(~s, clean_start=~s, expiry_interval=~w, "
                     "subscriptions=~w, max_inflight=~w, inflight=~w, "
                     "mqueue_len=~w, mqueue_dropped=~w, awaiting_rel=~w, created_at=~w)~n",
-                    [format(K, maps:get(K, Attrs)) || K <- InfoKeys]);
+                    [format(K, maps:get(K, Attrs, undefined)) || K <- InfoKeys]);
 
 print({emqx_route, #route{topic = Topic, dest = {_, Node}}}) ->
     emqx_cli:print("~s -> ~s~n", [Topic, Node]);
