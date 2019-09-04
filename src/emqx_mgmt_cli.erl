@@ -29,7 +29,6 @@
         , broker/1
         , cluster/1
         , clients/1
-        , sessions/1
         , routes/1
         , subscriptions/1
         , plugins/1
@@ -213,54 +212,30 @@ acl(_) ->
 %% @doc Query clients
 
 clients(["list"]) ->
-    dump(emqx_channel, connection);
+    dump(emqx_channel, client);
 
 clients(["show", ClientId]) ->
     if_client(ClientId, fun print/1);
 
-% clients(["kick", ClientId]) ->
-%     if_client(ClientId, fun({_, {_ClientId, Pid}}) -> Pid ! {shutdown, kicked} end);
+clients(["kick", ClientId]) ->
+    if_client(ClientId, fun({_, Channel = {_ClientId, CPid}}) ->
+                            case ets:lookup(emqx_channel_attrs, Channel) of
+                                [{_, #{client := #{conn_mod := ConnMod}}}] ->
+                                    ConnMod:call(CPid, kick);
+                                _ -> emqx_cli:print("Not Found.~n")
+                            end
+                        end);
 
 clients(_) ->
     emqx_cli:usage([{"clients list",            "List all clients"},
-                    {"clients show <ClientId>", "Show a client"}]).
-                    % {"clients kick <ClientId>", "Kick out a client"}
+                    {"clients show <ClientId>", "Show a client"},
+                    {"clients kick <ClientId>", "Kick out a client"}]).
 
 if_client(ClientId, Fun) ->
     case ets:lookup(emqx_channel, (bin(ClientId))) of
         [] -> emqx_cli:print("Not Found.~n");
-        [Channel]    -> Fun({connection, Channel})
+        [Channel]    -> Fun({client, Channel})
     end.
-
-%%--------------------------------------------------------------------
-%% @doc Sessions Command
-
-sessions(["list"]) ->
-    dump(emqx_channel, session);
-
-sessions(["show", ClientId]) ->
-    case ets:lookup(emqx_channel, bin(ClientId)) of
-        []         -> emqx_cli:print("Not Found.~n");
-        [Channel] -> print({session, Channel})
-    end;
-
-% sessions(["clean-persistent", ClientId]) ->
-%     case ets:lookup(emqx_session, bin(ClientId)) of
-%         [] -> emqx_cli:print("Not Found.~n");
-%         [{_, SessPid}] -> 
-%             case proplists:get_value(conn_pid, emqx_session:info(SessPid)) of
-%                 undefined ->
-%                     emqx_session:close(SessPid),
-%                     emqx_cli:print("Clean persistent session successfully.~n");
-%                 _ ->
-%                     emqx_cli:print("Couldn't clean a session with a valid connection.~n")
-%             end
-%     end;
-
-sessions(_) ->
-    emqx_cli:usage([{"sessions list",                        "List all sessions"},
-                    {"sessions show <ClientId>",             "Show a session"}]).
-                    % {"sessions clean-persistent <ClientId>",  "Clean a persistent session"}
 
 %%--------------------------------------------------------------------
 %% @doc Routes Command
@@ -698,58 +673,51 @@ dump(Table, Tag, Key, Result) ->
 print({_, []}) ->
     ok;
 
-print({connection, Key}) ->
-    [{_, #{client := #{client_id := ClientId,
-                       username := Username,
-                       peername := Peername},
-           connected_at := ConnectedAt,
-           protocol := #{clean_start := CleanStart}}}] = ets:lookup(emqx_channel_attrs, Key),
-    Attrs = #{client_id => ClientId,
-              clean_start => CleanStart,
-              username => Username,
-              peername => Peername,
-              connected_at => ConnectedAt},
-    InfoKeys = [client_id,
-                clean_start,
-                username,
-                peername,
-                connected_at],
-    emqx_cli:print("Connection(~s, clean_start=~s, username=~s, peername=~s, connected_at=~p)~n",
-                   [format(K, maps:get(K, Attrs)) || K <- InfoKeys]);
-
-print({session, Key}) ->
-    [{{ClientId, _}, #{session := #{expiry_interval := ExpiryInterval,
-                                    created_at := CreatedAt},
-                       protocol := #{clean_start := CleanStart}}}] = ets:lookup(emqx_channel_attrs, Key),
-    Attrs =  maps:merge(case ets:lookup(emqx_channel_stats, Key) of
-                            [] -> #{};
-                            [{_, Stats}] -> maps:with([awaiting_rel,
-                                                       inflight,
-                                                       max_inflight,
-                                                       mqueue_dropped,
-                                                       mqueue_len,
-                                                       subscriptions], maps:from_list(Stats))
-                        end, #{client_id => ClientId,
-                               created_at => CreatedAt,
-                               expiry_interval => ExpiryInterval,
-                               clean_start => CleanStart}),                                    
-    InfoKeys = [client_id,
-                clean_start,
-                expiry_interval,
-                subscriptions,
-                max_inflight,
-                inflight,
-                mqueue_len,
-                mqueue_dropped,
-                awaiting_rel,
-                % deliver_msg,
-                % enqueue_msg,
-                created_at],
-
-    emqx_cli:print("Session(~s, clean_start=~s, expiry_interval=~w, "
-                    "subscriptions=~w, max_inflight=~w, inflight=~w, "
-                    "mqueue_len=~w, mqueue_dropped=~w, awaiting_rel=~w, created_at=~w)~n",
-                    [format(K, maps:get(K, Attrs, undefined)) || K <- InfoKeys]);
+print({client, Key}) ->
+    Misc = 
+        maps:merge(
+            case ets:lookup(emqx_channel_attrs, Key) of
+                [] -> #{};
+                [{_, Attrs}] -> Attrs
+            end,
+            case ets:lookup(emqx_channel_stats, Key) of
+                [] -> #{};
+                [{_, Stats}] -> maps:from_list(Stats)
+            end
+        ),
+    Client = maps:get(client, Misc, #{}),
+    Connection = maps:get(connection, Misc, #{}),
+    Protocol = maps:get(protocol, Misc, #{}),
+    Session = maps:get(session, Misc, #{}),
+    Info = 
+        lists:foldl(fun(Items, Acc) ->
+                        maps:merge(Items, Acc)
+                    end, #{}, [maps:with([ connected, connected_at, disconnected_at
+                                         , subscriptions_cnt
+                                         , inflight
+                                         , awaiting_rel
+                                         , mqueue_len, mqueue_dropped
+                                         , send_msg],
+                                         maps:without([client, connection, protocol, session], Misc)),
+                               maps:with([client_id, username], Client),
+                               maps:with([peername], Connection),
+                               maps:with([clean_start, keepalive], Protocol),
+                               maps:with([created_at, expiry_interval], Session)]),
+    InfoKeys = [client_id, username, peername,
+                clean_start, keepalive, expiry_interval,
+                subscriptions_cnt, inflight, awaiting_rel, send_msg, mqueue_len, mqueue_dropped,
+                connected, created_at, connected_at] ++ case maps:get(connected, Info) of
+                                                            true -> [];
+                                                            false -> [disconnected_at]
+                                                        end,
+    emqx_cli:print("Client(~s, username=~s, peername=~s, "
+                   "clean_start=~s, keepalive=~w, session_expiry_interval=~w, "
+                   "subscriptions=~w, inflight=~w, awaiting_rel=~w, delivered_msgs=~w, enqueued_msgs=~w, dropped_msgs=~w, "
+                   "connected=~s, created_at=~w, connected_at=~w" ++ case maps:get(connected, Info) of
+                                                                          true -> ")~n";
+                                                                          false -> ", disconnected_at=~w)~n"
+                                                                      end,
+                   [format(K, maps:get(K, Info)) || K <- InfoKeys]);
 
 print({emqx_route, #route{topic = Topic, dest = {_, Node}}}) ->
     emqx_cli:print("~s -> ~s~n", [Topic, Node]);
@@ -767,8 +735,9 @@ print({emqx_suboption, {{Pid, Topic}, Options}}) when is_pid(Pid) ->
 format(_, undefined) ->
     undefined;
 
-format(CreatedAt, Val) when CreatedAt =:= created_at;
-                            CreatedAt =:= connected_at ->
+format(At, Val) when At =:= created_at;
+                     At =:= connected_at;
+                     At =:= disconnected_at ->
     emqx_time:now_secs(Val);
 
 format(peername, {IPAddr, Port}) ->
