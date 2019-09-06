@@ -222,7 +222,7 @@ clients(["kick", ClientId]) ->
                             case ets:lookup(emqx_channel_attrs, Channel) of
                                 [{_, #{client := #{conn_mod := ConnMod}}}] ->
                                     ConnMod:call(CPid, kick);
-                                _ -> emqx_cli:print("Not Found.~n")
+                                _ -> emqx_mgmt:print("Not Found.~n")
                             end
                         end);
 
@@ -233,7 +233,7 @@ clients(_) ->
 
 if_client(ClientId, Fun) ->
     case ets:lookup(emqx_channel, (bin(ClientId))) of
-        [] -> emqx_cli:print("Not Found.~n");
+        [] -> emqx_mgmt:print("Not Found.~n");
         [Channel]    -> Fun({client, Channel})
     end.
 
