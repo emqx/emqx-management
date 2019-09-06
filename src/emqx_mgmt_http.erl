@@ -1,5 +1,5 @@
 %%--------------------------------------------------------------------
-%% Copyright (c) 2013-2019 EMQ Technologies Co., Ltd. All Rights Reserved.
+%% Copyright (c) 2019 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -15,8 +15,6 @@
 %%--------------------------------------------------------------------
 
 -module(emqx_mgmt_http).
-
--author("Feng Lee <feng@emqtt.io>").
 
 -import(proplists, [get_value/3]).
 
