@@ -1,4 +1,5 @@
-%% Copyright (c) 2013-2019 EMQ Technologies Co., Ltd. All Rights Reserved.
+%%--------------------------------------------------------------------
+%% Copyright (c) 2019 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -11,6 +12,7 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
+%%--------------------------------------------------------------------
 
 -module(emqx_mgmt_api_SUITE).
 
@@ -42,7 +44,6 @@ groups() ->
        brokers,
        configs,
        connections_and_sessions,
-       connections_and_sessions_2,
        listeners,
        metrics,
        nodes,
@@ -151,62 +152,22 @@ connections_and_sessions(_) ->
     {ok, _} = emqtt:connect(C2),
 
     {ok, ConsViaUsername} = request_api(get, api_path(["nodes", atom_to_list(node()),
-                                                      "connection",
+                                                      "clients",
                                                       "username", binary_to_list(Username)])
                                       , auth_header_()),
     ?assertEqual(2, length(get(data, ConsViaUsername))),
-    {ok, Conns} = request_api(get, api_path(["connections"]), "_limit=100&_page=1",
+    {ok, Conns} = request_api(get, api_path(["clients"]), "_limit=100&_page=1",
                               auth_header_()),
     ?assertEqual(2, proplists:get_value(<<"count">>, get(meta, Conns))),
-    {ok, Conns} = request_api(get, api_path(["nodes", atom_to_list(node()), "connections"]), "_limit=100&_page=1",
+    {ok, Conns} = request_api(get, api_path(["nodes", atom_to_list(node()), "clients"]), "_limit=100&_page=1",
                               auth_header_()),
-    {ok, Result} = request_api(get, api_path(["nodes", atom_to_list(node()), "connections", binary_to_list(ClientId1)]), auth_header_()),
+    {ok, Result} = request_api(get, api_path(["nodes", atom_to_list(node()), "clients", binary_to_list(ClientId1)]), auth_header_()),
     [Conn] = get(data, Result),
     ?assertEqual(ClientId1, proplists:get_value(<<"client_id">>, Conn)),
 
-    {ok, Result} = request_api(get, api_path(["connections",
+    {ok, Result} = request_api(get, api_path(["clients",
                                               binary_to_list(ClientId1)]),
-                               auth_header_()),
-
-    {ok, Result2} = request_api(get, api_path(["sessions"]), auth_header_()),
-    [Session1, Session2] = get(data, Result2),
-    ?assertEqual(ClientId1, proplists:get_value(<<"client_id">>, Session1)),
-    ?assertEqual(ClientId2, proplists:get_value(<<"client_id">>, Session2)),
-    {ok, Result2} = request_api(get, api_path(["nodes", atom_to_list(node()), "sessions"]), auth_header_()),
-
-    {ok, Result3} = request_api(get, api_path(["sessions", binary_to_list(ClientId1)]), auth_header_()),
-    {ok, Result3} = request_api(get, api_path(["nodes", atom_to_list(node()),
-                                               "sessions", binary_to_list(ClientId1)]),
-                                auth_header_()).
-
-    % {ok, _} = request_api(delete, api_path(["connections", binary_to_list(ClientId1)]), auth_header_()),
-    % {ok, _} = request_api(delete, api_path(["connections", binary_to_list(ClientId2)]), auth_header_()),
-    % receive_exit(2),
-    % {ok, NonConn} = request_api(
-    %                   get, api_path(["connections"]), "_limit=100&_page=1", auth_header_()),
-    % ?assertEqual([], get(data, NonConn)),
-    % {ok, NonSession} = request_api(get, api_path(["sessions"]), auth_header_()),
-    % ?assertEqual([], get(data, NonSession)).
-
-connections_and_sessions_2(_) ->
-    process_flag(trap_exit, true),
-    ClientId1 = <<"client1">>,
-    ClientId2 = <<"client2">>,
-    {ok, C1} = emqtt:start_link(#{client_id => ClientId1, clean_start => false}),
-    {ok, C2} = emqtt:start_link(#{client_id => ClientId2, clean_start => false}),
-    {ok, _} = emqtt:connect(C1),
-    {ok, _} = emqtt:connect(C2),
-
-    {ok, _Result1} = request_api(get, api_path(["sessions"]), auth_header_()),
-    emqtt:disconnect(C1),
-    emqtt:disconnect(C2).
-    % {ok, Result1} = request_api(get, api_path(["sessions"]), auth_header_()).
-    % {ok, Result2} = request_api(delete, api_path(["sessions", "persistent", binary_to_list(ClientId1)]), auth_header_()),
-    % {ok, Result2} = request_api(delete, api_path(["nodes", atom_to_list(node()),
-    %                                               "sessions", "persistent", binary_to_list(ClientId2)]), auth_header_()),
-    % ?assertEqual(0, proplists:get_value(<<"code">>, jsx:decode(list_to_binary(Result2)))),
-    % {ok, Result3} = request_api(get, api_path(["sessions"]), auth_header_()),
-    % ?assertEqual([], get(data, Result3)).
+                               auth_header_()).
 
 receive_exit(0) ->
     ok;
