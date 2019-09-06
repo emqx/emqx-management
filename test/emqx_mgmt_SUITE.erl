@@ -42,7 +42,6 @@ groups() ->
         t_mgmt_cmd,
         t_status_cmd,
         t_clients_cmd,
-        t_sessions_cmd,
         t_vm_cmd,
         t_plugins,
         t_trace_cmd,
@@ -161,28 +160,6 @@ raw_recv_pase(Packet) ->
 raw_send_serialize(Packet) ->
     emqx_frame:serialize(Packet).
 
-t_sessions_cmd(_) ->
-    ct:pal("start testing the session command"),
-    {ok, T1} = emqtt:start_link([{host, "localhost"},
-                                       {client_id, <<"client1">>},
-                                       {username, <<"testuser1">>},
-                                       {password, <<"pass1">>},
-                                       {clean_start, false}]),
-    {ok, _} = emqtt:connect(T1),
-    {ok, T2} = emqtt:start_link([{host, "localhost"},
-                                       {client_id, <<"client2">>},
-                                       {username, <<"testuser2">>},
-                                       {password, <<"pass2">>},
-                                       {clean_start, true}]),
-    {ok, _} = emqtt:connect(T2),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["list"]), "Session")),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["show", "client2"]), "client2")),
-    ok = emqtt:disconnect(T1),
-    ok = emqtt:disconnect(T2).
-    % timer:sleep(100),
-    % ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["clean-persistent", "client1"]), "successfully")),
-    % ?assertMatch({match, _}, re:run(emqx_mgmt_cli:sessions(["clean-persistent", "client2"]), "Not Found")).
-
 t_vm_cmd(_) ->
     ct:pal("start testing the vm command"),
     [[?assertMatch({match, _}, re:run(Result, Name)) || Result <- emqx_mgmt_cli:vm([Name])] || Name <- ["load", "memory", "process", "io", "ports"]],
@@ -260,7 +237,6 @@ t_cli(_) ->
     [?assertMatch({match, _}, re:run(Value, "broker")) || Value <- emqx_mgmt_cli:broker([""])],
     [?assertMatch({match, _}, re:run(Value, "cluster")) || Value <- emqx_mgmt_cli:cluster([""])],
     [?assertMatch({match, _}, re:run(Value, "clients")) || Value <- emqx_mgmt_cli:clients([""])],
-    [?assertMatch({match, _}, re:run(Value, "sessions")) || Value <- emqx_mgmt_cli:sessions([""])],
     [?assertMatch({match, _}, re:run(Value, "routes")) || Value <- emqx_mgmt_cli:routes([""])],
     [?assertMatch({match, _}, re:run(Value, "subscriptions")) || Value <- emqx_mgmt_cli:subscriptions([""])],
     [?assertMatch({match, _}, re:run(Value, "plugins")) || Value <- emqx_mgmt_cli:plugins([""])],
