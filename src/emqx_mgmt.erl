@@ -365,7 +365,7 @@ reload_plugin(Node, Name) ->
 
 gen_config(App) ->
     Schema = cuttlefish_schema:files([filename:join([code:priv_dir(App), App]) ++ ".schema"]),
-    Conf = cuttlefish_conf:file(filename:join([emqx_config:get_env(plugins_etc_dir), App]) ++ ".conf"),
+    Conf = cuttlefish_conf:file(filename:join([emqx:get_env(plugins_etc_dir), App]) ++ ".conf"),
     Configs = cuttlefish_generator:map(Schema, Conf),
     proplists:get_value(App, Configs, []).
 
