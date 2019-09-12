@@ -24,12 +24,6 @@
 
 -import(proplists, [get_value/2]).
 
--export([ print/1
-        , print/2
-        , usage/1
-        , usage/2
-        ]).
-
 %% Nodes and Brokers API
 -export([ list_nodes/0
         , lookup_node/1
@@ -114,22 +108,6 @@
 -define(MAX_ROW_LIMIT, 10000).
 
 -define(APP, emqx_management).
-
-print(Msg) ->
-    io:format(Msg), lists:flatten(io_lib:format("~p", [Msg])).
-
-print(Format, Args) ->
-    io:format(Format, Args), lists:flatten(io_lib:format(Format, Args)).
-
-usage(CmdList) ->
-    lists:map(
-      fun({Cmd, Desc}) ->
-          io:format("~-48s# ~s~n", [Cmd, Desc]),
-          lists:flatten(io_lib:format("~-48s# ~s~n", [Cmd, Desc]))
-      end, CmdList).
-
-usage(Cmd, Desc) ->
-    usage([{Cmd, Desc}]).
 
 %%--------------------------------------------------------------------
 %% Node Info
