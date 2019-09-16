@@ -487,7 +487,7 @@ item(client, Key) ->
             end
         ),
     Client = maps:get(client, Misc, #{}),
-    Connection = maps:get(connection, Misc, #{}),
+    ConnInfo = maps:get(conninfo, Misc, #{}),
     Protocol = maps:get(protocol, Misc, #{}),
     Session = maps:get(session, Misc, #{}),
     DisconnectedAt = case maps:get(connected, Misc) of
@@ -504,9 +504,9 @@ item(client, Key) ->
                                      , heap_size, reductions, mailbox_len
                                      , recv_cnt, recv_msg, recv_oct, recv_pkt
                                      , send_cnt, send_msg, send_oct, send_pkt] ++ DisconnectedAt,
-                                     maps:without([client, connection, protocol, session], Misc)),
+                                     maps:without([client, conninfo, protocol, session], Misc)),
                            maps:with([client_id, username, is_bridge, zone], Client),
-                           maps:with([peername], Connection),
+                           maps:with([peername], ConnInfo),
                            maps:with([clean_start, keepalive, proto_name, proto_ver], Protocol),
                            maps:with([created_at, expiry_interval], Session)]);
 

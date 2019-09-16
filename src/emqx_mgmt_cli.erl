@@ -686,7 +686,7 @@ print({client, Key}) ->
             end
         ),
     Client = maps:get(client, Misc, #{}),
-    Connection = maps:get(connection, Misc, #{}),
+    ConnInfo = maps:get(conninfo, Misc, #{}),
     Protocol = maps:get(protocol, Misc, #{}),
     Session = maps:get(session, Misc, #{}),
     Info = 
@@ -698,9 +698,9 @@ print({client, Key}) ->
                                          , awaiting_rel
                                          , mqueue_len, mqueue_dropped
                                          , send_msg],
-                                         maps:without([client, connection, protocol, session], Misc)),
+                                         maps:without([client, conninfo, protocol, session], Misc)),
                                maps:with([client_id, username], Client),
-                               maps:with([peername], Connection),
+                               maps:with([peername], ConnInfo),
                                maps:with([clean_start, keepalive], Protocol),
                                maps:with([created_at, expiry_interval], Session)]),
     InfoKeys = [client_id, username, peername,
