@@ -42,14 +42,14 @@ create_config_tab() ->
     case ets:info(?TAB, name) of
         undefined ->
             ets:new(?TAB, [named_table, public]),
-            PluginsEtcDir = emqx_config:get_env(plugins_etc_dir),
+            PluginsEtcDir = emqx:get_env(plugins_etc_dir),
             Files = filelib:wildcard("*.conf", PluginsEtcDir),
             lists:foreach(fun(File) ->
                 [FileName | _] = string:tokens(File, "."),
                 Configs = cuttlefish_conf:file(lists:concat([PluginsEtcDir, File])),
                 ets:insert(?TAB, {list_to_atom(FileName), Configs})
             end, Files),
-            Dir = emqx_config:get_env(expand_plugins_dir),
+            Dir = emqx:get_env(expand_plugins_dir),
             PluginsDir = filelib:wildcard("*", Dir),
             lists:foreach(fun(PluginDir) ->
                 case filelib:is_dir(Dir ++ PluginDir) of

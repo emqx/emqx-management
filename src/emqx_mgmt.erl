@@ -24,12 +24,6 @@
 
 -import(proplists, [get_value/2]).
 
--export([ print/1
-        , print/2
-        , usage/1
-        , usage/2
-        ]).
-
 %% Nodes and Brokers API
 -export([ list_nodes/0
         , lookup_node/1
@@ -114,22 +108,6 @@
 -define(MAX_ROW_LIMIT, 10000).
 
 -define(APP, emqx_management).
-
-print(Msg) ->
-    io:format(Msg), lists:flatten(io_lib:format("~p", [Msg])).
-
-print(Format, Args) ->
-    io:format(Format, Args), lists:flatten(io_lib:format(Format, Args)).
-
-usage(CmdList) ->
-    lists:map(
-      fun({Cmd, Desc}) ->
-          io:format("~-48s# ~s~n", [Cmd, Desc]),
-          lists:flatten(io_lib:format("~-48s# ~s~n", [Cmd, Desc]))
-      end, CmdList).
-
-usage(Cmd, Desc) ->
-    usage([{Cmd, Desc}]).
 
 %%--------------------------------------------------------------------
 %% Node Info
@@ -365,7 +343,7 @@ reload_plugin(Node, Name) ->
 
 gen_config(App) ->
     Schema = cuttlefish_schema:files([filename:join([code:priv_dir(App), App]) ++ ".schema"]),
-    Conf = cuttlefish_conf:file(filename:join([emqx_config:get_env(plugins_etc_dir), App]) ++ ".conf"),
+    Conf = cuttlefish_conf:file(filename:join([emqx:get_env(plugins_etc_dir), App]) ++ ".conf"),
     Configs = cuttlefish_generator:map(Schema, Conf),
     proplists:get_value(App, Configs, []).
 
@@ -509,7 +487,7 @@ item(client, Key) ->
             end
         ),
     Client = maps:get(client, Misc, #{}),
-    Connection = maps:get(connection, Misc, #{}),
+    ConnInfo = maps:get(conninfo, Misc, #{}),
     Protocol = maps:get(protocol, Misc, #{}),
     Session = maps:get(session, Misc, #{}),
     DisconnectedAt = case maps:get(connected, Misc) of
@@ -526,9 +504,9 @@ item(client, Key) ->
                                      , heap_size, reductions, mailbox_len
                                      , recv_cnt, recv_msg, recv_oct, recv_pkt
                                      , send_cnt, send_msg, send_oct, send_pkt] ++ DisconnectedAt,
-                                     maps:without([client, connection, protocol, session], Misc)),
+                                     maps:without([client, conninfo, protocol, session], Misc)),
                            maps:with([client_id, username, is_bridge, zone], Client),
-                           maps:with([peername], Connection),
+                           maps:with([peername], ConnInfo),
                            maps:with([clean_start, keepalive, proto_name, proto_ver], Protocol),
                            maps:with([created_at, expiry_interval], Session)]);
 

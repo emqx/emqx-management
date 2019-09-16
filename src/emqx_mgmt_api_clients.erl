@@ -31,7 +31,7 @@
             func   => list,
             descr  => "A list of clients on current node"}).
 
--rest_api(#{name   => list_node_clientss,
+-rest_api(#{name   => list_node_clients,
             method => 'GET',
             path   => "nodes/:atom:node/clients/",
             func   => list,
