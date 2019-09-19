@@ -32,23 +32,35 @@
             func   => list,
             descr  => "List all plugins on a node"}).
 
--rest_api(#{name   => load_plugin,
+-rest_api(#{name   => load_node_plugin,
             method => 'PUT',
             path   => "/nodes/:atom:node/plugins/:atom:plugin/load",
             func   => load,
             descr  => "Load a plugin"}).
 
--rest_api(#{name   => unload_plugin,
+-rest_api(#{name   => unload_node_plugin,
             method => 'PUT',
             path   => "/nodes/:atom:node/plugins/:atom:plugin/unload",
             func   => unload,
             descr  => "Unload a plugin"}).
 
--rest_api(#{name   => reload_plugin,
+-rest_api(#{name   => reload_node_plugin,
             method => 'PUT',
             path   => "/nodes/:atom:node/plugins/:atom:plugin/reload",
             func   => reload,
             descr  => "Reload a plugin"}).
+
+-rest_api(#{name   => unload_plugin,
+            method => 'PUT',
+            path   => "/plugins/:atom:plugin/unload",
+            func   => unload,
+            descr  => "Unload a plugin in the cluster"}).
+
+-rest_api(#{name   => reload_plugin,
+            method => 'PUT',
+            path   => "/plugins/:atom:plugin/reload",
+            func   => reload,
+            descr  => "Reload a plugin in the cluster"}).
 
 -export([ list/2
         , load/2
@@ -66,10 +78,30 @@ load(#{node := Node, plugin := Plugin}, _Params) ->
     return(emqx_mgmt:load_plugin(Node, Plugin)).
 
 unload(#{node := Node, plugin := Plugin}, _Params) ->
-    return(emqx_mgmt:unload_plugin(Node, Plugin)).
+    return(emqx_mgmt:unload_plugin(Node, Plugin));
+
+unload(#{plugin := Plugin}, _Params) ->
+    Results = [emqx_mgmt:unload_plugin(Node, Plugin) || {Node, _Info} <- emqx_mgmt:list_nodes()],
+    case lists:any(fun(Item) -> Item =:= ok end, Results) of
+        true  ->
+            return(ok);
+        false ->
+            Reason = lists:last(Results),
+            return({error, ?ERROR1, Reason})
+    end.
 
 reload(#{node := Node, plugin := Plugin}, _Params) ->
-    return(emqx_mgmt:reload_plugin(Node, Plugin)).
+    return(emqx_mgmt:reload_plugin(Node, Plugin));
+
+reload(#{plugin := Plugin}, _Params) ->
+    Results = [emqx_mgmt:reload_plugin(Node, Plugin) || {Node, _Info} <- emqx_mgmt:list_nodes()],
+    case lists:any(fun(Item) -> Item =:= ok end, Results) of
+        true  ->
+            return(ok);
+        false ->
+            Reason = lists:last(Results),
+            return({error, ?ERROR1, Reason})
+    end.
 
 format({Node, Plugins}) ->
     [{node, Node}, {plugins, [format(Plugin) || Plugin <- Plugins]}];
