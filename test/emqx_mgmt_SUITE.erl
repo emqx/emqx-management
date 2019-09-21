@@ -134,6 +134,7 @@ t_clients_cmd(_) ->
                                       {username, <<"testuser1">>},
                                       {password, <<"pass1">>}]),
     {ok, _} = emqtt:connect(T),
+    timer:sleep(300),
     emqx_mgmt_cli:clients(["list"]),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:clients(["show", "client12"]), "client12")),
     % emqx_mgmt_cli:clients(["kick", "client12"]),
@@ -224,8 +225,8 @@ t_subscriptions_cmd(_) ->
     timer:sleep(300),
     [?assertMatch({match, _} , re:run(Result, "b/b/c"))
      || Result <- emqx_mgmt_cli:subscriptions(["show", <<"client">>])],
-    ?assertEqual(emqx_mgmt_cli:subscriptions(["add", "client", "b/b/c", "0"]), "\"ok~n\""),
-    ?assertEqual(emqx_mgmt_cli:subscriptions(["del", "client", "b/b/c"]), "\"ok~n\"").
+    ?assertEqual(emqx_mgmt_cli:subscriptions(["add", "client", "b/b/c", "0"]), "ok~n"),
+    ?assertEqual(emqx_mgmt_cli:subscriptions(["del", "client", "b/b/c"]), "ok~n").
 
 t_listeners(_) ->
     print_mock(),
@@ -242,7 +243,7 @@ t_plugins(_) ->
     ?assertEqual(emqx_mgmt_cli:plugins(["list"]), ok),
     ?assertEqual(emqx_mgmt_cli:plugins(["unload", "emqx_reloader"]), "Plugin emqx_reloader unloaded successfully.\n"),
     ?assertEqual(emqx_mgmt_cli:plugins(["load", "emqx_reloader"]),"Start apps: [emqx_reloader]\nPlugin emqx_reloader loaded successfully.\n"),
-    ?assertEqual(emqx_mgmt_cli:plugins(["unload", "emqx_management"]), "\"Plugin emqx_management can not be unloaded ~n\"").
+    ?assertEqual(emqx_mgmt_cli:plugins(["unload", "emqx_management"]), "Plugin emqx_management can not be unloaded ~n").
 
 t_cli(_) ->
     print_mock(),

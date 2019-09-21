@@ -687,7 +687,6 @@ print({client, Key}) ->
         ),
     Client = maps:get(client, Misc, #{}),
     ConnInfo = maps:get(conninfo, Misc, #{}),
-    Protocol = maps:get(protocol, Misc, #{}),
     Session = maps:get(session, Misc, #{}),
     Info = 
         lists:foldl(fun(Items, Acc) ->
@@ -698,11 +697,10 @@ print({client, Key}) ->
                                          , awaiting_rel
                                          , mqueue_len, mqueue_dropped
                                          , send_msg],
-                                         maps:without([client, conninfo, protocol, session], Misc)),
+                                         maps:without([client, conninfo, session], Misc)),
                                maps:with([client_id, username], Client),
-                               maps:with([peername], ConnInfo),
-                               maps:with([clean_start, keepalive], Protocol),
-                               maps:with([created_at, expiry_interval], Session)]),
+                               maps:with([peername, clean_start, keepalive, expiry_interval], ConnInfo),
+                               maps:with([created_at], Session)]),
     InfoKeys = [client_id, username, peername,
                 clean_start, keepalive, expiry_interval,
                 subscriptions_cnt, inflight, awaiting_rel, send_msg, mqueue_len, mqueue_dropped,
