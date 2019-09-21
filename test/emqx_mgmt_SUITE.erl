@@ -134,6 +134,7 @@ t_clients_cmd(_) ->
                                       {username, <<"testuser1">>},
                                       {password, <<"pass1">>}]),
     {ok, _} = emqtt:connect(T),
+    timer:sleep(300),
     emqx_mgmt_cli:clients(["list"]),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:clients(["show", "client12"]), "client12")),
     % emqx_mgmt_cli:clients(["kick", "client12"]),
