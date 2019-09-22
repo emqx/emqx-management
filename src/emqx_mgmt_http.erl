@@ -117,7 +117,7 @@ authorize_appid(Req) ->
     end.
 
 filter(#{app := App}) ->
-    case emqx_plugins:find_plugin(App) of
+    case lists:keyfind(App, 1, application:which_applications()) of
         false -> false;
-        Plugin -> Plugin#plugin.active
+        _ -> true
     end.

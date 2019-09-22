@@ -417,7 +417,7 @@ gen_config(App) ->
     proplists:get_value(App, Configs, []).
 
 load_plugin_with_config(Plugin, Config) ->
-    lists:foreach(fun({Key, _}) -> ets:delete(ac_tab, {env, Plugin, Key}) end, application:get_all_env(Plugin)),
+    lists:foreach(fun({Key, _}) -> application:unset_env(Plugin, Key) end, application:get_all_env(Plugin)),
     lists:foreach(fun({Key, Val}) -> application:set_env(Plugin, Key, Val) end, Config),
     case emqx_plugins:load(Plugin) of
         {ok, _StartedApp} -> ok;
