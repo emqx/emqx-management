@@ -85,4 +85,4 @@ format({{Subscriber, Topic}, Options}) ->
 
 format({_Subscriber, Topic, Options}) ->
     QoS = maps:get(qos, Options),
-    #{node => node(), topic => Topic, client_id => maps:get(subid, Options), qos => QoS}.
+    #{node => node(), topic => Topic, clientid => maps:get(subid, Options), qos => QoS}.
