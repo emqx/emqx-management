@@ -506,7 +506,7 @@ item(client, Key) ->
                                      , recv_cnt, recv_msg, recv_oct, recv_pkt
                                      , send_cnt, send_msg, send_oct, send_pkt] ++ DisconnectedAt,
                                      maps:without([client, conninfo, protocol, session], Misc)),
-                           maps:with([client_id, username, is_bridge, zone], Client),
+                           maps:with([clientid, username, is_bridge, zone], Client),
                            maps:with([peername], ConnInfo),
                            maps:with([clean_start, keepalive, proto_name, proto_ver], Protocol),
                            maps:with([created_at, expiry_interval], Session)]);

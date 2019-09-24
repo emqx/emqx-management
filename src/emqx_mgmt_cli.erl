@@ -528,13 +528,13 @@ trace(["list"]) ->
             end, emqx_tracer:lookup_traces());
 
 trace(["stop", "client", ClientId]) ->
-    trace_off(client_id, ClientId);
+    trace_off(clientid, ClientId);
 
 trace(["start", "client", ClientId, LogFile]) ->
-    trace_on(client_id, ClientId, all, LogFile);
+    trace_on(clientid, ClientId, all, LogFile);
 
 trace(["start", "client", ClientId, LogFile, Level]) ->
-    trace_on(client_id, ClientId, list_to_atom(Level), LogFile);
+    trace_on(clientid, ClientId, list_to_atom(Level), LogFile);
 
 trace(["stop", "topic", Topic]) ->
     trace_off(topic, Topic);
@@ -698,10 +698,10 @@ print({client, Key}) ->
                                          , mqueue_len, mqueue_dropped
                                          , send_msg],
                                          maps:without([client, conninfo, session], Misc)),
-                               maps:with([client_id, username], Client),
+                               maps:with([clientid, username], Client),
                                maps:with([peername, clean_start, keepalive, expiry_interval], ConnInfo),
                                maps:with([created_at], Session)]),
-    InfoKeys = [client_id, username, peername,
+    InfoKeys = [clientid, username, peername,
                 clean_start, keepalive, expiry_interval,
                 subscriptions_cnt, inflight, awaiting_rel, send_msg, mqueue_len, mqueue_dropped,
                 connected, created_at, connected_at] ++ case maps:get(connected, Info) of

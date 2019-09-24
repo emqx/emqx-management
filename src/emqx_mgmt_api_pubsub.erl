@@ -53,7 +53,7 @@
 
 subscribe(_Bindings, Params) ->
     logger:debug("API subscribe Params:~p", [Params]),
-    ClientId = get_value(<<"client_id">>, Params),
+    ClientId = get_value(<<"clientid">>, Params),
     Topics   = topics(filter, get_value(<<"topic">>, Params), get_value(<<"topics">>, Params, <<"">>)),
     QoS      = get_value(<<"qos">>, Params, 0),
     case Topics =/= [] of
@@ -72,7 +72,7 @@ subscribe(_Bindings, Params) ->
 publish(_Bindings, Params) ->
     logger:debug("API publish Params:~p", [Params]),
     Topics   = topics(name, get_value(<<"topic">>, Params), get_value(<<"topics">>, Params, <<"">>)),
-    ClientId = get_value(<<"client_id">>, Params),
+    ClientId = get_value(<<"clientid">>, Params),
     Payload  = get_value(<<"payload">>, Params, <<>>),
     Qos      = get_value(<<"qos">>, Params, 0),
     Retain   = get_value(<<"retain">>, Params, false),
@@ -89,7 +89,7 @@ publish(_Bindings, Params) ->
 
 unsubscribe(_Bindings, Params) ->
     logger:debug("API unsubscribe Params:~p", [Params]),
-    ClientId = get_value(<<"client_id">>, Params),
+    ClientId = get_value(<<"clientid">>, Params),
     Topic    = get_value(<<"topic">>, Params),
     case validate_by_filter(Topic) of
         true ->

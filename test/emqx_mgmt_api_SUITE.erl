@@ -102,7 +102,7 @@ banned(_) ->
     Who = <<"myclient">>,
     {ok, _} = request_api(post, api_path(["banned"]), [],
                           auth_header_(), [{<<"who">>, Who},
-                                           {<<"as">>, <<"client_id">>},
+                                           {<<"as">>, <<"clientid">>},
                                            {<<"reason">>, <<"test">>},
                                            {<<"by">>, <<"dashboard">>},
                                            {<<"desc">>, <<"hello world">>},
@@ -113,7 +113,7 @@ banned(_) ->
     ?assertEqual(Who, proplists:get_value(<<"who">>, Banned)),
 
     {ok, _} = request_api(delete, api_path(["banned", binary_to_list(Who)]), [],
-                          auth_header_(), [{<<"as">>, <<"client_id">>}]),
+                          auth_header_(), [{<<"as">>, <<"clientid">>}]),
     {ok, Result2} = request_api(get, api_path(["banned"]), auth_header_()),
     ?assertEqual([], get(data, Result2)).
 
@@ -146,9 +146,9 @@ connections_and_sessions(_) ->
     Options = #{username => Username},
     ClientId1 = <<"client1">>,
     ClientId2 = <<"client2">>,
-    {ok, C1} = emqtt:start_link(Options#{client_id => ClientId1}),
+    {ok, C1} = emqtt:start_link(Options#{clientid => ClientId1}),
     {ok, _} = emqtt:connect(C1),
-    {ok, C2} = emqtt:start_link(Options#{client_id => ClientId2}),
+    {ok, C2} = emqtt:start_link(Options#{clientid => ClientId2}),
     {ok, _} = emqtt:connect(C2),
 
     {ok, ConsViaUsername} = request_api(get, api_path(["nodes", atom_to_list(node()),
@@ -163,7 +163,7 @@ connections_and_sessions(_) ->
                               auth_header_()),
     {ok, Result} = request_api(get, api_path(["nodes", atom_to_list(node()), "clients", binary_to_list(ClientId1)]), auth_header_()),
     [Conn] = get(data, Result),
-    ?assertEqual(ClientId1, proplists:get_value(<<"client_id">>, Conn)),
+    ?assertEqual(ClientId1, proplists:get_value(<<"clientid">>, Conn)),
 
     {ok, Result} = request_api(get, api_path(["clients",
                                               binary_to_list(ClientId1)]),
@@ -216,19 +216,19 @@ plugins(_) ->
 
 pubsub(_) ->
     ClientId = <<"client1">>,
-    Options = #{client_id => ClientId,
+    Options = #{clientid => ClientId,
                 proto_ver => 5},
     Topic = <<"mytopic">>,
     {ok, C1} = emqtt:start_link(Options),
     {ok, _} = emqtt:connect(C1),
     {ok, _, [2]} = emqtt:subscribe(C1, Topic, 2),
     {ok, Code} = request_api(post, api_path(["mqtt/subscribe"]), [], auth_header_(),
-                             [{<<"client_id">>, ClientId},
+                             [{<<"clientid">>, ClientId},
                               {<<"topic">>, Topic},
                               {<<"qos">>, 2}]),
     ?assertEqual(0, proplists:get_value(<<"code">>, jsx:decode(list_to_binary(Code)))),
     {ok, Code} = request_api(post, api_path(["mqtt/publish"]), [], auth_header_(),
-                             [{<<"client_id">>, ClientId},
+                             [{<<"clientid">>, ClientId},
                               {<<"topic">>, <<"mytopic">>},
                               {<<"qos">>, 1},
                               {<<"payload">>, <<"hello">>}]),
@@ -239,18 +239,18 @@ pubsub(_) ->
                     false
             end),
     {ok, Code} = request_api(post, api_path(["mqtt/unsubscribe"]), [], auth_header_(),
-                             [{<<"client_id">>, ClientId},
+                             [{<<"clientid">>, ClientId},
                               {<<"topic">>, Topic}]).
 
 routes_and_subscriptions(_) ->
     {ok, NonRoute} = request_api(get, api_path(["routes"]), auth_header_()),
     ?assertEqual([], get(data, NonRoute)),
     ClientId = <<"myclient">>,
-    Options = #{client_id => <<"myclient">>},
+    Options = #{clientid => <<"myclient">>},
     Topic = <<"mytopic">>,
     {ok, C1} = emqtt:start_link(Options#{clean_start => true,
-                                               client_id   => ClientId,
-                                               proto_ver   => ?MQTT_PROTO_V5}),
+                                         clientid    => ClientId,
+                                         proto_ver   => ?MQTT_PROTO_V5}),
     {ok, _} = emqtt:connect(C1),
     {ok, _, [2]} = emqtt:subscribe(C1, Topic, qos2),
     {ok, Result} = request_api(get, api_path(["routes"]), auth_header_()),
@@ -263,7 +263,7 @@ routes_and_subscriptions(_) ->
     {ok, Result3} = request_api(get, api_path(["subscriptions"]), auth_header_()),
     [Subscription] = get(data, Result3),
     ?assertEqual(Topic, proplists:get_value(<<"topic">>, Subscription)),
-    ?assertEqual(ClientId, proplists:get_value(<<"client_id">>, Subscription)),
+    ?assertEqual(ClientId, proplists:get_value(<<"clientid">>, Subscription)),
 
     {ok, Result3} = request_api(get, api_path(["nodes", atom_to_list(node()), "subscriptions"]), auth_header_()),
 
