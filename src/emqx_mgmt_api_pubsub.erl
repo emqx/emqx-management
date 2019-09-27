@@ -24,7 +24,7 @@
                    , get_value/3
                    ]).
 
--import(minirest, [  return/1 ]).
+-import(minirest, [return/1]).
 
 -rest_api(#{name   => mqtt_subscribe,
             method => 'POST',
@@ -33,10 +33,10 @@
             descr  => "Subscribe a topic"}).
 
 -rest_api(#{name   => mqtt_subscribe_batchs,
-        method => 'POST',
-        path   => "/mqtt/subscribe_batch",
-        func   => subscribe_batch,
-        descr  => "Batch subscribes a topic"}).
+            method => 'POST',
+            path   => "/mqtt/subscribe_batch",
+            func   => subscribe_batch,
+            descr  => "Batch subscribes topics"}).
 
 -rest_api(#{name   => mqtt_publish,
             method => 'POST',
@@ -48,7 +48,7 @@
             method => 'POST',
             path   => "/mqtt/publish_batch",
             func   => publish_batch,
-            descr  => "Batch publish a MQTT message"}).
+            descr  => "Batch publish MQTT messages"}).
 
 -rest_api(#{name   => mqtt_unsubscribe,
             method => 'POST',
@@ -60,7 +60,7 @@
             method => 'POST',
             path   => "/mqtt/unsubscribe_batch",
             func   => unsubscribe_batch,
-            descr  => "Batch unsubscribes a topic"}).
+            descr  => "Batch unsubscribes topics"}).
 
 -export([ subscribe/2
         , publish/2
@@ -73,45 +73,38 @@
 subscribe(_Bindings, Params) ->
     {ClientId, Topic, QoS} = parsing_params(subscribe, Params),
     Reason = do(subscribe, {ClientId, Topic, QoS}),
-    io:format("Reason: ~p~n", [Reason]),
     return(Reason).
 
+subscribe_batch(_Bindings, []) -> 
+    return({ok, ?ERROR15, bad_topic});
+
 subscribe_batch(_Bindings, Params) ->
-    case Params =/= [] of
-        true ->
-            Reason = loop(subscribe, Params, []),
-            return({ok, Reason});
-        false ->
-            return({ok, ?ERROR15, bad_topic})
-    end.
+    Reason = loop(subscribe, Params, []),
+    return({ok, Reason}).
 
 publish(_Bindings, Params) ->
     {ClientId, Topic, Qos, Retain, Payload} = parsing_params(publish, Params),
     Reason = do(publish, {ClientId, Topic, Qos, Retain, Payload}),
     return(Reason).
 
+publish_batch(_Bindings, []) ->
+    return({ok, ?ERROR15, bad_topic});
+
 publish_batch(_Bindings, Params) ->
-    case Params =/= [] of
-        true ->
-            Reason = loop(publish, Params, []),
-            return({ok, Reason});
-        false ->
-            return({ok, ?ERROR15, bad_topic})
-    end.
+    Reason = loop(publish, Params, []),
+    return({ok, Reason}).
 
 unsubscribe(_Bindings, Params) ->
     {ClientId, Topic} = parsing_params(unsubscribe, Params),
     Reason = do(unsubscribe, {ClientId, Topic}),
     return(Reason).
 
+unsubscribe_batch(_Bindings, []) ->
+        return({ok, ?ERROR15, bad_topic});
+
 unsubscribe_batch(_Bindings, Params) ->
-    case Params =/= [] of
-        true ->
-            Reason = loop(unsubscribe, Params, []),
-            return({ok, Reason});
-        false ->
-            return({ok, ?ERROR15, bad_topic})
-    end.
+    Reason = loop(unsubscribe, Params, []),
+    return({ok, Reason}).
 
 parsing_params(subscribe, Params) ->
     logger:debug("API subscribe Params:~p", [Params]),
@@ -135,36 +128,29 @@ parsing_params(unsubscribe, Params) ->
     Topic    = get_value(<<"topic">>, Params),
     {ClientId, Topic}.
 
-do(subscribe, Data) ->
-    {ClientId, Topics, QoS} = Data,
-    case Topics =/= [] of
-        true ->
-            TopicTable = parse_topic_filters(Topics, QoS),
-            case emqx_mgmt:subscribe(ClientId, TopicTable) of
-                {error, Reason} -> 
-                    {ok, ?ERROR12, Reason};
-                _ ->
-                    ok
-            end;
-        false ->
-            {ok, ?ERROR15, bad_topic}
+do(subscribe, {_ClientId, [], _QoS}) ->
+    {ok, ?ERROR15, bad_topic};
+
+do(subscribe, {ClientId, Topics, QoS}) ->
+    TopicTable = parse_topic_filters(Topics, QoS),
+    case emqx_mgmt:subscribe(ClientId, TopicTable) of
+        {error, Reason} -> 
+            {ok, ?ERROR12, Reason};
+        _ ->
+            ok
     end;
 
-do(publish, Data) ->
-    {ClientId, Topics, Qos, Retain, Payload} = Data,
-    case Topics =/= [] of
-        true ->
-            lists:foreach(fun(Topic) ->
-                Msg = emqx_message:make(ClientId, Qos, Topic, Payload),
-                emqx_mgmt:publish(Msg#message{flags = #{retain => Retain}})
-            end, Topics),
-            ok;
-        false ->
-            {ok, ?ERROR15, bad_topic}
-    end;
+do(publish, {_ClientId, [], _Qos, _Retain, _Payload}) ->
+    {ok, ?ERROR15, bad_topic};
 
-do(unsubscribe, Data) ->
-    {ClientId, Topic} = Data,
+do(publish, {ClientId, Topics, Qos, Retain, Payload}) ->
+    lists:foreach(fun(Topic) ->
+        Msg = emqx_message:make(ClientId, Qos, Topic, Payload),
+        emqx_mgmt:publish(Msg#message{flags = #{retain => Retain}})
+    end, Topics),
+    ok;
+
+do(unsubscribe, {ClientId, Topic}) ->
     case validate_by_filter(Topic) of
         true ->
             case emqx_mgmt:unsubscribe(ClientId, Topic) of
