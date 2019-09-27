@@ -32,10 +32,10 @@
             func   => subscribe,
             descr  => "Subscribe a topic"}).
 
--rest_api(#{name   => mqtt_batch_subscribes,
+-rest_api(#{name   => mqtt_subscribe_batchs,
         method => 'POST',
-        path   => "/mqtt/batch_subscribe",
-        func   => batch_subscribe,
+        path   => "/mqtt/subscribe_batch",
+        func   => subscribe_batch,
         descr  => "Batch subscribes a topic"}).
 
 -rest_api(#{name   => mqtt_publish,
@@ -44,10 +44,10 @@
             func   => publish,
             descr  => "Publish a MQTT message"}).
 
--rest_api(#{name   => mqtt_batch_publishs,
+-rest_api(#{name   => mqtt_publish_batchs,
             method => 'POST',
-            path   => "/mqtt/batch_publish",
-            func   => batch_publish,
+            path   => "/mqtt/publish_batch",
+            func   => publish_batch,
             descr  => "Batch publish a MQTT message"}).
 
 -rest_api(#{name   => mqtt_unsubscribe,
@@ -56,18 +56,18 @@
             func   => unsubscribe,
             descr  => "Unsubscribe a topic"}).
 
--rest_api(#{name   => mqtt_batch_unsubscribes,
+-rest_api(#{name   => mqtt_unsubscribe_batchs,
             method => 'POST',
-            path   => "/mqtt/batch_unsubscribe",
-            func   => batch_unsubscribe,
+            path   => "/mqtt/unsubscribe_batch",
+            func   => unsubscribe_batch,
             descr  => "Batch unsubscribes a topic"}).
 
 -export([ subscribe/2
         , publish/2
         , unsubscribe/2
-        , batch_subscribe/2
-        , batch_publish/2
-        , batch_unsubscribe/2
+        , subscribe_batch/2
+        , publish_batch/2
+        , unsubscribe_batch/2
         ]).
 
 subscribe(_Bindings, Params) ->
@@ -76,7 +76,7 @@ subscribe(_Bindings, Params) ->
     io:format("Reason: ~p~n", [Reason]),
     return(Reason).
 
-batch_subscribe(_Bindings, Params) ->
+subscribe_batch(_Bindings, Params) ->
     case Params =/= [] of
         true ->
             Reason = loop(subscribe, Params, []),
@@ -90,7 +90,7 @@ publish(_Bindings, Params) ->
     Reason = do(publish, {ClientId, Topic, Qos, Retain, Payload}),
     return(Reason).
 
-batch_publish(_Bindings, Params) ->
+publish_batch(_Bindings, Params) ->
     case Params =/= [] of
         true ->
             Reason = loop(publish, Params, []),
@@ -104,7 +104,7 @@ unsubscribe(_Bindings, Params) ->
     Reason = do(unsubscribe, {ClientId, Topic}),
     return(Reason).
 
-batch_unsubscribe(_Bindings, Params) ->
+unsubscribe_batch(_Bindings, Params) ->
     case Params =/= [] of
         true ->
             Reason = loop(unsubscribe, Params, []),
