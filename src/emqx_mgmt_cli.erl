@@ -220,7 +220,7 @@ clients(["show", ClientId]) ->
 clients(["kick", ClientId]) ->
     if_client(ClientId, fun({_, Channel = {_ClientId, CPid}}) ->
                             case ets:lookup(emqx_channel_attrs, Channel) of
-                                [{_, #{client := #{conn_mod := ConnMod}}}] ->
+                                [{_, #{conninfo := #{conn_mod := ConnMod}}}] ->
                                     ConnMod:call(CPid, kick);
                                 _ -> emqx_ctl:print("Not Found.~n")
                             end
@@ -674,33 +674,31 @@ print({_, []}) ->
     ok;
 
 print({client, Key}) ->
-    Misc = 
-        maps:merge(
-            case ets:lookup(emqx_channel_attrs, Key) of
+    Attrs = case ets:lookup(emqx_channel_attrs, Key) of
                 [] -> #{};
-                [{_, Attrs}] -> Attrs
+                [{_, Attrs0}] -> Attrs0
             end,
-            case ets:lookup(emqx_channel_stats, Key) of
+    Stats = case ets:lookup(emqx_channel_stats, Key) of
                 [] -> #{};
-                [{_, Stats}] -> maps:from_list(Stats)
-            end
-        ),
-    Client = maps:get(client, Misc, #{}),
-    ConnInfo = maps:get(conninfo, Misc, #{}),
-    Session = maps:get(session, Misc, #{}),
+                [{_, Stats0}] -> maps:from_list(Stats0)
+            end,      
+    ClientInfo = maps:get(clientinfo, Attrs, #{}),
+    ConnInfo = maps:get(conninfo, Attrs, #{}),
+    Session = maps:get(session, Attrs, #{}),
+    State = maps:get(state, Attrs, #{}),
+    NState = State#{connected => case maps:get(state_name, State) of
+                                     connected -> true;
+                                     _ -> false
+                                 end},
     Info = 
         lists:foldl(fun(Items, Acc) ->
                         maps:merge(Items, Acc)
-                    end, #{}, [maps:with([ connected, connected_at, disconnected_at
-                                         , subscriptions_cnt
-                                         , inflight
-                                         , awaiting_rel
-                                         , mqueue_len, mqueue_dropped
-                                         , send_msg],
-                                         maps:without([client, conninfo, session], Misc)),
-                               maps:with([clientid, username], Client),
+                    end, #{}, [maps:with([ subscriptions_cnt, inflight, awaiting_rel
+                                         , mqueue_len, mqueue_dropped, send_msg], Stats),
+                               maps:with([clientid, username], ClientInfo),
                                maps:with([peername, clean_start, keepalive, expiry_interval], ConnInfo),
-                               maps:with([created_at], Session)]),
+                               maps:with([created_at], Session),
+                               maps:with([connected, connected_at, disconnected_at], NState)]),
     InfoKeys = [clientid, username, peername,
                 clean_start, keepalive, expiry_interval,
                 subscriptions_cnt, inflight, awaiting_rel, send_msg, mqueue_len, mqueue_dropped,
@@ -732,11 +730,6 @@ print({emqx_suboption, {{Pid, Topic}, Options}}) when is_pid(Pid) ->
 
 format(_, undefined) ->
     undefined;
-
-format(At, Val) when At =:= created_at;
-                     At =:= connected_at;
-                     At =:= disconnected_at ->
-    emqx_time:now_secs(Val);
 
 format(peername, {IPAddr, Port}) ->
     IPStr = emqx_mgmt_util:ntoa(IPAddr),
