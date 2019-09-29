@@ -197,7 +197,7 @@ lookup_client(Node, {clientid, ClientId}, FormatFun) ->
     rpc_call(Node, lookup_client, [Node, {clientid, ClientId}, FormatFun]);
 
 lookup_client(Node, {username, Username}, FormatFun) when Node =:= node() ->
-    MatchSpec = [{{'$1', #{client => #{username => '$2'}}}, [{'=:=','$2', Username}], ['$1']}],
+    MatchSpec = [{{'$1', #{clientinfo => #{username => '$2'}}}, [{'=:=','$2', Username}], ['$1']}],
     FormatFun(ets:select(emqx_channel_attrs, MatchSpec));
 
 lookup_client(Node, {username, Username}, FormatFun) ->
@@ -215,7 +215,7 @@ kickout_client(Node, ClientId) when Node =:= node() ->
         [] -> {error, not_found};
         [Channel = {_, CPid}] ->
             case ets:lookup(emqx_channel_attrs, Channel) of
-                [{_, #{client := #{conn_mod := ConnMod}}}] ->
+                [{_, #{conninfo := #{conn_mod := ConnMod}}}] ->
                     ConnMod:call(CPid, kick);
                 _ -> {error, not_found}
             end
@@ -476,40 +476,43 @@ query_handle(routes) ->
     qlc:append([qlc:q([E || E <- ets:table(Tab)]) || Tab <- emqx_route]).
 
 item(client, Key) ->
-    Misc = 
-        maps:merge(
-            case ets:lookup(emqx_channel_attrs, Key) of
+    Attrs = case ets:lookup(emqx_channel_attrs, Key) of
                 [] -> #{};
-                [{_, Attrs}] -> Attrs
+                [{_, Attrs0}] -> Attrs0
             end,
-            case ets:lookup(emqx_channel_stats, Key) of
+    Stats = case ets:lookup(emqx_channel_stats, Key) of
                 [] -> #{};
-                [{_, Stats}] -> maps:from_list(Stats)
-            end
-        ),
-    Client = maps:get(client, Misc, #{}),
-    ConnInfo = maps:get(conninfo, Misc, #{}),
-    Protocol = maps:get(protocol, Misc, #{}),
-    Session = maps:get(session, Misc, #{}),
-    DisconnectedAt = case maps:get(connected, Misc) of
-                         true -> [];
-                         false -> [disconnected_at]
+                [{_, Stats0}] -> maps:from_list(Stats0)
+            end,      
+    ClientInfo = maps:get(clientinfo, Attrs, #{}),
+    ConnInfo = maps:get(conninfo, Attrs, #{}),
+    Session = maps:get(session, Attrs, #{}),
+    State = maps:get(state, Attrs, #{}),
+    DisconnectedAt = case maps:get(state_name, State) of
+                         connected -> [];
+                         _ -> [disconnected_at]
                      end,
+    NState = State#{connected => case maps:get(state_name, State) of
+                                     connected -> true;
+                                     _ -> false
+                                 end},
+    NStats = Stats#{max_subscriptions => maps:get(subscriptions_max, Stats, 0),
+                    max_inflight => maps:get(inflight_max, Stats, 0),
+                    max_awaiting_rel => maps:get(awaiting_rel_max, Stats, 0),
+                    max_mqueue => maps:get(mqueue_max, Stats, 0)},
     lists:foldl(fun(Items, Acc) ->
                     maps:merge(Items, Acc)
-                end, #{}, [maps:with([ connected, connected_at
-                                     , subscriptions_cnt, max_subscriptions
+                end, #{}, [maps:with([ subscriptions_cnt, max_subscriptions
                                      , inflight, max_inflight
                                      , awaiting_rel, max_awaiting_rel
                                      , mqueue_len, mqueue_dropped, max_mqueue
                                      , heap_size, reductions, mailbox_len
                                      , recv_cnt, recv_msg, recv_oct, recv_pkt
-                                     , send_cnt, send_msg, send_oct, send_pkt] ++ DisconnectedAt,
-                                     maps:without([client, conninfo, protocol, session], Misc)),
-                           maps:with([clientid, username, is_bridge, zone], Client),
-                           maps:with([peername], ConnInfo),
-                           maps:with([clean_start, keepalive, proto_name, proto_ver], Protocol),
-                           maps:with([created_at, expiry_interval], Session)]);
+                                     , send_cnt, send_msg, send_oct, send_pkt], NStats),
+                           maps:with([clientid, username, is_bridge, zone], ClientInfo),
+                           maps:with([clean_start, keepalive, expiry_interval, proto_name, proto_ver, peername], ConnInfo),
+                           maps:with([created_at], Session),
+                           maps:with([connected, connected_at] ++ DisconnectedAt, NState)]);
 
 item(subscription, {{Topic, ClientId}, Options}) ->
     #{topic => Topic, clientid => ClientId, options => Options};

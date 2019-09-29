@@ -150,6 +150,7 @@ connections_and_sessions(_) ->
     {ok, _} = emqtt:connect(C1),
     {ok, C2} = emqtt:start_link(Options#{clientid => ClientId2}),
     {ok, _} = emqtt:connect(C2),
+    timer:sleep(300),
 
     {ok, ConsViaUsername} = request_api(get, api_path(["nodes", atom_to_list(node()),
                                                       "clients",
