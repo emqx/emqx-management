@@ -496,15 +496,19 @@ item(client, Key) ->
                                      connected -> true;
                                      _ -> false
                                  end},
+    NStats = Stats#{max_subscriptions => maps:get(subscriptions_max, Stats, 0),
+                    max_inflight => maps:get(inflight_max, Stats, 0),
+                    max_awaiting_rel => maps:get(awaiting_rel_max, Stats, 0),
+                    max_mqueue => maps:get(mqueue_max, Stats, 0)},
     lists:foldl(fun(Items, Acc) ->
                     maps:merge(Items, Acc)
-                end, #{}, [maps:with([ subscriptions_cnt, subscriptions_max
-                                     , inflight, inflight_max
-                                     , awaiting_rel, awaiting_rel_max
-                                     , mqueue_len, mqueue_dropped, mqueue_max
+                end, #{}, [maps:with([ subscriptions_cnt, max_subscriptions
+                                     , inflight, max_inflight
+                                     , awaiting_rel, max_awaiting_rel
+                                     , mqueue_len, mqueue_dropped, max_mqueue
                                      , heap_size, reductions, mailbox_len
                                      , recv_cnt, recv_msg, recv_oct, recv_pkt
-                                     , send_cnt, send_msg, send_oct, send_pkt], Stats),
+                                     , send_cnt, send_msg, send_oct, send_pkt], NStats),
                            maps:with([clientid, username, is_bridge, zone], ClientInfo),
                            maps:with([clean_start, keepalive, expiry_interval, proto_name, proto_ver, peername], ConnInfo),
                            maps:with([created_at], Session),
