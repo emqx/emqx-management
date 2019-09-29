@@ -32,7 +32,7 @@
             func   => subscribe,
             descr  => "Subscribe a topic"}).
 
--rest_api(#{name   => mqtt_subscribe_batchs,
+-rest_api(#{name   => mqtt_subscribe_batch,
             method => 'POST',
             path   => "/mqtt/subscribe_batch",
             func   => subscribe_batch,
@@ -44,7 +44,7 @@
             func   => publish,
             descr  => "Publish a MQTT message"}).
 
--rest_api(#{name   => mqtt_publish_batchs,
+-rest_api(#{name   => mqtt_publish_batch,
             method => 'POST',
             path   => "/mqtt/publish_batch",
             func   => publish_batch,
@@ -56,7 +56,7 @@
             func   => unsubscribe,
             descr  => "Unsubscribe a topic"}).
 
--rest_api(#{name   => mqtt_unsubscribe_batchs,
+-rest_api(#{name   => mqtt_unsubscribe_batch,
             method => 'POST',
             path   => "/mqtt/unsubscribe_batch",
             func   => unsubscribe_batch,
