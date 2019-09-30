@@ -121,11 +121,11 @@ format(Data) when is_map(Data)->
     CreatedAt = maps:get(created_at, Data),
     Data1 = maps:without([peername], Data),
     maps:merge(Data1#{node         => node(),
-                      ipaddress    => iolist_to_binary(ntoa(IpAddr)),
+                      ip_address   => iolist_to_binary(ntoa(IpAddr)),
                       port         => Port,
                       connected_at => iolist_to_binary(strftime(ConnectedAt)),
                       created_at   => iolist_to_binary(strftime(CreatedAt))},
                case maps:get(disconnected_at, Data, undefined) of
                    undefined -> #{};
-                   DisconnectedAt -> iolist_to_binary(strftime(DisconnectedAt))
+                   DisconnectedAt -> #{disconnected_at => iolist_to_binary(strftime(DisconnectedAt))}
                end).
