@@ -73,8 +73,8 @@ delete(#{who := Who}, Params) ->
         {ok, <<"username">>} ->
             emqx_mgmt:delete_banned({username, bin(Who)}),
             return();
-        {ok, <<"client_id">>} ->
-            emqx_mgmt:delete_banned({client_id, bin(Who)}),
+        {ok, <<"clientid">>} ->
+            emqx_mgmt:delete_banned({clientid, bin(Who)}),
             return();
         {error, Code, Message} -> 
             return({error, Code, Message})
@@ -121,8 +121,8 @@ do_pack_banned([{<<"who">>, Who} | Params], Banned) ->
         {value, {<<"as">>, <<"ip_address">>}, Params2} ->
             {ok, IPAddress} = inet:parse_address(str(Who)),
             do_pack_banned(Params2, Banned#banned{who = {ip_address, IPAddress}});
-        {value, {<<"as">>, <<"client_id">>}, Params2} ->
-            do_pack_banned(Params2, Banned#banned{who = {client_id, Who}});
+        {value, {<<"as">>, <<"clientid">>}, Params2} ->
+            do_pack_banned(Params2, Banned#banned{who = {clientid, Who}});
         {value, {<<"as">>, <<"username">>}, Params2} ->
             do_pack_banned(Params2, Banned#banned{who = {username, Who}})
     end;
@@ -150,8 +150,8 @@ required_params(delete) ->
     message => <<"missing mandatory params: ['as']">> }.
 
 enum_values(as) ->
-    #{enum_values => [<<"client_id">>, <<"username">>, <<"ip_address">>],
-      message => <<"value of 'as' must be one of: ['client_id', 'username', 'ip_address']">> }.
+    #{enum_values => [<<"clientid">>, <<"username">>, <<"ip_address">>],
+      message => <<"value of 'as' must be one of: ['clientid', 'username', 'ip_address']">> }.
 
 %% Internal Functions
 

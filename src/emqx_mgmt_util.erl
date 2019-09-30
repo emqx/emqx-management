@@ -33,6 +33,9 @@
 strftime({MegaSecs, Secs, _MicroSecs}) ->
     strftime(datetime(MegaSecs * 1000000 + Secs));
 
+strftime(Secs) when is_integer(Secs) ->
+    strftime(datetime(Secs));
+
 strftime({{Y,M,D}, {H,MM,S}}) ->
     lists:flatten(
         io_lib:format(
