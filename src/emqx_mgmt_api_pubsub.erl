@@ -112,7 +112,8 @@ loop_subscribe([Params | ParamsN], Acc) ->
         {_, Code0, _Reason} -> Code0
     end,
     Result = [{client_id, ClientId},
-              {topic, Topic},
+              resp_topic(get_value(<<"topic">>, Params),
+                         get_value(<<"topics">>, Params, <<"">>)),
               {code, Code}],
     loop_subscribe(ParamsN, [Result | Acc]).
 
@@ -126,7 +127,9 @@ loop_publish([Params | ParamsN], Acc) ->
         ok -> 0;
         {_, Code0, _Reason} -> Code0
     end,
-    Result = [{topic, Topic}, {code, Code}],
+    Result = [resp_topic(get_value(<<"topic">>, Params),
+                         get_value(<<"topics">>, Params, <<"">>)),
+              {code, Code}],
     loop_publish(ParamsN, [Result | Acc]).
 
 loop_unsubscribe(Params) ->
@@ -140,7 +143,8 @@ loop_unsubscribe([Params | ParamsN], Acc) ->
         {_, Code0, _Reason} -> Code0
     end,
     Result = [{client_id, ClientId},
-              {topic, Topic},
+              resp_topic(get_value(<<"topic">>, Params),
+                         get_value(<<"topics">>, Params, <<"">>)),
               {code, Code}],
     loop_unsubscribe(ParamsN, [Result | Acc]).
 
@@ -218,3 +222,7 @@ parse_topic_filters(Topics, Qos) ->
          {Topic, Opts#{qos => Qos}}
      end || Topic0 <- Topics].
 
+resp_topic(undefined, Topics) ->
+    {topics, Topics};
+resp_topic(Topic, _) ->
+    {topic, Topic}.
