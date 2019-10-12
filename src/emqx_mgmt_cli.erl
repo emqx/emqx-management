@@ -681,37 +681,36 @@ print({client, Key}) ->
     Stats = case ets:lookup(emqx_channel_stats, Key) of
                 [] -> #{};
                 [{_, Stats0}] -> maps:from_list(Stats0)
-            end,      
+            end,
     ClientInfo = maps:get(clientinfo, Attrs, #{}),
     ConnInfo = maps:get(conninfo, Attrs, #{}),
     Session = maps:get(session, Attrs, #{}),
-    State = maps:get(state, Attrs, #{}),
-    NState = State#{connected => case maps:get(state_name, State) of
-                                     connected -> true;
-                                     _ -> false
-                                 end},
-    Info = 
-        lists:foldl(fun(Items, Acc) ->
-                        maps:merge(Items, Acc)
-                    end, #{}, [maps:with([ subscriptions_cnt, inflight, awaiting_rel
-                                         , mqueue_len, mqueue_dropped, send_msg], Stats),
-                               maps:with([clientid, username], ClientInfo),
-                               maps:with([peername, clean_start, keepalive, expiry_interval], ConnInfo),
-                               maps:with([created_at], Session),
-                               maps:with([connected, connected_at, disconnected_at], NState)]),
+    Connected = case maps:get(conn_state, Attrs) of
+                    connected -> true;
+                    _ -> false
+                end,
+    Info = lists:foldl(fun(Items, Acc) ->
+                               maps:merge(Items, Acc)
+                       end, #{connected => Connected},
+                       [maps:with([subscriptions_cnt, inflight, awaiting_rel,
+                                   mqueue_len, mqueue_dropped, send_msg], Stats),
+                        maps:with([clientid, username], ClientInfo),
+                        maps:with([peername, clean_start, keepalive, expiry_interval,
+                                   connected_at, disconnected_at], ConnInfo),
+                        maps:with([created_at], Session)]),
     InfoKeys = [clientid, username, peername,
                 clean_start, keepalive, expiry_interval,
                 subscriptions_cnt, inflight, awaiting_rel, send_msg, mqueue_len, mqueue_dropped,
-                connected, created_at, connected_at] ++ case maps:get(connected, Info) of
-                                                            true -> [];
-                                                            false -> [disconnected_at]
+                connected, created_at, connected_at] ++ case maps:is_key(disconnected_at, Info) of
+                                                            true  -> [disconnected_at];
+                                                            false -> []
                                                         end,
     emqx_ctl:print("Client(~s, username=~s, peername=~s, "
                     "clean_start=~s, keepalive=~w, session_expiry_interval=~w, "
                     "subscriptions=~w, inflight=~w, awaiting_rel=~w, delivered_msgs=~w, enqueued_msgs=~w, dropped_msgs=~w, "
-                    "connected=~s, created_at=~w, connected_at=~w" ++ case maps:get(connected, Info) of
-                                                                          true -> ")~n";
-                                                                          false -> ", disconnected_at=~w)~n"
+                    "connected=~s, created_at=~w, connected_at=~w" ++ case maps:is_key(disconnected_at, Info) of
+                                                                          true  -> ", disconnected_at=~w)~n";
+                                                                          false -> ")~n"
                                                                       end,
                     [format(K, maps:get(K, Info)) || K <- InfoKeys]);
 
