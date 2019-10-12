@@ -155,6 +155,7 @@ t_clients_cmd(_) ->
     Connack = ?CONNACK_PACKET(?CONNACK_ACCEPT),
     {binary, Bin} = rfc6455_client:recv(WS),
     {ok, Connack, <<>>, _} = raw_recv_pase(Bin),
+    timer:sleep(300),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:clients(["show", "client13"]), "client13")).
     % emqx_mgmt_cli:clients(["kick", "client13"]),
     % timer:sleep(500),
