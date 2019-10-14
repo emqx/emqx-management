@@ -483,36 +483,31 @@ item(client, Key) ->
     Stats = case ets:lookup(emqx_channel_stats, Key) of
                 [] -> #{};
                 [{_, Stats0}] -> maps:from_list(Stats0)
-            end,      
+            end,
     ClientInfo = maps:get(clientinfo, Attrs, #{}),
     ConnInfo = maps:get(conninfo, Attrs, #{}),
     Session = maps:get(session, Attrs, #{}),
-    State = maps:get(state, Attrs, #{}),
-    DisconnectedAt = case maps:get(state_name, State) of
-                         connected -> [];
-                         _ -> [disconnected_at]
-                     end,
-    NState = State#{connected => case maps:get(state_name, State) of
-                                     connected -> true;
-                                     _ -> false
-                                 end},
+    Connected = case maps:get(conn_state, Attrs) of
+                    connected -> true;
+                    _ -> false
+                end,
     NStats = Stats#{max_subscriptions => maps:get(subscriptions_max, Stats, 0),
                     max_inflight => maps:get(inflight_max, Stats, 0),
                     max_awaiting_rel => maps:get(awaiting_rel_max, Stats, 0),
                     max_mqueue => maps:get(mqueue_max, Stats, 0)},
     lists:foldl(fun(Items, Acc) ->
                     maps:merge(Items, Acc)
-                end, #{}, [maps:with([ subscriptions_cnt, max_subscriptions
-                                     , inflight, max_inflight
-                                     , awaiting_rel, max_awaiting_rel
-                                     , mqueue_len, mqueue_dropped, max_mqueue
-                                     , heap_size, reductions, mailbox_len
-                                     , recv_cnt, recv_msg, recv_oct, recv_pkt
-                                     , send_cnt, send_msg, send_oct, send_pkt], NStats),
-                           maps:with([clientid, username, is_bridge, zone], ClientInfo),
-                           maps:with([clean_start, keepalive, expiry_interval, proto_name, proto_ver, peername], ConnInfo),
-                           maps:with([created_at], Session),
-                           maps:with([connected, connected_at] ++ DisconnectedAt, NState)]);
+                end, #{connected => Connected},
+                [maps:with([ subscriptions_cnt, max_subscriptions,
+                             inflight, max_inflight, awaiting_rel,
+                             max_awaiting_rel, mqueue_len, mqueue_dropped,
+                             max_mqueue, heap_size, reductions, mailbox_len,
+                             recv_cnt, recv_msg, recv_oct, recv_pkt, send_cnt,
+                             send_msg, send_oct, send_pkt], NStats),
+                 maps:with([clientid, username, is_bridge, zone], ClientInfo),
+                 maps:with([clean_start, keepalive, expiry_interval, proto_name,
+                            proto_ver, peername, connected_at, disconnected_at], ConnInfo),
+                 maps:with([created_at], Session)]);
 
 item(subscription, {{Topic, ClientId}, Options}) ->
     #{topic => Topic, clientid => ClientId, options => Options};
