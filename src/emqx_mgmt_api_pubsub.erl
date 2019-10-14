@@ -24,9 +24,7 @@
                    , get_value/3
                    ]).
 
--import(minirest, [ return/0
-                  , return/1
-                  ]).
+-import(minirest, [return/1]).
 
 -rest_api(#{name   => mqtt_subscribe,
             method => 'POST',
@@ -46,62 +44,159 @@
             func   => unsubscribe,
             descr  => "Unsubscribe a topic"}).
 
+-rest_api(#{name   => mqtt_subscribe_batch,
+            method => 'POST',
+            path   => "/mqtt/subscribe_batch",
+            func   => subscribe_batch,
+            descr  => "Batch subscribes topics"}).
+
+-rest_api(#{name   => mqtt_publish_batch,
+            method => 'POST',
+            path   => "/mqtt/publish_batch",
+            func   => publish_batch,
+            descr  => "Batch publish MQTT messages"}).
+
+-rest_api(#{name   => mqtt_unsubscribe_batch,
+            method => 'POST',
+            path   => "/mqtt/unsubscribe_batch",
+            func   => unsubscribe_batch,
+            descr  => "Batch unsubscribes topics"}).
+
 -export([ subscribe/2
         , publish/2
         , unsubscribe/2
+        , subscribe_batch/2
+        , publish_batch/2
+        , unsubscribe_batch/2
         ]).
 
 subscribe(_Bindings, Params) ->
     logger:debug("API subscribe Params:~p", [Params]),
-    ClientId = get_value(<<"clientid">>, Params),
-    Topics   = topics(filter, get_value(<<"topic">>, Params), get_value(<<"topics">>, Params, <<"">>)),
-    QoS      = get_value(<<"qos">>, Params, 0),
-    case Topics =/= [] of
+    {ClientId, Topic, QoS} = parse_subscribe_params(Params),
+    Reason = do_subscribe(ClientId, Topic, QoS),
+    return(Reason).
+
+publish(_Bindings, Params) ->
+    logger:debug("API publish Params:~p", [Params]),
+    {ClientId, Topic, Qos, Retain, Payload} = parse_publish_params(Params),
+    Reason = do_publish(ClientId, Topic, Qos, Retain, Payload),
+    return(Reason).
+
+unsubscribe(_Bindings, Params) ->
+    logger:debug("API unsubscribe Params:~p", [Params]),
+    {ClientId, Topic} = parse_unsubscribe_params(Params),
+    Reason = do_unsubscribe(ClientId, Topic),
+    return(Reason).
+
+subscribe_batch(_Bindings, Params) ->
+    logger:debug("API subscribe batch Params:~p", [Params]),
+    Reason = loop_subscribe(Params),
+    return({ok, Reason}).
+
+publish_batch(_Bindings, Params) ->
+    logger:debug("API publish batch Params:~p", [Params]),
+    Reason = loop_publish(Params),
+    return({ok, Reason}).
+
+unsubscribe_batch(_Bindings, Params) ->
+    logger:debug("API unsubscribe batch Params:~p", [Params]),
+    Reason = loop_unsubscribe(Params),
+    return({ok, Reason}).
+
+loop_subscribe(Params) ->
+    loop_subscribe(Params, []).
+loop_subscribe([], Result) ->
+    lists:reverse(Result);
+loop_subscribe([Params | ParamsN], Acc) ->
+    {ClientId, Topic, QoS} = parse_subscribe_params(Params),
+    Code = case do_subscribe(ClientId, Topic, QoS) of
+        ok -> 0;
+        {_, Code0, _Reason} -> Code0
+    end,
+    Result = [{clientid, ClientId},
+              resp_topic(get_value(<<"topic">>, Params),
+                         get_value(<<"topics">>, Params, <<"">>)),
+              {code, Code}],
+    loop_subscribe(ParamsN, [Result | Acc]).
+
+loop_publish(Params) ->
+    loop_publish(Params, []).
+loop_publish([], Result) ->
+    lists:reverse(Result);
+loop_publish([Params | ParamsN], Acc) ->
+    {ClientId, Topic, Qos, Retain, Payload} = parse_publish_params(Params),
+    Code = case do_publish(ClientId, Topic, Qos, Retain, Payload) of
+        ok -> 0;
+        {_, Code0, _} -> Code0
+    end,
+    Result = [resp_topic(get_value(<<"topic">>, Params),
+                         get_value(<<"topics">>, Params, <<"">>)),
+              {code, Code}],
+    loop_publish(ParamsN, [Result | Acc]).
+
+loop_unsubscribe(Params) ->
+    loop_unsubscribe(Params, []).
+loop_unsubscribe([], Result) ->
+    lists:reverse(Result);
+loop_unsubscribe([Params | ParamsN], Acc) ->
+    {ClientId, Topic} = parse_unsubscribe_params(Params),
+    Code = case do_unsubscribe(ClientId, Topic) of
+        ok -> 0;
+        {_, Code0, _} -> Code0
+    end,
+    Result = [{clientid, ClientId},
+              resp_topic(get_value(<<"topic">>, Params),
+                         get_value(<<"topics">>, Params, <<"">>)),
+              {code, Code}],
+    loop_unsubscribe(ParamsN, [Result | Acc]).
+
+do_subscribe(_ClientId, [], _QoS) ->
+    {ok, ?ERROR15, bad_topic};
+do_subscribe(ClientId, Topics, QoS) ->
+    TopicTable = parse_topic_filters(Topics, QoS),
+    case emqx_mgmt:subscribe(ClientId, TopicTable) of
+        {error, Reason} -> {ok, ?ERROR12, Reason};
+        _ -> ok
+    end.
+
+do_publish(_ClientId, [], _Qos, _Retain, _Payload) ->
+    {ok, ?ERROR15, bad_topic};
+do_publish(ClientId, Topics, Qos, Retain, Payload) ->
+    lists:foreach(fun(Topic) ->
+        Msg = emqx_message:make(ClientId, Qos, Topic, Payload),
+        emqx_mgmt:publish(Msg#message{flags = #{retain => Retain}})
+    end, Topics),
+    ok.
+
+do_unsubscribe(ClientId, Topic) ->
+    case validate_by_filter(Topic) of
         true ->
-            TopicTable = parse_topic_filters(Topics, QoS),
-            case emqx_mgmt:subscribe(ClientId, TopicTable) of
-                {error, Reason} -> 
-                    return({ok, ?ERROR12, Reason});
-                _ ->
-                    return()
+            case emqx_mgmt:unsubscribe(ClientId, Topic) of
+                {error, Reason} -> ({ok, ?ERROR12, Reason});
+                _ -> ok
             end;
         false ->
             return({ok, ?ERROR15, bad_topic})
     end.
 
-publish(_Bindings, Params) ->
-    logger:debug("API publish Params:~p", [Params]),
+parse_subscribe_params(Params) ->
+    ClientId = get_value(<<"clientid">>, Params),
+    Topics   = topics(filter, get_value(<<"topic">>, Params), get_value(<<"topics">>, Params, <<"">>)),
+    QoS      = get_value(<<"qos">>, Params, 0),
+    {ClientId, Topics, QoS}.
+
+parse_publish_params(Params) ->
     Topics   = topics(name, get_value(<<"topic">>, Params), get_value(<<"topics">>, Params, <<"">>)),
     ClientId = get_value(<<"clientid">>, Params),
     Payload  = get_value(<<"payload">>, Params, <<>>),
     Qos      = get_value(<<"qos">>, Params, 0),
     Retain   = get_value(<<"retain">>, Params, false),
-    case Topics =/= [] of
-        true ->
-            lists:foreach(fun(Topic) ->
-                Msg = emqx_message:make(ClientId, Qos, Topic, Payload),
-                emqx_mgmt:publish(Msg#message{flags = #{retain => Retain}})
-            end, Topics),
-            return();
-        false ->
-            return({ok, ?ERROR15, bad_topic})
-    end.
+    {ClientId, Topics, Qos, Retain, Payload}.
 
-unsubscribe(_Bindings, Params) ->
-    logger:debug("API unsubscribe Params:~p", [Params]),
+parse_unsubscribe_params(Params) ->
     ClientId = get_value(<<"clientid">>, Params),
     Topic    = get_value(<<"topic">>, Params),
-    case validate_by_filter(Topic) of
-        true ->
-            case emqx_mgmt:unsubscribe(ClientId, Topic) of
-                {error, Reason} -> 
-                    return({ok, ?ERROR12, Reason});
-                _ -> 
-                    return()
-            end;
-        false ->
-            return({ok, ?ERROR15, bad_topic})
-    end.
+    {ClientId, Topic}.
 
 topics(Type, undefined, Topics0) ->
     Topics = binary:split(Topics0, <<",">>, [global]),
@@ -136,3 +231,7 @@ parse_topic_filters(Topics, Qos) ->
          {Topic, Opts#{qos => Qos}}
      end || Topic0 <- Topics].
 
+resp_topic(undefined, Topics) ->
+    {topics, Topics};
+resp_topic(Topic, _) ->
+    {topic, Topic}.

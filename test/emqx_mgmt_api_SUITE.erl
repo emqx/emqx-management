@@ -434,7 +434,39 @@ pubsub(_) ->
             end),
     {ok, Code} = request_api(post, api_path(["mqtt/unsubscribe"]), [], auth_header_(),
                              [{<<"clientid">>, ClientId},
-                              {<<"topic">>, Topic}]).
+                              {<<"topic">>, Topic}]),
+
+    %% tests subscribe_batch
+    Topic_list = [<<"mytopic1">>, <<"mytopic2">>],
+    [ {ok, _, [2]} = emqtt:subscribe(C1, Topics, 2) || Topics <- Topic_list],
+
+    Body1 = [[{<<"clientid">>, ClientId}, {<<"topic">>, Topics}, {<<"qos">>, 2}] || Topics <- Topic_list],
+    {ok, Data1} = request_api(post, api_path(["mqtt/subscribe_batch"]), [], auth_header_(),Body1),
+    loop(proplists:get_value(<<"data">>, jsx:decode(list_to_binary(Data1)))),
+
+    %% tests publish_batch
+    Body2 = [ [{<<"clientid">>, ClientId}, {<<"topic">>, Topics}, {<<"qos">>, 2}, {<<"retain">>, <<"false">>}, {<<"payload">>, <<"publish_batch">>}] || Topics <- Topic_list ],
+    {ok, Data2} = request_api(post, api_path(["mqtt/publish_batch"]), [], auth_header_(),Body2),
+    loop(proplists:get_value(<<"data">>, jsx:decode(list_to_binary(Data2)))),
+    [ ?assert(receive
+                    {publish, #{topic := Topics}} ->
+                        true
+                    after 100 ->
+                        false
+                    end) || Topics <- Topic_list ],
+
+    %% tests unsubscribe_batch
+    Body3 = [[{<<"clientid">>, ClientId}, {<<"topic">>, Topics}] || Topics <- Topic_list],
+    {ok, Data3} = request_api(post, api_path(["mqtt/unsubscribe_batch"]), [], auth_header_(),Body3),
+    loop(proplists:get_value(<<"data">>, jsx:decode(list_to_binary(Data3)))).
+
+loop([]) -> [];
+
+loop(Data) ->
+    [H | T] = Data,
+    ct:pal("H: ~p~n", [H]),
+    ?assertEqual(0,proplists:get_value(<<"code">>, H)),
+    loop(T).
 
 routes_and_subscriptions(_) ->
     ClientId = <<"myclient">>,
