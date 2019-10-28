@@ -69,6 +69,18 @@
             func   => kickout,
             descr  => "Kick out the client in the cluster"}).
 
+-rest_api(#{name   => clean_acl_cache,
+            method => 'DELETE',
+            path   => "/clients/:bin:clientid/acl_cache",
+            func   => clean_acl_cache,
+            descr  => "Clear the ACL cache of a specified client in the cluster"}).
+
+-rest_api(#{name   => list_acl_cache,
+            method => 'GET',
+            path   => "/clients/:bin:clientid/acl_cache",
+            func   => list_acl_cache,
+            descr  => "List the ACL cache of a specified client in the cluster"}).
+
 -import(emqx_mgmt_util, [ ntoa/1
                         , strftime/1
                         ]).
@@ -76,6 +88,8 @@
 -export([ list/2
         , lookup/2
         , kickout/2
+        , clean_acl_cache/2
+        , list_acl_cache/2
         ]).
 
 list(Bindings, Params) when map_size(Bindings) == 0 ->
@@ -108,6 +122,16 @@ kickout(#{clientid := ClientId}, _Params) ->
         {error, Reason} -> return({error, ?ERROR12, Reason})
     end.
 
+clean_acl_cache(#{clientid := ClientId}, _Params) ->
+    case emqx_mgmt:clean_acl_cache(http_uri:decode(ClientId)) of
+        ok -> return();
+        {error, Reason} -> return({error, ?ERROR12, Reason})
+    end.
+
+list_acl_cache(#{clientid := ClientId}, _Params) ->
+    return({ok, [format_acl_cache(Cache)
+                 || Cache <- emqx_mgmt:list_acl_cache(http_uri:decode(ClientId))]}).
+
 format([]) ->
     [];
 format(Items) when is_list(Items) ->
@@ -119,7 +143,7 @@ format(Data) when is_map(Data)->
     {IpAddr, Port} = maps:get(peername, Data),
     ConnectedAt = maps:get(connected_at, Data),
     CreatedAt = maps:get(created_at, Data),
-    Data1 = maps:without([peername], Data),
+    Data1 = maps:without([peername, inflight], Data),
     maps:merge(Data1#{node         => node(),
                       ip_address   => iolist_to_binary(ntoa(IpAddr)),
                       port         => Port,
@@ -129,3 +153,9 @@ format(Data) when is_map(Data)->
                    undefined -> #{};
                    DisconnectedAt -> #{disconnected_at => iolist_to_binary(strftime(DisconnectedAt))}
                end).
+
+format_acl_cache({{PubSub, Topic}, {AclResult, Timestamp}}) ->
+    #{access => PubSub,
+      topic => Topic,
+      result => AclResult,
+      updated_time => Timestamp}.
