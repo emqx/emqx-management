@@ -44,6 +44,10 @@
 -export([ lookup_client/2
         , lookup_client/3
         , kickout_client/1
+        , list_acl_cache/1
+        , list_acl_cache/2
+        , clean_acl_cache/1
+        , clean_acl_cache/2
         ]).
 
 %% Subscriptions
@@ -224,21 +228,41 @@ kickout_client(Node, ClientId) when Node =:= node() ->
 kickout_client(Node, ClientId) ->
     rpc_call(Node, kickout_client, [Node, ClientId]).
 
-%% clean_acl_cache(ClientId, Topic) ->
-%%     Results = [clean_acl_cache(Node, ClientId, Topic) || Node <- ekka_mnesia:running_nodes()],
-%%     case lists:any(fun(Item) -> Item =:= ok end, Results) of
-%%         true  -> ok;
-%%         false -> lists:last(Results)
-%%     end.
+list_acl_cache(ClientId) ->
+    list_acl_cache(ekka_mnesia:running_nodes(), ClientId).
 
-%% clean_acl_cache(Node, ClientId, Topic) when Node =:= node() ->
-%%     case emqx_cm:lookup_conn_pid(ClientId) of
-%%         Pid when is_pid(Pid) ->
-%%             emqx_channel:clean_acl_cache(Pid, Topic);
-%%         _ -> {error, not_found}
-%%     end;
-%% clean_acl_cache(Node, ClientId, Topic) ->
-%%     rpc_call(Node, clean_acl_cache, [Node, ClientId, Topic]).
+list_acl_cache(Node, ClientId) when is_atom(Node) ->
+    apply_on_client(Node, ClientId,
+        fun(Pid) -> gen_server:call(Pid, list_acl_cache) end);
+
+list_acl_cache([], _ClientId) -> [];
+list_acl_cache([Node | RNodes], ClientId) ->
+    case list_acl_cache(Node, ClientId) of
+        {error, not_found} -> list_acl_cache(RNodes, ClientId);
+        AclCache -> AclCache
+    end.
+
+clean_acl_cache(ClientId) ->
+    Results = [clean_acl_cache(Node, ClientId) || Node <- ekka_mnesia:running_nodes()],
+    case lists:any(fun(Item) -> Item =:= ok end, Results) of
+        true  -> ok;
+        false -> lists:last(Results)
+    end.
+
+clean_acl_cache(Node, ClientId) when Node =:= node() ->
+    apply_on_client(Node, ClientId,
+        fun(Pid) -> erlang:send(Pid, clean_acl_cache), ok end).
+
+apply_on_client(Node, ClientId, Fun) when Node =:= node() ->
+    case emqx_cm:lookup_channels(ClientId) of
+        [Pid] when is_pid(Pid) ->
+            Fun(Pid);
+        Pids when is_list(Pids) ->
+            Fun(lists:last(Pids));
+        _ -> {error, not_found}
+    end;
+apply_on_client(Node, ClientId, Fun) ->
+    rpc_call(Node, apply_on_client, [Node, ClientId, Fun]).
 
 %%--------------------------------------------------------------------
 %% Subscriptions
