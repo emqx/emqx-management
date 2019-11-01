@@ -65,6 +65,16 @@
   hidden
 ]}.
 
+{mapping, "management.listener.http.inet6", "emqx_management.listeners", [
+  {default, false},
+  {datatype, {enum, [true, false]}}
+]}.
+
+{mapping, "management.listener.http.ipv6_v6only", "emqx_management.listeners", [
+  {default, false},
+  {datatype, {enum, [true, false]}}
+]}.
+
 {mapping, "management.listener.https", "emqx_management.listeners", [
   {datatype, [integer, ip]}
 ]}.
@@ -139,6 +149,16 @@
   {datatype, {enum, [true, false]}}
 ]}.
 
+{mapping, "management.listener.https.inet6", "emqx_management.listeners", [
+  {default, false},
+  {datatype, {enum, [true, false]}}
+]}.
+
+{mapping, "management.listener.https.ipv6_v6only", "emqx_management.listeners", [
+  {default, false},
+  {datatype, {enum, [true, false]}}
+]}.
+
 {translation, "emqx_management.application", fun(Conf) ->
   Filter = fun(Opts) -> [{K, V} || {K, V} <- Opts, V =/= undefined] end,
   Opts = fun(Prefix) ->
@@ -164,7 +184,9 @@ end}.
                         {recbuf,  cuttlefish:conf_get(Prefix ++ ".recbuf", Conf, undefined)},
                         {sndbuf,  cuttlefish:conf_get(Prefix ++ ".sndbuf", Conf, undefined)},
                         {buffer,  cuttlefish:conf_get(Prefix ++ ".buffer", Conf, undefined)},
-                        {nodelay, cuttlefish:conf_get(Prefix ++ ".nodelay", Conf, true)}])
+                        {nodelay, cuttlefish:conf_get(Prefix ++ ".nodelay", Conf, true)},
+                        {inet6, cuttlefish:conf_get(Prefix ++ ".inet6", Conf)},
+                        {ipv6_v6only, cuttlefish:conf_get(Prefix ++ ".ipv6_v6only", Conf)}])
             end,
   SslOpts = fun(Prefix) ->
                 Filter([{keyfile,    cuttlefish:conf_get(Prefix ++ ".keyfile", Conf, undefined)},
