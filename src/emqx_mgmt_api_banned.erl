@@ -61,7 +61,8 @@ create(_Bindings, Params) ->
             return({error, Code, Message})
     end.
 
-delete(#{who := Who}, Params) ->
+delete(#{who := Who0}, Params) ->
+    Who = http_uri:decode(Who0),
     case pipeline(Params, delete, [fun ensure_required/2,
                                    fun validate_params/2,
                                    fun fetch_as/2]) of
