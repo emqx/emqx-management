@@ -48,6 +48,7 @@ groups() ->
        metrics,
        nodes,
        plugins,
+       acl_cache,
        pubsub,
        routes_and_subscriptions,
        stats]}].
@@ -151,7 +152,7 @@ connections_and_sessions(_) ->
     {ok, C2} = emqtt:start_link(Options#{clientid => ClientId2}),
     {ok, _} = emqtt:connect(C2),
     timer:sleep(300),
-
+    %ct:log("-------: ~p", [ets:tab2list(emqx_channel_attrs)]),
     {ok, ConsViaUsername} = request_api(get, api_path(["nodes", atom_to_list(node()),
                                                       "clients",
                                                       "username", binary_to_list(Username)])
@@ -214,6 +215,29 @@ plugins(_) ->
     ?assert(proplists:get_value(<<"active">>, Plugin)),
     {ok, Result2} = request_api(get, api_path([ "nodes", atom_to_list(node()), "plugins"]), auth_header_()),
     [Plugin] = filter(get(data, Result2), <<"emqx_reloader">>).
+
+acl_cache(_) ->
+    ClientId = <<"client1">>,
+    Topic = <<"mytopic">>,
+    {ok, C1} = emqtt:start_link(#{clientid => ClientId}),
+    {ok, _} = emqtt:connect(C1),
+    {ok, _, _} = emqtt:subscribe(C1, Topic, 2),
+    %% get acl cache, should not be empty
+    {ok, Result} = request_api(get, api_path(["clients", binary_to_list(ClientId), "acl_cache"]), [], auth_header_()),
+    #{<<"code">> := 0, <<"data">> := Caches} = jsx:decode(list_to_binary(Result), [return_maps]),
+    ?assert(length(Caches) > 0),
+    ?assertMatch(#{<<"access">> := <<"subscribe">>,
+                   <<"topic">> := Topic,
+                   <<"result">> := <<"allow">>,
+                   <<"updated_time">> := _}, hd(Caches)),
+    %% clear acl cache
+    {ok, Result2} = request_api(delete, api_path(["clients", binary_to_list(ClientId), "acl_cache"]), [], auth_header_()),
+    ?assertMatch(#{<<"code">> := 0}, jsx:decode(list_to_binary(Result2), [return_maps])),
+    %% get acl cache again, after the acl cache is cleared
+    {ok, Result3} = request_api(get, api_path(["clients", binary_to_list(ClientId), "acl_cache"]), [], auth_header_()),
+    #{<<"code">> := 0, <<"data">> := Caches3} = jsx:decode(list_to_binary(Result3), [return_maps]),
+    ?assertEqual(0, length(Caches3)),
+    ok.
 
 pubsub(_) ->
     ClientId = <<"client1">>,
