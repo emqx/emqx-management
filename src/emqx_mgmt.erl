@@ -466,10 +466,10 @@ update_plugin_configs(Node, PluginName, Terms) ->
 %%--------------------------------------------------------------------
 
 create_banned(Banned) ->
-    emqx_banned:add(Banned).
+    emqx_banned:create(Banned).
 
-delete_banned(Key) ->
-    emqx_banned:delete(Key).
+delete_banned(Who) ->
+    emqx_banned:delete(Who).
 
 %%--------------------------------------------------------------------
 %% Common Table API
