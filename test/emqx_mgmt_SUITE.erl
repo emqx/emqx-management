@@ -109,10 +109,14 @@ t_log_cmd(_) ->
 t_mgmt_cmd(_) ->
     ct:pal("start testing the mgmt command"),
     print_mock(),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:mgmt(["lookup", "emqx_appid"]), "Not Found.")),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:mgmt(["delete", "emqx_appid"]), "ok")),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:mgmt(["insert", "emqx_appid", "emqx_name"]), "AppSecret:")),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:mgmt(["insert", "emqx_appid", "emqx_name"]), "Error:")),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:mgmt(["lookup", "emqx_appid"]), "app_id:")),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:mgmt(["update", "emqx_appid", "ts"]), "update successfully")),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:mgmt(["delete", "emqx_appid"]), "ok")).
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:mgmt(["delete", "emqx_appid"]), "ok")),
+    ok = emqx_mgmt_cli:mgmt(["list"]).
 
 t_status_cmd(_) ->
     ct:pal("start testing status command"),
@@ -122,8 +126,10 @@ t_status_cmd(_) ->
 t_broker_cmd(_) ->
     ct:pal("start testing the broker command"),
     print_mock(),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker([]), "sysdescr")),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["stats"]), "subscriptions.shared")),
-    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["metrice"]), "broker")).
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker(["metrics"]), "bytes.sent")),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:broker([undefined]), "broker")).
 
 t_clients_cmd(_) ->
     ct:pal("start testing the client command"),
@@ -137,16 +143,16 @@ t_clients_cmd(_) ->
     timer:sleep(300),
     emqx_mgmt_cli:clients(["list"]),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:clients(["show", "client12"]), "client12")),
-    % emqx_mgmt_cli:clients(["kick", "client12"]),
-    % timer:sleep(500),
-    % ?assertMatch({match, _}, re:run(emqx_mgmt_cli:clients(["show", "client12"]), "Not Found")),
-    % receive
-    %     {'EXIT', T, Reason} ->
-    %         ct:pal("Connection closed: ~p~n", [Reason])
-    % after
-    %     500 ->
-    %         erlang:error("Client is not kick")
-    % end,
+    emqx_mgmt_cli:clients(["kick", "client12"]),
+    timer:sleep(500),
+    ?assertMatch({match, _}, re:run(emqx_mgmt_cli:clients(["show", "client12"]), "Not Found")),
+    receive
+        {'EXIT', T, Reason} ->
+            ct:pal("Connection closed: ~p~n", [Reason])
+    after
+        500 ->
+            erlang:error("Client is not kick")
+    end,
     WS = rfc6455_client:new("ws://127.0.0.1:8083" ++ "/mqtt", self()),
     {ok, _} = rfc6455_client:open(WS),
     Packet = raw_send_serialize(?CONNECT_PACKET(#mqtt_packet_connect{

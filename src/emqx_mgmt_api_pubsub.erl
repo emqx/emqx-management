@@ -118,10 +118,17 @@ topics(Type, Topic, _) ->
 %    (Qos >= ?QOS_0) and (Qos =< ?QOS_2).
 
 validate_by_filter(Topic) ->
-    emqx_topic:validate({filter, Topic}).
+    validate_topic({filter, Topic}).
 
 validate_by_name(Topic) ->
-    emqx_topic:validate({name, Topic}).
+    validate_topic({name, Topic}).
+
+validate_topic({Type, Topic}) ->
+    try emqx_topic:validate({Type, Topic}) of
+        true -> true
+    catch
+        error:_Reason -> false
+    end.
 
 parse_topic_filters(Topics, Qos) ->
     [begin
