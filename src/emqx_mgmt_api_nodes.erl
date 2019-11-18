@@ -40,7 +40,7 @@ list(_Bindings, _Params) ->
 get(#{node := Node}, _Params) ->
     return({ok, emqx_mgmt:lookup_node(Node)}).
 
-format(Node, {error, Reason}) -> [{node, Node}, {error, Reason}];
+format(Node, {error, Reason}) -> #{node => Node, error => Reason};
 
 format(Node, Info = #{memory_total := Total, memory_used := Used}) ->
     Info#{node         => Node,
