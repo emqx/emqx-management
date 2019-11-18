@@ -190,7 +190,7 @@ cluster(["force-leave", SNode]) ->
     end;
 
 cluster(["status"]) ->
-    emqx_ctl:print("Cluster status: ~p~n", [ekka_cluster:status()]);
+    emqx_ctl:print("Cluster status: ~p~n", [ekka_cluster:info()]);
 
 cluster(_) ->
     emqx_ctl:usage([{"cluster join <Node>",       "Join the cluster"},
