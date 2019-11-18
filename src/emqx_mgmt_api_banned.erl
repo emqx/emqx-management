@@ -40,7 +40,7 @@
 
 -rest_api(#{name   => delete_banned,
             method => 'DELETE',
-            path   => "/banned/:who",
+            path   => "/banned/:as/:who",
             func   => delete,
             descr  => "Delete banned"}).
 
@@ -53,48 +53,42 @@ list(_Bindings, Params) ->
     return({ok, emqx_mgmt_api:paginate(emqx_banned, Params, fun format/1)}).
 
 create(_Bindings, Params) ->
-    case pipeline(Params, create, [fun ensure_required/2,
-                                   fun validate_params/2,
-                                   fun pack_banned/2]) of
-        {ok, Banned} ->
+    case pipeline([fun ensure_required/1,
+                   fun validate_params/1], Params) of
+        {ok, NParams} ->
+            {ok, Banned} = pack_banned(NParams),
             ok = emqx_mgmt:create_banned(Banned),
             return({ok, Params});
         {error, Code, Message} -> 
             return({error, Code, Message})
     end.
 
-delete(#{who := Who0}, Params) ->
-    Who = http_uri:decode(Who0),
-    case pipeline(Params, delete, [fun ensure_required/2,
-                                   fun validate_params/2,
-                                   fun fetch_as/2]) of
-        {ok, <<"ip_address">>} ->
-            emqx_mgmt:delete_banned({ip_address, inet:parse_address(str(Who))}),
-            return();
-        {ok, <<"username">>} ->
-            emqx_mgmt:delete_banned({username, bin(Who)}),
-            return();
-        {ok, <<"clientid">>} ->
-            emqx_mgmt:delete_banned({clientid, bin(Who)}),
+delete(#{as := As, who := Who}, _) ->
+    Params = [{<<"who">>, bin(http_uri:decode(Who))},
+              {<<"as">>, bin(http_uri:decode(As))}],
+    io:format("Params: ~p~n", [{As, Who}]),
+    case pipeline([fun ensure_required/1,
+                   fun validate_params/1], Params) of
+        {ok, NParams} ->
+            do_delete(get_value(<<"as">>, NParams), get_value(<<"who">>, NParams)),
             return();
         {error, Code, Message} -> 
             return({error, Code, Message})
     end.
 
-%% Go through plugs in pipeline
-pipeline(Params, _Action, []) ->
+pipeline([], Params) ->
     {ok, Params};
-pipeline(Params, Action, [Plug | PlugList]) ->
-    case Plug(Params, Action) of
-        {ok, NewParams} ->
-            pipeline(NewParams, Action, PlugList);
+pipeline([Fun|More], Params) ->
+    case Fun(Params) of
+        {ok, NParams} ->
+            pipeline(More, NParams);
         {error, Code, Message} ->
             {error, Code, Message}
     end.
 
 %% Plugs
-ensure_required(Params, Action) when is_list(Params) ->
-    #{required_params := RequiredParams, message := Msg} = required_params(Action),
+ensure_required(Params) when is_list(Params) ->
+    #{required_params := RequiredParams, message := Msg} = required_params(),
     AllIncluded = lists:all(fun(Key) ->
                       lists:keymember(Key, 1, Params)
                   end, RequiredParams),
@@ -104,7 +98,7 @@ ensure_required(Params, Action) when is_list(Params) ->
             {error, ?ERROR7, Msg}
     end.
 
-validate_params(Params, _Action) ->
+validate_params(Params) ->
     #{enum_values := AsEnums, message := Msg} = enum_values(as),
     case lists:member(get_value(<<"as">>, Params), AsEnums) of
         true -> {ok, Params};
@@ -112,16 +106,16 @@ validate_params(Params, _Action) ->
             {error, ?ERROR8, Msg}
     end.
 
-pack_banned(Params, _Action) ->
-    do_pack_banned(Params, #banned{}).
+pack_banned(Params) ->
+    do_pack_banned(Params, #banned{by = <<"user">>}).
 
 do_pack_banned([], Banned) ->
     {ok, Banned};
 do_pack_banned([{<<"who">>, Who} | Params], Banned) ->
     case lists:keytake(<<"as">>, 1, Params) of
-        {value, {<<"as">>, <<"ip_address">>}, Params2} ->
+        {value, {<<"as">>, <<"peerhost">>}, Params2} ->
             {ok, IPAddress} = inet:parse_address(str(Who)),
-            do_pack_banned(Params2, Banned#banned{who = {ip_address, IPAddress}});
+            do_pack_banned(Params2, Banned#banned{who = {peerhost, IPAddress}});
         {value, {<<"as">>, <<"clientid">>}, Params2} ->
             do_pack_banned(Params2, Banned#banned{who = {clientid, Who}});
         {value, {<<"as">>, <<"username">>}, Params2} ->
@@ -129,40 +123,42 @@ do_pack_banned([{<<"who">>, Who} | Params], Banned) ->
     end;
 do_pack_banned([P1 = {<<"as">>, _}, P2 | Params], Banned) ->
     do_pack_banned([P2, P1 | Params], Banned);
-do_pack_banned([{<<"reason">>, Reason} | Params], Banned) ->
-    do_pack_banned(Params, Banned#banned{reason = Reason});
 do_pack_banned([{<<"by">>, By} | Params], Banned) ->
     do_pack_banned(Params, Banned#banned{by = By});
-do_pack_banned([{<<"desc">>, Desc} | Params], Banned) ->
-    do_pack_banned(Params, Banned#banned{desc = Desc});
+do_pack_banned([{<<"reason">>, Reason} | Params], Banned) ->
+    do_pack_banned(Params, Banned#banned{reason = Reason});
+do_pack_banned([{<<"at">>, At} | Params], Banned) ->
+    do_pack_banned(Params, Banned#banned{at = At});
 do_pack_banned([{<<"until">>, Until} | Params], Banned) ->
     do_pack_banned(Params, Banned#banned{until = Until});
 do_pack_banned([_P | Params], Banned) -> %% ingore other params
     do_pack_banned(Params, Banned).
 
-fetch_as(Params, _Action) ->
-    {ok, get_value(<<"as">>, Params)}.
+do_delete(<<"peerhost">>, Who) ->
+    emqx_mgmt:delete_banned({peerhost, inet:parse_address(str(Who))});
+do_delete(<<"username">>, Who) ->
+    emqx_mgmt:delete_banned({username, bin(Who)});
+do_delete(<<"clientid">>, Who) ->
+    emqx_mgmt:delete_banned({clientid, bin(Who)}).
 
-required_params(create) ->
+required_params() ->
     #{required_params => [<<"who">>, <<"as">>],
-      message => <<"missing mandatory params: ['who', 'as']">> };
-required_params(delete) ->
-  #{required_params => [<<"as">>],
-    message => <<"missing mandatory params: ['as']">> }.
+      message => <<"missing mandatory params: ['who', 'as']">> }.
 
 enum_values(as) ->
-    #{enum_values => [<<"clientid">>, <<"username">>, <<"ip_address">>],
-      message => <<"value of 'as' must be one of: ['clientid', 'username', 'ip_address']">> }.
+    #{enum_values => [<<"clientid">>, <<"username">>, <<"peerhost">>],
+      message => <<"value of 'as' must be one of: ['clientid', 'username', 'peerhost']">> }.
 
 %% Internal Functions
 
 format(BannedList) when is_list(BannedList) ->
     [format(Ban) || Ban <- BannedList];
-format(#banned{who = {ip_address, IpAddr}, reason = Reason, desc = Desc, by = By,
-               until = Until}) ->
-    #{who => bin(inet:ntoa(IpAddr)), as => <<"ip_address">>, reason => Reason, desc => Desc, by => By, until => Until};
-format(#banned{who = {As, Who}, reason = Reason, desc = Desc, by = By, until = Until}) ->
-    #{who => Who, as => As, reason => Reason, desc => Desc, by => By, until => Until}.
+format(#banned{who = {As, Who}, by = By, reason = Reason, at = At, until = Until}) ->
+    #{who => case As of
+                 peerhost -> bin(inet:ntoa(Who));
+                 _ -> Who
+             end,
+      as => As, by => By, reason => Reason, at => At, until => Until}.
 
 bin(L) when is_list(L) ->
     list_to_binary(L);

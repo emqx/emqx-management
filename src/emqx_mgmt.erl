@@ -229,18 +229,27 @@ kickout_client(Node, ClientId) ->
     rpc_call(Node, kickout_client, [Node, ClientId]).
 
 list_acl_cache(ClientId) ->
-    list_acl_cache(ekka_mnesia:running_nodes(), ClientId).
-
-list_acl_cache(Node, ClientId) when is_atom(Node) ->
-    apply_on_client(Node, ClientId,
-        fun(Pid) -> gen_server:call(Pid, list_acl_cache) end);
-
-list_acl_cache([], _ClientId) -> [];
-list_acl_cache([Node | RNodes], ClientId) ->
-    case list_acl_cache(Node, ClientId) of
-        {error, not_found} -> list_acl_cache(RNodes, ClientId);
-        AclCache -> AclCache
+    Results = lists:append([list_acl_cache(Node, ClientId) || Node <- ekka_mnesia:running_nodes()]),
+    Expected = lists:filter(fun({error, _}) -> false;
+                               (_) -> true
+                            end, Results),
+    case Expected of
+        [] -> case Results of
+                  [] -> [];
+                  _ -> lists:last(Results)
+              end;
+        _ -> Expected
     end.
+
+list_acl_cache(Node, ClientId) when Node =:= node() ->
+    case emqx_cm:lookup_channels(ClientId) of
+        [] ->
+            [{error, not_found}];
+        Pids when is_list(Pids) ->
+            gen_server:call(lists:last(Pids), list_acl_cache)
+    end;
+list_acl_cache(Node, ClientId) ->
+    rpc_call(Node, list_acl_cache, [Node, ClientId]).
 
 clean_acl_cache(ClientId) ->
     Results = [clean_acl_cache(Node, ClientId) || Node <- ekka_mnesia:running_nodes()],
@@ -250,19 +259,15 @@ clean_acl_cache(ClientId) ->
     end.
 
 clean_acl_cache(Node, ClientId) when Node =:= node() ->
-    apply_on_client(Node, ClientId,
-        fun(Pid) -> erlang:send(Pid, clean_acl_cache), ok end).
-
-apply_on_client(Node, ClientId, Fun) when Node =:= node() ->
     case emqx_cm:lookup_channels(ClientId) of
-        [Pid] when is_pid(Pid) ->
-            Fun(Pid);
+        [] ->
+            {error, not_found};
         Pids when is_list(Pids) ->
-            Fun(lists:last(Pids));
-        _ -> {error, not_found}
+            erlang:send(lists:last(Pids), clean_acl_cache),
+            ok
     end;
-apply_on_client(Node, ClientId, Fun) ->
-    rpc_call(Node, apply_on_client, [Node, ClientId, Fun]).
+clean_acl_cache(Node, ClientId) ->
+    rpc_call(Node, clean_acl_cache, [Node, ClientId]).
 
 %%--------------------------------------------------------------------
 %% Subscriptions
@@ -466,10 +471,10 @@ update_plugin_configs(Node, PluginName, Terms) ->
 %%--------------------------------------------------------------------
 
 create_banned(Banned) ->
-    emqx_banned:add(Banned).
+    emqx_banned:create(Banned).
 
-delete_banned(Key) ->
-    emqx_banned:delete(Key).
+delete_banned(Who) ->
+    emqx_banned:delete(Who).
 
 %%--------------------------------------------------------------------
 %% Common Table API
@@ -518,7 +523,9 @@ item(client, Key) ->
     NStats = Stats#{max_subscriptions => maps:get(subscriptions_max, Stats, 0),
                     max_inflight => maps:get(inflight_max, Stats, 0),
                     max_awaiting_rel => maps:get(awaiting_rel_max, Stats, 0),
-                    max_mqueue => maps:get(mqueue_max, Stats, 0)},
+                    max_mqueue => maps:get(mqueue_max, Stats, 0),
+                    inflight => maps:get(inflight_cnt, Stats, 0),
+                    awaiting_rel => maps:get(awaiting_rel_cnt, Stats, 0)},
     lists:foldl(fun(Items, Acc) ->
                     maps:merge(Items, Acc)
                 end, #{connected => Connected},
