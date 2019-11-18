@@ -143,7 +143,7 @@ format(Data) when is_map(Data)->
     {IpAddr, Port} = maps:get(peername, Data),
     ConnectedAt = maps:get(connected_at, Data),
     CreatedAt = maps:get(created_at, Data),
-    Data1 = maps:without([peername, inflight], Data),
+    Data1 = maps:without([peername], Data),
     maps:merge(Data1#{node         => node(),
                       ip_address   => iolist_to_binary(ntoa(IpAddr)),
                       port         => Port,

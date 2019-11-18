@@ -518,7 +518,9 @@ item(client, Key) ->
     NStats = Stats#{max_subscriptions => maps:get(subscriptions_max, Stats, 0),
                     max_inflight => maps:get(inflight_max, Stats, 0),
                     max_awaiting_rel => maps:get(awaiting_rel_max, Stats, 0),
-                    max_mqueue => maps:get(mqueue_max, Stats, 0)},
+                    max_mqueue => maps:get(mqueue_max, Stats, 0),
+                    inflight => maps:get(inflight_cnt, Stats, 0),
+                    awaiting_rel => maps:get(awaiting_rel_cnt, Stats, 0)},
     lists:foldl(fun(Items, Acc) ->
                     maps:merge(Items, Acc)
                 end, #{connected => Connected},
