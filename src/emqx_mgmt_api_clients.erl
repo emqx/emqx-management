@@ -100,7 +100,7 @@ list(#{node := Node}, Params) when Node =:= node() ->
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
-        {badrpc, Reason} -> return({error, ?ERROR2, Reason});
+        {badrpc, Reason} -> return({error, ?ERROR1, Reason});
         Res -> Res
     end.
 
@@ -119,18 +119,23 @@ lookup(#{username := Username}, _Params) ->
 kickout(#{clientid := ClientId}, _Params) ->
     case emqx_mgmt:kickout_client(http_uri:decode(ClientId)) of
         ok -> return();
-        {error, Reason} -> return({error, ?ERROR12, Reason})
+        {error, not_found} -> return({error, ?ERROR12, not_found});
+        {error, Reason} -> return({error, ?ERROR1, Reason})
     end.
 
 clean_acl_cache(#{clientid := ClientId}, _Params) ->
     case emqx_mgmt:clean_acl_cache(http_uri:decode(ClientId)) of
         ok -> return();
-        {error, Reason} -> return({error, ?ERROR12, Reason})
+        {error, not_found} -> return({error, ?ERROR12, not_found});
+        {error, Reason} -> return({error, ?ERROR1, Reason})
     end.
 
 list_acl_cache(#{clientid := ClientId}, _Params) ->
-    return({ok, [format_acl_cache(Cache)
-                 || Cache <- emqx_mgmt:list_acl_cache(http_uri:decode(ClientId))]}).
+    case emqx_mgmt:list_acl_cache(http_uri:decode(ClientId)) of
+        {error, not_found} -> return({error, ?ERROR12, not_found});
+        {error, Reason} -> return({error, ?ERROR1, Reason});
+        Caches -> return({ok, [format_acl_cache(Cache) || Cache <- Caches]})
+    end.
 
 format([]) ->
     [];
@@ -143,7 +148,7 @@ format(Data) when is_map(Data)->
     {IpAddr, Port} = maps:get(peername, Data),
     ConnectedAt = maps:get(connected_at, Data),
     CreatedAt = maps:get(created_at, Data),
-    Data1 = maps:without([peername, inflight], Data),
+    Data1 = maps:without([peername], Data),
     maps:merge(Data1#{node         => node(),
                       ip_address   => iolist_to_binary(ntoa(IpAddr)),
                       port         => Port,
