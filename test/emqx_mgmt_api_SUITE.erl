@@ -160,15 +160,14 @@ banned(_) ->
                                            {<<"as">>, <<"clientid">>},
                                            {<<"reason">>, <<"test">>},
                                            {<<"by">>, <<"dashboard">>},
-                                           {<<"desc">>, <<"hello world">>},
+                                           {<<"at">>, erlang:system_time(second)},
                                            {<<"until">>, erlang:system_time(second) + 10}]),
 
     {ok, Result} = request_api(get, api_path(["banned"]), auth_header_()),
     [Banned] = get(<<"data">>, Result),
     ?assertEqual(Who, proplists:get_value(<<"who">>, Banned)),
 
-    {ok, _} = request_api(delete, api_path(["banned", binary_to_list(Who)]), [],
-                          auth_header_(), [{<<"as">>, <<"clientid">>}]),
+    {ok, _} = request_api(delete, api_path(["banned", "clientid", binary_to_list(Who)]), auth_header_()),
     {ok, Result2} = request_api(get, api_path(["banned"]), auth_header_()),
     ?assertEqual([], get(<<"data">>, Result2)).
 

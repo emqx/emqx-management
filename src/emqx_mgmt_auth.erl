@@ -130,7 +130,7 @@ update_app(AppId, Status) ->
                 {aborted, Reason} -> {error, Reason}
             end;
         [] ->
-            {error, ont_found}
+            {error, not_found}
     end.
 
 -spec(update_app(appid(), binary(), binary(), boolean(), integer() | undefined) -> ok | {error, term()}).
@@ -145,7 +145,7 @@ update_app(AppId, Name, Desc, Status, Expired) ->
                 {aborted, Reason} -> {error, Reason}
             end;
         [] ->
-            {error, ont_found}
+            {error, not_found}
     end.
 
 -spec(del_app(appid()) -> ok | {error, term()}).

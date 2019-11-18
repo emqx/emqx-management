@@ -692,7 +692,7 @@ print({client, Key}) ->
     Info = lists:foldl(fun(Items, Acc) ->
                                maps:merge(Items, Acc)
                        end, #{connected => Connected},
-                       [maps:with([subscriptions_cnt, inflight, awaiting_rel,
+                       [maps:with([subscriptions_cnt, inflight_cnt, awaiting_rel,
                                    mqueue_len, mqueue_dropped, send_msg], Stats),
                         maps:with([clientid, username], ClientInfo),
                         maps:with([peername, clean_start, keepalive, expiry_interval,
@@ -700,7 +700,7 @@ print({client, Key}) ->
                         maps:with([created_at], Session)]),
     InfoKeys = [clientid, username, peername,
                 clean_start, keepalive, expiry_interval,
-                subscriptions_cnt, inflight, awaiting_rel, send_msg, mqueue_len, mqueue_dropped,
+                subscriptions_cnt, inflight_cnt, awaiting_rel, send_msg, mqueue_len, mqueue_dropped,
                 connected, created_at, connected_at] ++ case maps:is_key(disconnected_at, Info) of
                                                             true  -> [disconnected_at];
                                                             false -> []
