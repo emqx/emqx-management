@@ -28,7 +28,7 @@
 
 -define(CONTENT_TYPE, "application/x-www-form-urlencoded").
 
--define(HOST, "http://127.0.0.1:8080/").
+-define(HOST, "http://127.0.0.1:8081/").
 
 -define(API_VERSION, "v3").
 
