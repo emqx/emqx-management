@@ -201,8 +201,8 @@ lookup_client(Node, {clientid, ClientId}, FormatFun) ->
     rpc_call(Node, lookup_client, [Node, {clientid, ClientId}, FormatFun]);
 
 lookup_client(Node, {username, Username}, FormatFun) when Node =:= node() ->
-    MatchSpec = [{{'$1', #{clientinfo => #{username => '$2'}}}, [{'=:=','$2', Username}], ['$1']}],
-    FormatFun(ets:select(emqx_channel_attrs, MatchSpec));
+    MatchSpec = [{{'$1', #{clientinfo => #{username => '$2'}}, '_'}, [{'=:=','$2', Username}], ['$1']}],
+    FormatFun(ets:select(emqx_channel_info, MatchSpec));
 
 lookup_client(Node, {username, Username}, FormatFun) ->
     rpc_call(Node, lookup_client, [Node, {username, Username}, FormatFun]).
@@ -215,15 +215,7 @@ kickout_client(ClientId) ->
     end.
 
 kickout_client(Node, ClientId) when Node =:= node() ->
-    case ets:lookup(emqx_channel, ClientId) of
-        [] -> {error, not_found};
-        [Channel = {_, CPid}] ->
-            case ets:lookup(emqx_channel_attrs, Channel) of
-                [{_, #{conninfo := #{conn_mod := ConnMod}}}] ->
-                    ConnMod:call(CPid, kick);
-                _ -> {error, not_found}
-            end
-    end;
+    emqx_cm:kick_session(ClientId);
 
 kickout_client(Node, ClientId) ->
     rpc_call(Node, kickout_client, [Node, ClientId]).
@@ -504,14 +496,14 @@ query_handle(subscriptions) ->
 query_handle(routes) ->
     qlc:append([qlc:q([E || E <- ets:table(Tab)]) || Tab <- emqx_route]).
 
-item(client, Key) ->
-    Attrs = case ets:lookup(emqx_channel_attrs, Key) of
-                [] -> #{};
-                [{_, Attrs0}] -> Attrs0
+item(client, {ClientId, ChanPid}) ->
+    Attrs = case emqx_cm:get_chan_info(ClientId, ChanPid) of
+                undefined -> #{};
+                Attrs0 -> Attrs0
             end,
-    Stats = case ets:lookup(emqx_channel_stats, Key) of
-                [] -> #{};
-                [{_, Stats0}] -> maps:from_list(Stats0)
+    Stats = case emqx_cm:get_chan_stats(ClientId, ChanPid) of
+                undefined -> #{};
+                Stats0 -> maps:from_list(Stats0)
             end,
     ClientInfo = maps:get(clientinfo, Attrs, #{}),
     ConnInfo = maps:get(conninfo, Attrs, #{}),
