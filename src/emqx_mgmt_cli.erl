@@ -218,13 +218,10 @@ clients(["show", ClientId]) ->
     if_client(ClientId, fun print/1);
 
 clients(["kick", ClientId]) ->
-    if_client(ClientId, fun({_, Channel = {_ClientId, CPid}}) ->
-                            case ets:lookup(emqx_channel_attrs, Channel) of
-                                [{_, #{conninfo := #{conn_mod := ConnMod}}}] ->
-                                    ConnMod:call(CPid, kick);
-                                _ -> emqx_ctl:print("Not Found.~n")
-                            end
-                        end);
+    case emqx_cm:kick_session(bin(ClientId)) of
+        ok -> ok;
+        _ -> emqx_ctl:print("Not Found.~n")
+    end;
 
 clients(_) ->
     emqx_ctl:usage([{"clients list",            "List all clients"},
@@ -673,14 +670,14 @@ dump(Table, Tag, Key, Result) ->
 print({_, []}) ->
     ok;
 
-print({client, Key}) ->
-    Attrs = case ets:lookup(emqx_channel_attrs, Key) of
-                [] -> #{};
-                [{_, Attrs0}] -> Attrs0
+print({client, {ClientId, ChanPid}}) ->
+    Attrs = case emqx_cm:get_chan_info(ClientId, ChanPid) of
+                undefined -> #{};
+                Attrs0 -> Attrs0
             end,
-    Stats = case ets:lookup(emqx_channel_stats, Key) of
-                [] -> #{};
-                [{_, Stats0}] -> maps:from_list(Stats0)
+    Stats = case emqx_cm:get_chan_stats(ClientId, ChanPid) of
+                undefined -> #{};
+                Stats0 -> maps:from_list(Stats0)
             end,
     ClientInfo = maps:get(clientinfo, Attrs, #{}),
     ConnInfo = maps:get(conninfo, Attrs, #{}),
@@ -692,7 +689,7 @@ print({client, Key}) ->
     Info = lists:foldl(fun(Items, Acc) ->
                                maps:merge(Items, Acc)
                        end, #{connected => Connected},
-                       [maps:with([subscriptions_cnt, inflight_cnt, awaiting_rel,
+                       [maps:with([subscriptions_cnt, inflight_cnt, awaiting_rel_cnt,
                                    mqueue_len, mqueue_dropped, send_msg], Stats),
                         maps:with([clientid, username], ClientInfo),
                         maps:with([peername, clean_start, keepalive, expiry_interval,
@@ -700,7 +697,7 @@ print({client, Key}) ->
                         maps:with([created_at], Session)]),
     InfoKeys = [clientid, username, peername,
                 clean_start, keepalive, expiry_interval,
-                subscriptions_cnt, inflight_cnt, awaiting_rel, send_msg, mqueue_len, mqueue_dropped,
+                subscriptions_cnt, inflight_cnt, awaiting_rel_cnt, send_msg, mqueue_len, mqueue_dropped,
                 connected, created_at, connected_at] ++ case maps:is_key(disconnected_at, Info) of
                                                             true  -> [disconnected_at];
                                                             false -> []
