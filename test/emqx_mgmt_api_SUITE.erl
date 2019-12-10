@@ -45,7 +45,6 @@ groups() ->
        banned,
        brokers,
        clients,
-       configs,
        listeners,
        metrics,
        nodes,
@@ -179,25 +178,6 @@ brokers(_) ->
     {ok, Error} = request_api(get, api_path(["brokers", atom_to_list(node())]), auth_header_()),
     ?assertEqual(<<"undefined">>, get(<<"message">>, Error)),
     meck:unload(emqx_mgmt).
-
-configs(_) ->
-    {ok, _} = request_api(get, api_path(["configs"]), auth_header_()),
-
-    {ok, _} = request_api(get, api_path(["nodes", atom_to_list(node()), "configs"]), auth_header_()),
-
-    {ok, _} = request_api(put, api_path(["nodes", atom_to_list(node()), "plugin_configs", atom_to_list(emqx_reloader)]), [],
-                          auth_header_(), [{<<"reloader.interval">>, <<"60s">>},
-                                           {<<"reloader.logfile">>, <<"reloader.log">>}]),
-
-    {ok, Result} = request_api(get, api_path(["nodes", atom_to_list(node()), "plugin_configs", atom_to_list(emqx_reloader)]),
-                               auth_header_()),
-    ?assert(lists:any(fun(Elem) ->
-                              case proplists:get_value(<<"key">>, Elem) of
-                              <<"reloader.interval">> ->
-                                  <<"60s">> == proplists:get_value(<<"value">>, Elem);
-                              _ -> false
-                          end
-                      end, get(<<"data">>, Result))).
 
 clients(_) ->
     process_flag(trap_exit, true),
