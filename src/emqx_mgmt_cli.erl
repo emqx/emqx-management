@@ -56,8 +56,7 @@
 -spec(load() -> ok).
 load() ->
     Cmds = [Fun || {Fun, _} <- ?MODULE:module_info(exports), is_cmd(Fun)],
-    lists:foreach(fun(Cmd) -> emqx_ctl:register_command(Cmd, {?MODULE, Cmd}, []) end, Cmds),
-    emqx_mgmt_cli_cfg:register_config().
+    lists:foreach(fun(Cmd) -> emqx_ctl:register_command(Cmd, {?MODULE, Cmd}, []) end, Cmds).
 
 is_cmd(Fun) ->
     not lists:member(Fun, [init, load, module_info]).
@@ -110,17 +109,6 @@ mgmt(_) ->
                     {"mgmt update <AppId> <status>", "Update Application of REST API"},
                     {"mgmt lookup <AppId>",          "Get Application of REST API"},
                     {"mgmt delete <AppId>",          "Delete Application of REST API"}]).
-
-% configs(["set"]) ->
-%     emqx_mgmt_cli_cfg:set_usage(), ok;
-
-% configs(Cmd) when length(Cmd) > 2 ->
-%     emqx_mgmt_cli_cfg:run(["config" | Cmd]), ok;
-
-% configs(_) ->
-%     emqx_ctl:usage([{"configs set",                           "Show All configs Item"},
-%                     {"configs set <Key>=<Value> --app=<app>", "Set Config Item"},
-%                     {"configs show <Key> --app=<app>",        "show Config Item"}]).
 
 %%--------------------------------------------------------------------
 %% @doc Node status
@@ -274,13 +262,6 @@ subscriptions(["add", ClientId, Topic, QoS]) ->
                                 Pid ! {subscribe, [{Topic1, Options#{qos => IntQos}}]},
                                 emqx_ctl:print("ok~n")
                         end
-                        % case emqx_sm:lookup_session_pids(bin(ClientId)) of
-                        %     [] -> emqx_ctl:print("Error: Session not found!");
-                        %     [Pid | _] ->
-                        %         {Topic1, Options} = emqx_topic:parse(bin(Topic)),
-                        %         emqx_session:subscribe(Pid, [{Topic1, Options#{qos => IntQos}}]),
-                        %         emqx_ctl:print("ok~n")
-                        % end
                      end);
 
 subscriptions(["del", ClientId, Topic]) ->
@@ -290,27 +271,12 @@ subscriptions(["del", ClientId, Topic]) ->
             Pid ! {unsubscribe, [emqx_topic:parse(bin(Topic))]},
             emqx_ctl:print("ok~n")
     end;
-    % case emqx_sm:lookup_session_pids(bin(ClientId)) of
-    %     [] -> emqx_ctl:print("Error: Session not found!");
-    %     [Pid | _] ->
-    %         emqx_session:unsubscribe(Pid, [emqx_topic:parse(bin(Topic))]),
-    %         emqx_ctl:print("ok~n")
-    % end;
 
 subscriptions(_) ->
     emqx_ctl:usage([{"subscriptions list",                         "List all subscriptions"},
                     {"subscriptions show <ClientId>",              "Show subscriptions of a client"},
                     {"subscriptions add <ClientId> <Topic> <QoS>", "Add a static subscription manually"},
                     {"subscriptions del <ClientId> <Topic>",       "Delete a static subscription manually"}]).
-
-%if_could_print(Tab, Fun) ->
-%    case mnesia:table_info(Tab, size) of
-%        Size when Size >= ?MAX_LIMIT ->
-%            emqx_ctl:print("Could not list, too many ~ss: ~p~n", [Tab, Size]);
-%        _Size ->
-%            Keys = mnesia:dirty_all_keys(Tab),
-%            foreach(fun(Key) -> Fun(ets:lookup(Tab, Key)) end, Keys)
-%    end.
 
 if_valid_qos(QoS, Fun) ->
     try list_to_integer(QoS) of
@@ -377,64 +343,6 @@ plugins(_) ->
                     {"plugins reload <Plugin>", "Reload plugin"}
                     % {"plugins add <Plugin.zip>", "Add plugin"}
                    ]).
-
-%%--------------------------------------------------------------------
-%% @doc Bridges command
-
-% bridges(["list"]) ->
-%     foreach(fun({Node, Topic, _Pid}) ->
-%                 emqx_ctl:print("bridge: ~s--~s-->~s~n", [node(), Topic, Node])
-%             end, emqx_bridge_sup_sup:bridges());
-
-% bridges(["options"]) ->
-%     emqx_ctl:print("Options:~n"),
-%     emqx_ctl:print("  qos     = 0 | 1 | 2~n"),
-%     emqx_ctl:print("  prefix  = string~n"),
-%     emqx_ctl:print("  suffix  = string~n"),
-%     emqx_ctl:print("  queue   = integer~n"),
-%     emqx_ctl:print("Example:~n"),
-%     emqx_ctl:print("  qos=2,prefix=abc/,suffix=/yxz,queue=1000~n");
-
-% bridges(["start", SNode, Topic]) ->
-%     case emqx_bridge_sup_sup:start_bridge(list_to_atom(SNode), list_to_binary(Topic)) of
-%         {ok, _}        -> emqx_ctl:print("bridge is started.~n");
-%         {error, Error} -> emqx_ctl:print("error: ~p~n", [Error])
-%     end;
-
-% bridges(["start", SNode, Topic, OptStr]) ->
-%     Opts = parse_opts(bridge, OptStr),
-%     case emqx_bridge_sup_sup:start_bridge(list_to_atom(SNode), list_to_binary(Topic), Opts) of
-%         {ok, _}        -> emqx_ctl:print("bridge is started.~n");
-%         {error, Error} -> emqx_ctl:print("error: ~p~n", [Error])
-%     end;
-
-% bridges(["stop", SNode, Topic]) ->
-%     case emqx_bridge_sup_sup:stop_bridge(list_to_atom(SNode), list_to_binary(Topic)) of
-%         ok             -> emqx_ctl:print("bridge is stopped.~n");
-%         {error, Error} -> emqx_ctl:print("error: ~p~n", [Error])
-%     end;
-
-% bridges(_) ->
-%     emqx_ctl:usage([{"bridges list",                 "List bridges"},
-%                     {"bridges options",              "Bridge options"},
-%                     {"bridges start <Node> <Topic>", "Start a bridge"},
-%                     {"bridges start <Node> <Topic> <Options>", "Start a bridge with options"},
-%                     {"bridges stop <Node> <Topic>", "Stop a bridge"}]).
-
-% parse_opts(Cmd, OptStr) ->
-%     Tokens = string:tokens(OptStr, ","),
-%     [parse_opt(Cmd, list_to_atom(Opt), Val)
-%         || [Opt, Val] <- [string:tokens(S, "=") || S <- Tokens]].
-% parse_opt(bridge, qos, Qos) ->
-%     {qos, list_to_integer(Qos)};
-% parse_opt(bridge, suffix, Suffix) ->
-%     {topic_suffix, bin(Suffix)};
-% parse_opt(bridge, prefix, Prefix) ->
-%     {topic_prefix, bin(Prefix)};
-% parse_opt(bridge, queue, Len) ->
-%     {max_queue_len, list_to_integer(Len)};
-% parse_opt(_Cmd, Opt, _Val) ->
-%     emqx_ctl:print("Bad Option: ~s~n", [Opt]).
 
 %%--------------------------------------------------------------------
 %% @doc vm command
