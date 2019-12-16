@@ -172,11 +172,11 @@ do_unsubscribe(ClientId, Topic) ->
     case validate_by_filter(Topic) of
         true ->
             case emqx_mgmt:unsubscribe(ClientId, Topic) of
-                {error, Reason} -> ({ok, ?ERROR12, Reason});
+                {error, Reason} -> {ok, ?ERROR12, Reason};
                 _ -> ok
             end;
         false ->
-            return({ok, ?ERROR15, bad_topic})
+            {ok, ?ERROR15, bad_topic}
     end.
 
 parse_subscribe_params(Params) ->
