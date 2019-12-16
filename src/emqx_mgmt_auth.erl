@@ -177,5 +177,5 @@ is_authorized(AppId, AppSecret) ->
     end.
 
 is_expired(undefined) -> true;
-is_expired(Expired)   -> Expired >= emqx_time:now_secs().
+is_expired(Expired)   -> Expired >= erlang:system_time(second).
 
