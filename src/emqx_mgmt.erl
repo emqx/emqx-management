@@ -85,18 +85,6 @@
         , get_alarms/2
         ]).
 
-%% Configs
--export([ update_configs/2
-        , update_config/3
-        , update_config/4
-        , get_all_configs/0
-        , get_all_configs/1
-        , get_plugin_configs/1
-        , get_plugin_configs/2
-        , update_plugin_configs/2
-        , update_plugin_configs/3
-        ]).
-
 %% Banned
 -export([ create_banned/1
         , delete_banned/1
@@ -369,7 +357,7 @@ gen_config(App) ->
     proplists:get_value(App, Configs, []).
 
 load_plugin_with_config(Plugin, Config) ->
-    lists:foreach(fun({Key, _}) -> ets:delete(ac_tab, {env, Plugin, Key}) end, application:get_all_env(Plugin)),
+    lists:foreach(fun({Key, _}) -> application:unset_env(Plugin, Key) end, application:get_all_env(Plugin)),
     lists:foreach(fun({Key, Val}) -> application:set_env(Plugin, Key, Val) end, Config),
     case emqx_plugins:load(Plugin) of
         {ok, _StartedApp} -> ok;
@@ -416,47 +404,6 @@ get_alarms(Node, Type) when Node =:= node() ->
     emqx_alarm_handler:get_alarms(Type);
 get_alarms(Node, Type) ->
     rpc_call(Node, get_alarms, [Node, Type]).
-
-%%--------------------------------------------------------------------
-%% Config ENV
-%%--------------------------------------------------------------------
-
-update_configs(App, Terms) ->
-    emqx_mgmt_config:write(App, Terms).
-
-update_config(App, Key, Value) ->
-    Results = [update_config(Node, App, Key, Value) || Node <- ekka_mnesia:running_nodes()],
-    case lists:any(fun(Item) -> Item =:= ok end, Results) of
-        true  -> ok;
-        false -> lists:last(Results)
-    end.
-
-update_config(Node, App, Key, Value) when Node =:= node() ->
-    emqx_mgmt_config:set(App, Key, Value);
-
-update_config(Node, App, Key, Value) ->
-    rpc_call(Node, update_config, [Node, App, Key, Value]).
-
-get_all_configs() ->
-    [{Node, get_all_configs(Node)} || Node <- ekka_mnesia:running_nodes()].
-
-get_all_configs(Node) when Node =:= node()->
-    emqx_mgmt_cli_cfg:all_cfgs();
-
-get_all_configs(Node) ->
-    rpc_call(Node, get_config, [Node]).
-
-get_plugin_configs(PluginName) ->
-    emqx_mgmt_config:read(PluginName).
-
-get_plugin_configs(Node, PluginName) ->
-    rpc_call(Node, get_plugin_configs, [PluginName]).
-
-update_plugin_configs(PluginName, Terms) ->
-    emqx_mgmt_config:write(PluginName, Terms).
-
-update_plugin_configs(Node, PluginName, Terms) ->
-    rpc_call(Node, update_plugin_configs, [PluginName, Terms]).
 
 %%--------------------------------------------------------------------
 %% Banned API
