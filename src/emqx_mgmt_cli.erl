@@ -668,14 +668,13 @@ dump(Table) ->
     dump(Table, ets:first(Table), []).
 
 dump(_Table, '$end_of_table', Result) ->
-    Result;
+    lists:reverse(Result);
 
 dump(Table, Key, Result) ->
-    PrintValue = case ets:lookup(Table, Key) of
-                      [Record] -> print({Table, Record});
-                      [] -> ok
-                  end,
-    dump(Table, ets:next(Table, Key), [Result | PrintValue]).
+    PrintValue = lists:foreach(fun(Record) ->
+                                   print({Table, Record})
+                               end, ets:lookup(Table, Key)),
+    dump(Table, ets:next(Table, Key), [PrintValue | Result]).
 
 print({_, []}) ->
     ok;
