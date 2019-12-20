@@ -66,7 +66,6 @@ create(_Bindings, Params) ->
 delete(#{as := As, who := Who}, _) ->
     Params = [{<<"who">>, bin(http_uri:decode(Who))},
               {<<"as">>, bin(http_uri:decode(As))}],
-    io:format("Params: ~p~n", [{As, Who}]),
     case pipeline([fun ensure_required/1,
                    fun validate_params/1], Params) of
         {ok, NParams} ->
@@ -107,7 +106,10 @@ validate_params(Params) ->
     end.
 
 pack_banned(Params) ->
-    do_pack_banned(Params, #banned{by = <<"user">>}).
+    Now = erlang:system_time(second),
+    do_pack_banned(Params, #banned{by = <<"user">>,
+                                   at = Now,
+                                   until = Now + 300}).
 
 do_pack_banned([], Banned) ->
     {ok, Banned};

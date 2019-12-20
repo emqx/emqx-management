@@ -291,21 +291,21 @@ plugins(["list"]) ->
 
 plugins(["load", Name]) ->
     case emqx_plugins:load(list_to_atom(Name)) of
-        {ok, StartedApps} ->
-            emqx_ctl:print("Start apps: ~p~nPlugin ~s loaded successfully.~n", [StartedApps, Name]);
+        ok ->
+            emqx_ctl:print("Plugin ~s loaded successfully.~n", [Name]);
         {error, Reason}   ->
-            emqx_ctl:print("load plugin error: ~p~n", [Reason])
+            emqx_ctl:print("Load plugin ~s error: ~p.~n", [Name, Reason])
     end;
 
 plugins(["unload", "emqx_management"])->
-    emqx_ctl:print("Plugin emqx_management can not be unloaded ~n");
+    emqx_ctl:print("Plugin emqx_management can not be unloaded.~n");
 
 plugins(["unload", Name]) ->
     case emqx_plugins:unload(list_to_atom(Name)) of
         ok ->
             emqx_ctl:print("Plugin ~s unloaded successfully.~n", [Name]);
         {error, Reason} ->
-            emqx_ctl:print("unload plugin error: ~p~n", [Reason])
+            emqx_ctl:print("Unload plugin ~s error: ~p.~n", [Name, Reason])
     end;
 
 plugins(["reload", Name]) ->
@@ -313,13 +313,13 @@ plugins(["reload", Name]) ->
         PluginName ->
             case emqx_mgmt:reload_plugin(node(), PluginName) of
                 ok ->
-                    emqx_ctl:print("Plugin ~p reloaded successfully.~n", [PluginName]);
+                    emqx_ctl:print("Plugin ~s reloaded successfully.~n", [Name]);
                 {error, Reason} ->
-                    emqx_ctl:print("Reload plugin error: ~p~n", [Reason])
+                    emqx_ctl:print("Reload plugin ~s error: ~p.~n", [Name, Reason])
             end
     catch
         error:badarg ->
-            emqx_ctl:print("Reload plugin error: plugin_not_exist~n")
+            emqx_ctl:print("Reload plugin ~s error: The plugin doesn't exist.~n", [Name])
     end;
 
 % plugins(["add", Name]) ->
@@ -566,14 +566,11 @@ dump(Table, Tag) ->
     dump(Table, Tag, ets:first(Table), []).
 
 dump(_Table, _, '$end_of_table', Result) ->
-    Result;
+    lists:reverse(Result);
 
 dump(Table, Tag, Key, Result) ->
-    PrintValue = case ets:lookup(Table, Key) of
-                      [Record] -> print({Tag, Record});
-                      [] -> ok
-                  end,
-    dump(Table, Tag, ets:next(Table, Key), [Result | PrintValue]).
+    PrintValue = [print({Tag, Record}) || Record <- ets:lookup(Table, Key)],
+    dump(Table, Tag, ets:next(Table, Key), [PrintValue | Result]).
 
 print({_, []}) ->
     ok;

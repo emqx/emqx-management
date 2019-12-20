@@ -226,7 +226,14 @@ list_acl_cache(Node, ClientId) when Node =:= node() ->
         [] ->
             [{error, not_found}];
         Pids when is_list(Pids) ->
-            gen_server:call(lists:last(Pids), list_acl_cache)
+            Pid = lists:last(Pids),
+            case emqx_cm:get_chan_info(ClientId, Pid) of
+                #{conninfo := #{conn_mod := emqx_connection}} ->
+                    gen_server:call(Pid, list_acl_cache);
+                #{conninfo := #{conn_mod := emqx_ws_connection}} ->
+                    emqx_ws_connection:call(Pid, list_acl_cache);
+                undefined -> [{error, not_found}]
+            end
     end;
 list_acl_cache(Node, ClientId) ->
     rpc_call(Node, list_acl_cache, [Node, ClientId]).
@@ -359,10 +366,7 @@ gen_config(App) ->
 load_plugin_with_config(Plugin, Config) ->
     lists:foreach(fun({Key, _}) -> application:unset_env(Plugin, Key) end, application:get_all_env(Plugin)),
     lists:foreach(fun({Key, Val}) -> application:set_env(Plugin, Key, Val) end, Config),
-    case emqx_plugins:load(Plugin) of
-        {ok, _StartedApp} -> ok;
-        {error, Reason}  -> {error, Reason}
-    end.
+    emqx_plugins:load(Plugin).
 
 %%--------------------------------------------------------------------
 %% Listeners

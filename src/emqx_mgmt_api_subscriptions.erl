@@ -83,6 +83,9 @@ format(Items) when is_list(Items) ->
 format({{Subscriber, Topic}, Options}) ->
     format({Subscriber, Topic, Options});
 
+format({_Subscriber, Topic, Options = #{share := Group}}) ->
+    QoS = maps:get(qos, Options),
+    #{node => node(), topic => filename:join([<<"$share">>, Group, Topic]), clientid => maps:get(subid, Options), qos => QoS};
 format({_Subscriber, Topic, Options}) ->
     QoS = maps:get(qos, Options),
     #{node => node(), topic => Topic, clientid => maps:get(subid, Options), qos => QoS}.
