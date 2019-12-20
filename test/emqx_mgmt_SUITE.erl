@@ -251,8 +251,8 @@ t_plugins(_) ->
     print_mock(),
     ?assertEqual(emqx_mgmt_cli:plugins(["list"]), ok),
     ?assertEqual(emqx_mgmt_cli:plugins(["unload", "emqx_reloader"]), "Plugin emqx_reloader unloaded successfully.\n"),
-    ?assertEqual(emqx_mgmt_cli:plugins(["load", "emqx_reloader"]),"Start apps: [emqx_reloader]\nPlugin emqx_reloader loaded successfully.\n"),
-    ?assertEqual(emqx_mgmt_cli:plugins(["unload", "emqx_management"]), "Plugin emqx_management can not be unloaded ~n").
+    ?assertEqual(emqx_mgmt_cli:plugins(["load", "emqx_reloader"]),"Plugin emqx_reloader loaded successfully.\n"),
+    ?assertEqual(emqx_mgmt_cli:plugins(["unload", "emqx_management"]), "Plugin emqx_management can not be unloaded.~n").
 
 t_cli(_) ->
     print_mock(),

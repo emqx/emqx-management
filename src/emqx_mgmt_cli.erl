@@ -569,9 +569,7 @@ dump(_Table, _, '$end_of_table', Result) ->
     lists:reverse(Result);
 
 dump(Table, Tag, Key, Result) ->
-    PrintValue = lists:foreach(fun(Record) ->
-                                   print({Tag, Record})
-                               end, ets:lookup(Table, Key)),
+    PrintValue = [print({Tag, Record}) || Record <- ets:lookup(Table, Key)],
     dump(Table, Tag, ets:next(Table, Key), [PrintValue | Result]).
 
 print({_, []}) ->
