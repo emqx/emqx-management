@@ -312,7 +312,7 @@ plugins(_) ->
                                          atom_to_list(emqx_reloader),
                                          "unload"]),
                                auth_header_()),
-    ?assertEqual(?ERROR2, get(<<"code">>, Error1)),
+    ?assertEqual(<<"not_started">>, get(<<"message">>, Error1)),
     {ok, Plugins2} = request_api(get,
                                  api_path(["nodes", atom_to_list(node()), "plugins"]),
                                  auth_header_()),
@@ -348,7 +348,7 @@ plugins(_) ->
                                          atom_to_list(emqx_reloader),
                                          "unload"]),
                                auth_header_()),
-    ?assertEqual(?ERROR2, get(<<"code">>, Error2)).
+    ?assertEqual(<<"not_started">>, get(<<"message">>, Error2)).
 
 acl_cache(_) ->
     ClientId = <<"client1">>,

@@ -187,9 +187,7 @@ cluster(_) ->
                     {"cluster status",            "Cluster status"}]).
 
 %%--------------------------------------------------------------------
-%% @doc Users usage
-
-% users(Args) -> emqx_auth_username:cli(Args).
+%% @doc ACL usage
 
 acl(["reload"]) ->
     emqx_access_control:reload_acl();
@@ -291,21 +289,21 @@ plugins(["list"]) ->
 
 plugins(["load", Name]) ->
     case emqx_plugins:load(list_to_atom(Name)) of
-        {ok, StartedApps} ->
-            emqx_ctl:print("Start apps: ~p~nPlugin ~s loaded successfully.~n", [StartedApps, Name]);
+        ok ->
+            emqx_ctl:print("Plugin ~s loaded successfully.~n", [Name]);
         {error, Reason}   ->
-            emqx_ctl:print("load plugin error: ~p~n", [Reason])
+            emqx_ctl:print("Load plugin ~s error: ~p.~n", [Name, Reason])
     end;
 
 plugins(["unload", "emqx_management"])->
-    emqx_ctl:print("Plugin emqx_management can not be unloaded ~n");
+    emqx_ctl:print("Plugin emqx_management can not be unloaded.~n");
 
 plugins(["unload", Name]) ->
     case emqx_plugins:unload(list_to_atom(Name)) of
         ok ->
             emqx_ctl:print("Plugin ~s unloaded successfully.~n", [Name]);
         {error, Reason} ->
-            emqx_ctl:print("unload plugin error: ~p~n", [Reason])
+            emqx_ctl:print("Unload plugin ~s error: ~p.~n", [Name, Reason])
     end;
 
 plugins(["reload", Name]) ->
@@ -313,13 +311,13 @@ plugins(["reload", Name]) ->
         PluginName ->
             case emqx_mgmt:reload_plugin(node(), PluginName) of
                 ok ->
-                    emqx_ctl:print("Plugin ~p reloaded successfully.~n", [PluginName]);
+                    emqx_ctl:print("Plugin ~s reloaded successfully.~n", [Name]);
                 {error, Reason} ->
-                    emqx_ctl:print("Reload plugin error: ~p~n", [Reason])
+                    emqx_ctl:print("Reload plugin ~s error: ~p.~n", [Name, Reason])
             end
     catch
         error:badarg ->
-            emqx_ctl:print("Reload plugin error: plugin_not_exist~n")
+            emqx_ctl:print("Reload plugin ~s error: The plugin doesn't exist.~n", [Name])
     end;
 
 % plugins(["add", Name]) ->
@@ -498,18 +496,6 @@ listeners([]) ->
                         end, Info)
             end, ranch:info());
 
-% listeners(["restart", Proto, ListenOn]) ->
-%     ListenOn1 = case string:tokens(ListenOn, ":") of
-%         [Port]     -> list_to_integer(Port);
-%         [IP, Port] -> {IP, list_to_integer(Port)}
-%     end,
-%     case emqx_listeners:restart_listener({list_to_atom(Proto), ListenOn1, []}) of
-%         ok ->
-%             io:format("Restart ~s listener on ~s successfully.~n", [Proto, ListenOn]);
-%         {error, Error} ->
-%             io:format("Failed to restart ~s listener on ~s, error:~p~n", [Proto, ListenOn, Error])
-%     end;
-
 listeners(["stop",  Name = "http" ++ _N, ListenOn]) ->
     case minirest:stop_http(list_to_atom(Name)) of
         ok ->
@@ -532,28 +518,7 @@ listeners(["stop", Proto, ListenOn]) ->
 
 listeners(_) ->
     emqx_ctl:usage([{"listeners",                        "List listeners"},
-                    % {"listeners restart <Proto> <Port>", "Restart a listener"},
                     {"listeners stop    <Proto> <Port>", "Stop a listener"}]).
-
-%%--------------------------------------------------------------------
-%% @doc License Command
-
-% license(["reload", File]) ->
-%     case emqx_license:reload(File) of
-%         ok              -> emqx_ctl:print("ok~n");
-%         {error, Reason} -> emqx_ctl:print("Error: ~p~n", [Reason])
-%     end;
-
-% license(["info"]) ->
-%     foreach(fun({K, V}) when is_binary(V); is_atom(V) ->
-%                 emqx_ctl:print("~-12s: ~s~n", [K, V]);
-%                ({K, V}) ->
-%                 emqx_ctl:print("~-12s: ~w~n", [K, V])
-%             end, emqx_license:info());
-
-% license(_) ->
-%     emqx_ctl:usage([{"license info",          "Show license info"},
-%                     {"license reload <File>", "Load a new license file"}]).
 
 %%--------------------------------------------------------------------
 %% Dump ETS
@@ -566,14 +531,11 @@ dump(Table, Tag) ->
     dump(Table, Tag, ets:first(Table), []).
 
 dump(_Table, _, '$end_of_table', Result) ->
-    Result;
+    lists:reverse(Result);
 
 dump(Table, Tag, Key, Result) ->
-    PrintValue = case ets:lookup(Table, Key) of
-                      [Record] -> print({Tag, Record});
-                      [] -> ok
-                  end,
-    dump(Table, Tag, ets:next(Table, Key), [Result | PrintValue]).
+    PrintValue = [print({Tag, Record}) || Record <- ets:lookup(Table, Key)],
+    dump(Table, Tag, ets:next(Table, Key), [PrintValue | Result]).
 
 print({_, []}) ->
     ok;

@@ -80,35 +80,27 @@ load(#{node := Node, plugin := Plugin}, _Params) ->
     return(emqx_mgmt:load_plugin(Node, Plugin)).
 
 unload(#{node := Node, plugin := Plugin}, _Params) ->
-    case emqx_mgmt:unload_plugin(Node, Plugin) of
-        ok -> return(ok);
-        {error, Reason} -> return({error, ?ERROR2, Reason})
-    end;
+    return(emqx_mgmt:unload_plugin(Node, Plugin));
 
 unload(#{plugin := Plugin}, _Params) ->
     Results = [emqx_mgmt:unload_plugin(Node, Plugin) || {Node, _Info} <- emqx_mgmt:list_nodes()],
-    case lists:any(fun(Item) -> Item =:= ok end, Results) of
-        true  ->
+    case lists:filter(fun(Item) -> Item =/= ok end, Results) of
+        [] ->
             return(ok);
-        false ->
-            {error, Reason} = lists:last(Results),
-            return({error, ?ERROR2, Reason})
+        Errors ->
+            return(lists:last(Errors))
     end.
 
 reload(#{node := Node, plugin := Plugin}, _Params) ->
-    case emqx_mgmt:reload_plugin(Node, Plugin) of
-        ok -> return(ok);
-        {error, Reason} -> return({error, ?ERROR2, Reason})
-    end;
+    return(emqx_mgmt:reload_plugin(Node, Plugin));
 
 reload(#{plugin := Plugin}, _Params) ->
     Results = [emqx_mgmt:reload_plugin(Node, Plugin) || {Node, _Info} <- emqx_mgmt:list_nodes()],
-    case lists:any(fun(Item) -> Item =:= ok end, Results) of
-        true  ->
+    case lists:filter(fun(Item) -> Item =/= ok end, Results) of
+        [] ->
             return(ok);
-        false ->
-            {error, Reason} = lists:last(Results),
-            return({error, ?ERROR2, Reason})
+        Errors ->
+            return(lists:last(Errors))
     end.
 
 format({Node, Plugins}) ->
