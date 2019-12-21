@@ -187,9 +187,7 @@ cluster(_) ->
                     {"cluster status",            "Cluster status"}]).
 
 %%--------------------------------------------------------------------
-%% @doc Users usage
-
-% users(Args) -> emqx_auth_username:cli(Args).
+%% @doc ACL usage
 
 acl(["reload"]) ->
     emqx_access_control:reload_acl();
@@ -498,18 +496,6 @@ listeners([]) ->
                         end, Info)
             end, ranch:info());
 
-% listeners(["restart", Proto, ListenOn]) ->
-%     ListenOn1 = case string:tokens(ListenOn, ":") of
-%         [Port]     -> list_to_integer(Port);
-%         [IP, Port] -> {IP, list_to_integer(Port)}
-%     end,
-%     case emqx_listeners:restart_listener({list_to_atom(Proto), ListenOn1, []}) of
-%         ok ->
-%             io:format("Restart ~s listener on ~s successfully.~n", [Proto, ListenOn]);
-%         {error, Error} ->
-%             io:format("Failed to restart ~s listener on ~s, error:~p~n", [Proto, ListenOn, Error])
-%     end;
-
 listeners(["stop",  Name = "http" ++ _N, ListenOn]) ->
     case minirest:stop_http(list_to_atom(Name)) of
         ok ->
@@ -532,28 +518,7 @@ listeners(["stop", Proto, ListenOn]) ->
 
 listeners(_) ->
     emqx_ctl:usage([{"listeners",                        "List listeners"},
-                    % {"listeners restart <Proto> <Port>", "Restart a listener"},
                     {"listeners stop    <Proto> <Port>", "Stop a listener"}]).
-
-%%--------------------------------------------------------------------
-%% @doc License Command
-
-% license(["reload", File]) ->
-%     case emqx_license:reload(File) of
-%         ok              -> emqx_ctl:print("ok~n");
-%         {error, Reason} -> emqx_ctl:print("Error: ~p~n", [Reason])
-%     end;
-
-% license(["info"]) ->
-%     foreach(fun({K, V}) when is_binary(V); is_atom(V) ->
-%                 emqx_ctl:print("~-12s: ~s~n", [K, V]);
-%                ({K, V}) ->
-%                 emqx_ctl:print("~-12s: ~w~n", [K, V])
-%             end, emqx_license:info());
-
-% license(_) ->
-%     emqx_ctl:usage([{"license info",          "Show license info"},
-%                     {"license reload <File>", "Load a new license file"}]).
 
 %%--------------------------------------------------------------------
 %% Dump ETS
