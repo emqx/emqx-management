@@ -188,7 +188,8 @@ parse_subscribe_params(Params) ->
 parse_publish_params(Params) ->
     Topics   = topics(name, get_value(<<"topic">>, Params), get_value(<<"topics">>, Params, <<"">>)),
     ClientId = get_value(<<"clientid">>, Params),
-    Payload  = get_value(<<"payload">>, Params, <<>>),
+    Payload  = decode_payload(get_value(<<"payload">>, Params, <<>>),
+                              get_value(<<"encoding">>, Params, <<"plain">>)),
     Qos      = get_value(<<"qos">>, Params, 0),
     Retain   = get_value(<<"retain">>, Params, false),
     {ClientId, Topics, Qos, Retain, Payload}.
@@ -235,3 +236,6 @@ resp_topic(undefined, Topics) ->
     {topics, Topics};
 resp_topic(Topic, _) ->
     {topic, Topic}.
+
+decode_payload(Payload, <<"base64">>) -> base64:decode(Payload);
+decode_payload(Payload, _) -> Payload.
