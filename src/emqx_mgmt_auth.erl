@@ -22,7 +22,8 @@
 -copy_mnesia({mnesia, [copy]}).
 
 %% APP Management API
--export([ add_app/2
+-export([ add_default_app/0
+        , add_app/2
         , add_app/5
         , add_app/6
         , lookup_app/1
@@ -60,6 +61,19 @@ mnesia(copy) ->
 %%--------------------------------------------------------------------
 %% Manage Apps
 %%--------------------------------------------------------------------
+-spec(add_default_app() -> ok | {ok, appsecret()} | {error, term()}).
+add_default_app() ->
+    AppId = application:get_env(?APP, default_application_id, undefined),
+    AppSecret = application:get_env(?APP, default_application_secret, undefined),
+    case {AppId, AppSecret} of
+        {undefined, _} -> ok;
+        {_, undefined} -> ok;
+        {_, _} ->
+            AppId1 = erlang:list_to_binary(AppId),
+            AppSecret1 = erlang:list_to_binary(AppSecret),
+            add_app(AppId1, <<"Default">>, AppSecret1, <<"Application user">>, true, undefined)
+    end.
+
 -spec(add_app(appid(), binary()) -> {ok, appsecret()} | {error, term()}).
 add_app(AppId, Name) when is_binary(AppId) ->
     add_app(AppId, Name, <<"Application user">>, true, undefined).
