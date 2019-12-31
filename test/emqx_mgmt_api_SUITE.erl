@@ -58,7 +58,6 @@ init_per_suite(Config) ->
     emqx_ct_helpers:start_apps([emqx, emqx_management, emqx_reloader]),
     ekka_mnesia:start(),
     emqx_mgmt_auth:mnesia(boot),
-    emqx_mgmt_auth:add_app(<<"myappid">>, <<"test">>),
     Config.
 
 end_per_suite(_Config) ->
@@ -150,7 +149,7 @@ apps(_) ->
     {ok, _} = request_api(delete, api_path(["apps", binary_to_list(AppId)]), auth_header_()),
     {ok, Result} = request_api(get, api_path(["apps"]), auth_header_()),
     [App] = get(<<"data">>, Result),
-    ?assertEqual(<<"myappid">>, proplists:get_value(<<"app_id">>, App)).
+    ?assertEqual(<<"admin">>, proplists:get_value(<<"app_id">>, App)).
 
 banned(_) ->
     Who = <<"myclient">>,
@@ -548,8 +547,8 @@ do_request_api(Method, Request)->
     end.
 
 auth_header_() ->
-    AppId = <<"myappid">>,
-    AppSecret = emqx_mgmt_auth:get_appsecret(AppId),
+    AppId = <<"admin">>,
+    AppSecret = <<"public">>,
     auth_header_(binary_to_list(AppId), binary_to_list(AppSecret)).
 
 auth_header_(User, Pass) ->
