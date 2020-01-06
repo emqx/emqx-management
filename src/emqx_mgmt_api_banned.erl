@@ -67,7 +67,8 @@ delete(#{who := Who0}, Params) ->
                                    fun validate_params/2,
                                    fun fetch_as/2]) of
         {ok, <<"ip_address">>} ->
-            emqx_mgmt:delete_banned({ip_address, inet:parse_address(str(Who))}),
+            {ok, IpAddress} = inet:parse_address(str(Who)),
+            emqx_mgmt:delete_banned({ip_address, IpAddress}),
             return();
         {ok, <<"username">>} ->
             emqx_mgmt:delete_banned({username, bin(Who)}),
