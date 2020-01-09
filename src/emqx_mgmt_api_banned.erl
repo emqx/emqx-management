@@ -137,7 +137,8 @@ do_pack_banned([_P | Params], Banned) -> %% ingore other params
     do_pack_banned(Params, Banned).
 
 do_delete(<<"peerhost">>, Who) ->
-    emqx_mgmt:delete_banned({peerhost, inet:parse_address(str(Who))});
+    {ok, IPAddress} = inet:parse_address(str(Who)),
+    emqx_mgmt:delete_banned({peerhost, IPAddress});
 do_delete(<<"username">>, Who) ->
     emqx_mgmt:delete_banned({username, bin(Who)});
 do_delete(<<"clientid">>, Who) ->
