@@ -47,12 +47,12 @@ stop_listeners() ->
 
 start_listener({Proto, Port, Options}) when Proto == http ->
     Dispatch = [{"/status", emqx_mgmt_http, []},
-                {"/api/v3/[...]", minirest, http_handlers()}],
+                {"/api/v4/[...]", minirest, http_handlers()}],
     minirest:start_http(listener_name(Proto), ranch_opts(Port, Options), Dispatch);
 
 start_listener({Proto, Port, Options}) when Proto == https ->
     Dispatch = [{"/status", emqx_mgmt_http, []},
-                {"/api/v3/[...]", minirest, http_handlers()}],
+                {"/api/v4/[...]", minirest, http_handlers()}],
     minirest:start_https(listener_name(Proto), ranch_opts(Port, Options), Dispatch).
 
 ranch_opts(Port, Options0) ->
@@ -84,7 +84,7 @@ listener_name(Proto) ->
 
 http_handlers() ->
     Plugins = lists:map(fun(Plugin) -> Plugin#plugin.name end, emqx_plugins:list()),
-    [{"/api/v3", minirest:handler(#{apps   => Plugins -- ?EXCEPT_PLUGIN,
+    [{"/api/v4", minirest:handler(#{apps   => Plugins -- ?EXCEPT_PLUGIN,
                                     except => ?EXCEPT,
                                     filter => fun filter/1}),
                  [{authorization, fun authorize_appid/1}]}].
