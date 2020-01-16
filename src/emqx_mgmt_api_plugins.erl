@@ -77,10 +77,22 @@ list(_Bindings, _Params) ->
     return({ok, [format({Node, Plugins}) || {Node, Plugins} <- emqx_mgmt:list_plugins()]}).
 
 load(#{node := Node, plugin := Plugin}, _Params) ->
-    return(emqx_mgmt:load_plugin(Node, Plugin)).
+    case emqx_mgmt:load_plugin(Node, Plugin) of
+        ok ->
+            return(ok);
+        {error, Error} ->
+            Msg = iolist_to_binary(io_lib:format("~p", [Error])),
+            return({error, Msg})
+    end.
 
 unload(#{node := Node, plugin := Plugin}, _Params) ->
-    return(emqx_mgmt:unload_plugin(Node, Plugin));
+    case emqx_mgmt:unload_plugin(Node, Plugin) of
+        ok ->
+            return(ok);
+        {error, Error} ->
+            Msg = iolist_to_binary(io_lib:format("~p", [Error])),
+            return({error, Msg})
+    end;
 
 unload(#{plugin := Plugin}, _Params) ->
     Results = [emqx_mgmt:unload_plugin(Node, Plugin) || {Node, _Info} <- emqx_mgmt:list_nodes()],
@@ -88,7 +100,9 @@ unload(#{plugin := Plugin}, _Params) ->
         [] ->
             return(ok);
         Errors ->
-            return(lists:last(Errors))
+            Error = lists:last(Errors),
+            Msg = iolist_to_binary(io_lib:format("~p", [Error])),
+            return({error, Msg})
     end.
 
 reload(#{node := Node, plugin := Plugin}, _Params) ->
@@ -100,7 +114,9 @@ reload(#{plugin := Plugin}, _Params) ->
         [] ->
             return(ok);
         Errors ->
-            return(lists:last(Errors))
+            Error = lists:last(Errors),
+            Msg = iolist_to_binary(io_lib:format("~p", [Error])),
+            return({error, Msg})
     end.
 
 format({Node, Plugins}) ->
