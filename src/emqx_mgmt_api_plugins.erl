@@ -106,7 +106,13 @@ unload(#{plugin := Plugin}, _Params) ->
     end.
 
 reload(#{node := Node, plugin := Plugin}, _Params) ->
-    return(emqx_mgmt:reload_plugin(Node, Plugin));
+    case emqx_mgmt:reload_plugin(Node, Plugin) of
+        ok ->
+            return(ok);
+        {error, Error} ->
+            Msg = iolist_to_binary(io_lib:format("~p", [Error])),
+            return({error, Msg})
+    end;
 
 reload(#{plugin := Plugin}, _Params) ->
     Results = [emqx_mgmt:reload_plugin(Node, Plugin) || {Node, _Info} <- emqx_mgmt:list_nodes()],

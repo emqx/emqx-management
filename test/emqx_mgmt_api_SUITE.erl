@@ -311,7 +311,7 @@ plugins(_) ->
                                          atom_to_list(emqx_reloader),
                                          "unload"]),
                                auth_header_()),
-    ?assertEqual(<<"not_started">>, get(<<"message">>, Error1)),
+    ?assertEqual(<<"{error,not_started}">>, get(<<"message">>, Error1)),
     {ok, Plugins2} = request_api(get,
                                  api_path(["nodes", atom_to_list(node()), "plugins"]),
                                  auth_header_()),
