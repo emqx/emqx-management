@@ -73,35 +73,29 @@
 subscribe(_Bindings, Params) ->
     logger:debug("API subscribe Params:~p", [Params]),
     {ClientId, Topic, QoS} = parse_subscribe_params(Params),
-    Reason = do_subscribe(ClientId, Topic, QoS),
-    return(Reason).
+    return(do_subscribe(ClientId, Topic, QoS)).
 
 publish(_Bindings, Params) ->
     logger:debug("API publish Params:~p", [Params]),
     {ClientId, Topic, Qos, Retain, Payload} = parse_publish_params(Params),
-    Reason = do_publish(ClientId, Topic, Qos, Retain, Payload),
-    return(Reason).
+    return(do_publish(ClientId, Topic, Qos, Retain, Payload)).
 
 unsubscribe(_Bindings, Params) ->
     logger:debug("API unsubscribe Params:~p", [Params]),
     {ClientId, Topic} = parse_unsubscribe_params(Params),
-    Reason = do_unsubscribe(ClientId, Topic),
-    return(Reason).
+    return(do_unsubscribe(ClientId, Topic)).
 
 subscribe_batch(_Bindings, Params) ->
     logger:debug("API subscribe batch Params:~p", [Params]),
-    Reason = loop_subscribe(Params),
-    return({ok, Reason}).
+    return({ok, loop_subscribe(Params)}).
 
 publish_batch(_Bindings, Params) ->
     logger:debug("API publish batch Params:~p", [Params]),
-    Reason = loop_publish(Params),
-    return({ok, Reason}).
+    return({ok, loop_publish(Params)}).
 
 unsubscribe_batch(_Bindings, Params) ->
     logger:debug("API unsubscribe batch Params:~p", [Params]),
-    Reason = loop_unsubscribe(Params),
-    return({ok, Reason}).
+    return({ok, loop_unsubscribe(Params)}).
 
 loop_subscribe(Params) ->
     loop_subscribe(Params, []).
@@ -113,10 +107,9 @@ loop_subscribe([Params | ParamsN], Acc) ->
         ok -> 0;
         {_, Code0, _Reason} -> Code0
     end,
-    Result = [{clientid, ClientId},
-              resp_topic(get_value(<<"topic">>, Params),
-                         get_value(<<"topics">>, Params, <<"">>)),
-              {code, Code}],
+    Result = #{clientid => ClientId,
+               topic => resp_topic(get_value(<<"topic">>, Params), get_value(<<"topics">>, Params, <<"">>)),
+               code => Code},
     loop_subscribe(ParamsN, [Result | Acc]).
 
 loop_publish(Params) ->
@@ -129,9 +122,8 @@ loop_publish([Params | ParamsN], Acc) ->
         ok -> 0;
         {_, Code0, _} -> Code0
     end,
-    Result = [resp_topic(get_value(<<"topic">>, Params),
-                         get_value(<<"topics">>, Params, <<"">>)),
-              {code, Code}],
+    Result = #{topic => resp_topic(get_value(<<"topic">>, Params), get_value(<<"topics">>, Params, <<"">>)),
+               code => Code},
     loop_publish(ParamsN, [Result | Acc]).
 
 loop_unsubscribe(Params) ->
@@ -144,10 +136,9 @@ loop_unsubscribe([Params | ParamsN], Acc) ->
         ok -> 0;
         {_, Code0, _} -> Code0
     end,
-    Result = [{clientid, ClientId},
-              resp_topic(get_value(<<"topic">>, Params),
-                         get_value(<<"topics">>, Params, <<"">>)),
-              {code, Code}],
+    Result = #{clientid => ClientId,
+               topic => resp_topic(get_value(<<"topic">>, Params), get_value(<<"topics">>, Params, <<"">>)),
+               code => Code},
     loop_unsubscribe(ParamsN, [Result | Acc]).
 
 do_subscribe(_ClientId, [], _QoS) ->
@@ -232,10 +223,8 @@ parse_topic_filters(Topics, Qos) ->
          {Topic, Opts#{qos => Qos}}
      end || Topic0 <- Topics].
 
-resp_topic(undefined, Topics) ->
-    {topics, Topics};
-resp_topic(Topic, _) ->
-    {topic, Topic}.
+resp_topic(undefined, Topics) -> Topics;
+resp_topic(Topic, _) -> Topic.
 
 decode_payload(Payload, <<"base64">>) -> base64:decode(Payload);
 decode_payload(Payload, _) -> Payload.
