@@ -138,7 +138,7 @@ list_acl_cache(#{clientid := ClientId}, _Params) ->
     end.
 
 format([]) ->
-    [];
+    #{};
 format(Items) when is_list(Items) ->
     [format(Item) || Item <- Items];
 format(Key) when is_tuple(Key) ->

@@ -65,11 +65,11 @@ end_per_suite(_Config) ->
     ekka_mnesia:ensure_stopped().
 
 get(Key, ResponseBody) ->
-    proplists:get_value(Key, jsx:decode(list_to_binary(ResponseBody))).
+   maps:get(Key, jiffy:decode(list_to_binary(ResponseBody), [return_maps])).
 
 lookup_alarm(AlarmId, Alarms) ->
     lists:foldl(fun(Alarm, Acc) ->
-                    case proplists:get_value(<<"id">>, Alarm) =:= AlarmId of
+                    case maps:get(<<"id">>, Alarm, undefined) =:= AlarmId of
                         true -> true;
                         false -> Acc
                     end
@@ -87,9 +87,9 @@ alarms(_) ->
 
     {ok, Return} = request_api(get, api_path(["alarms/present"]), auth_header_()),
     [Misc] = get(<<"data">>, Return),
-    ?assertEqual(erlang:atom_to_binary(node(), utf8), proplists:get_value(<<"node">>, Misc)),
-    ?assertEqual(true, lookup_alarm(<<"t1">>, proplists:get_value(<<"alarms">>, Misc))),
-    ?assertEqual(true, lookup_alarm(<<"t2">>, proplists:get_value(<<"alarms">>, Misc))),
+    ?assertEqual(erlang:atom_to_binary(node(), utf8), maps:get(<<"node">>, Misc, undefined)),
+    ?assertEqual(true, lookup_alarm(<<"t1">>, maps:get(<<"alarms">>, Misc, undefined))),
+    ?assertEqual(true, lookup_alarm(<<"t2">>, maps:get(<<"alarms">>, Misc, undefined))),
 
     {ok, Return1} = request_api(get, api_path(["alarms/present", atom_to_list(node())]), auth_header_()),
     ?assertEqual(true, lookup_alarm(<<"t1">>, get(<<"data">>, Return1))),
@@ -102,9 +102,9 @@ alarms(_) ->
     alarm_handler:clear_alarm(<<"t2">>),
     {ok, Return3} = request_api(get, api_path(["alarms/history"]), auth_header_()),
     [Misc3] = get(<<"data">>, Return3),
-    ?assertEqual(erlang:atom_to_binary(node(), utf8), proplists:get_value(<<"node">>, Misc3)),
-    ?assertEqual(true, lookup_alarm(<<"t1">>, proplists:get_value(<<"alarms">>, Misc3))),
-    ?assertEqual(true, lookup_alarm(<<"t2">>, proplists:get_value(<<"alarms">>, Misc3))),
+    ?assertEqual(erlang:atom_to_binary(node(), utf8), maps:get(<<"node">>, Misc3, undefined)),
+    ?assertEqual(true, lookup_alarm(<<"t1">>, maps:get(<<"alarms">>, Misc3, undefined))),
+    ?assertEqual(true, lookup_alarm(<<"t2">>, maps:get(<<"alarms">>, Misc3, undefined))),
 
     {ok, Return4} = request_api(get, api_path(["alarms/history", atom_to_list(node())]), auth_header_()),
     ?assertEqual(true, lookup_alarm(<<"t1">>, get(<<"data">>, Return4))),
@@ -118,9 +118,9 @@ apps(_) ->
     meck:new(emqx_mgmt_auth, [passthrough, no_history]),
     meck:expect(emqx_mgmt_auth, add_app, 6, fun(_, _, _, _, _, _) -> {error, undefined} end),
     {ok, Error1} = request_api(post, api_path(["apps"]), [],
-                               auth_header_(), [{<<"app_id">>, AppId},
-                                                {<<"name">>,   <<"test">>},
-                                                {<<"status">>, true}]),
+                               auth_header_(), #{<<"app_id">> => AppId,
+                                                 <<"name">> => <<"test">>,
+                                                 <<"status">> => true}),
     ?assertEqual(?ERROR2, get(<<"code">>, Error1)),
 
     meck:expect(emqx_mgmt_auth, del_app, 1, fun(_) -> {error, undefined} end),
@@ -129,41 +129,41 @@ apps(_) ->
     meck:unload(emqx_mgmt_auth),
 
     {ok, NoApp} = request_api(get, api_path(["apps", binary_to_list(AppId)]), auth_header_()),
-    ?assertEqual(0, length(get(<<"data">>, NoApp))),
+    ?assertEqual(0, maps:size(get(<<"data">>, NoApp))),
     {ok, NotFound} = request_api(put, api_path(["apps", binary_to_list(AppId)]), [],
-                                 auth_header_(), [{<<"name">>, <<"test 2">>},
-                                                  {<<"status">>, true}]),
+                                 auth_header_(), #{<<"name">> => <<"test 2">>,
+                                                   <<"status">> => true}),
     ?assertEqual(<<"not_found">>, get(<<"message">>, NotFound)),
 
     {ok, _} = request_api(post, api_path(["apps"]), [],
-                          auth_header_(), [{<<"app_id">>, AppId},
-                                           {<<"name">>,   <<"test">>},
-                                           {<<"status">>, true}]),
+                          auth_header_(), #{<<"app_id">> => AppId,
+                                            <<"name">> => <<"test">>,
+                                            <<"status">> => true}),
     {ok, _} = request_api(get, api_path(["apps"]), auth_header_()),
     {ok, _} = request_api(get, api_path(["apps", binary_to_list(AppId)]), auth_header_()),
     {ok, _} = request_api(put, api_path(["apps", binary_to_list(AppId)]), [],
-                          auth_header_(), [{<<"name">>, <<"test 2">>},
-                                           {<<"status">>, true}]),
+                          auth_header_(), #{<<"name">> => <<"test 2">>,
+                                            <<"status">> => true}),
     {ok, AppInfo} = request_api(get, api_path(["apps", binary_to_list(AppId)]), auth_header_()),
-    ?assertEqual(<<"test 2">>, proplists:get_value(<<"name">>, get(<<"data">>, AppInfo))),
+    ?assertEqual(<<"test 2">>, maps:get(<<"name">>, get(<<"data">>, AppInfo))),
     {ok, _} = request_api(delete, api_path(["apps", binary_to_list(AppId)]), auth_header_()),
     {ok, Result} = request_api(get, api_path(["apps"]), auth_header_()),
     [App] = get(<<"data">>, Result),
-    ?assertEqual(<<"admin">>, proplists:get_value(<<"app_id">>, App)).
+    ?assertEqual(<<"admin">>, maps:get(<<"app_id">>, App)).
 
 banned(_) ->
     Who = <<"myclient">>,
     {ok, _} = request_api(post, api_path(["banned"]), [],
-                          auth_header_(), [{<<"who">>, Who},
-                                           {<<"as">>, <<"clientid">>},
-                                           {<<"reason">>, <<"test">>},
-                                           {<<"by">>, <<"dashboard">>},
-                                           {<<"at">>, erlang:system_time(second)},
-                                           {<<"until">>, erlang:system_time(second) + 10}]),
+                          auth_header_(), #{<<"who">> => Who,
+                                            <<"as">> => <<"clientid">>,
+                                            <<"reason">> => <<"test">>,
+                                            <<"by">> => <<"dashboard">>,
+                                            <<"at">> => erlang:system_time(second),
+                                            <<"until">> => erlang:system_time(second) + 10}),
 
     {ok, Result} = request_api(get, api_path(["banned"]), auth_header_()),
     [Banned] = get(<<"data">>, Result),
-    ?assertEqual(Who, proplists:get_value(<<"who">>, Banned)),
+    ?assertEqual(Who, maps:get(<<"who">>, Banned)),
 
     {ok, _} = request_api(delete, api_path(["banned", "clientid", binary_to_list(Who)]), auth_header_()),
     {ok, Result2} = request_api(get, api_path(["banned"]), auth_header_()),
@@ -192,26 +192,26 @@ clients(_) ->
 
     {ok, Clients1} = request_api(get, api_path(["clients", binary_to_list(ClientId1)])
                                , auth_header_()),
-    ?assertEqual(<<"client1">>, proplists:get_value(<<"clientid">>, lists:nth(1, get(<<"data">>, Clients1)))),
+    ?assertEqual(<<"client1">>, maps:get(<<"clientid">>, lists:nth(1, get(<<"data">>, Clients1)))),
 
     {ok, Clients2} = request_api(get, api_path(["nodes", atom_to_list(node()),
                                                 "clients", binary_to_list(ClientId2)])
                                  , auth_header_()),
-    ?assertEqual(<<"client2">>, proplists:get_value(<<"clientid">>, lists:nth(1, get(<<"data">>, Clients2)))),               
+    ?assertEqual(<<"client2">>, maps:get(<<"clientid">>, lists:nth(1, get(<<"data">>, Clients2)))),               
 
     {ok, Clients3} = request_api(get, api_path(["clients",
                                                 "username", binary_to_list(Username1)]),
                                  auth_header_()),
-    ?assertEqual(<<"client1">>, proplists:get_value(<<"clientid">>, lists:nth(1, get(<<"data">>, Clients3)))),
+    ?assertEqual(<<"client1">>, maps:get(<<"clientid">>, lists:nth(1, get(<<"data">>, Clients3)))),
 
     {ok, Clients4} = request_api(get, api_path(["nodes", atom_to_list(node()),
                                                 "clients",
                                                 "username", binary_to_list(Username2)])
                                  , auth_header_()),
-     ?assertEqual(<<"client2">>, proplists:get_value(<<"clientid">>, lists:nth(1, get(<<"data">>, Clients4)))),
+     ?assertEqual(<<"client2">>, maps:get(<<"clientid">>, lists:nth(1, get(<<"data">>, Clients4)))),
 
     {ok, Clients5} = request_api(get, api_path(["clients"]), "_limit=100&_page=1", auth_header_()),
-    ?assertEqual(2, proplists:get_value(<<"count">>, get(<<"meta">>, Clients5))),
+    ?assertEqual(2, maps:get(<<"count">>, get(<<"meta">>, Clients5))),
     
     meck:new(emqx_mgmt, [passthrough, no_history]),
     meck:expect(emqx_mgmt, kickout_client, 1, fun(_) -> {error, undefined} end),
@@ -236,7 +236,7 @@ clients(_) ->
     ?assertEqual(?ERROR12, get(<<"code">>, NotFound0)),
 
     {ok, Clients6} = request_api(get, api_path(["clients"]), "_limit=100&_page=1", auth_header_()),
-    ?assertEqual(1, proplists:get_value(<<"count">>, get(<<"meta">>, Clients6))),
+    ?assertEqual(1, maps:get(<<"count">>, get(<<"meta">>, Clients6))),
 
     {ok, NotFound1} = request_api(get, api_path(["clients", binary_to_list(ClientId1), "acl_cache"]), auth_header_()),
     ?assertEqual(?ERROR12, get(<<"code">>, NotFound1)),
@@ -272,8 +272,7 @@ listeners(_) ->
     {ok, Return} = request_api(get, api_path(["listeners"]), auth_header_()),
     [Error] = get(<<"data">>, Return),
     ?assertEqual(<<"undefined">>,
-                 proplists:get_value(<<"error">>,
-                                     proplists:get_value(<<"listeners">>, Error))),
+                 maps:get(<<"error">>, maps:get(<<"listeners">>, Error))),
     meck:unload(emqx_mgmt).
 
 metrics(_) ->
@@ -291,15 +290,15 @@ nodes(_) ->
     meck:expect(emqx_mgmt, list_nodes, 0, fun() -> [{node(), {error, undefined}}] end),
     {ok, Return} = request_api(get, api_path(["nodes"]), auth_header_()),
     [Error] = get(<<"data">>, Return),
-    ?assertEqual(<<"undefined">>, proplists:get_value(<<"error">>, Error)),
+    ?assertEqual(<<"undefined">>, maps:get(<<"error">>, Error)),
     meck:unload(emqx_mgmt).
 
 plugins(_) ->
     {ok, Plugins1} = request_api(get, api_path(["plugins"]), auth_header_()),
     [Plugins11] = filter(get(<<"data">>, Plugins1), <<"node">>, atom_to_binary(node(), utf8)),
-    [Plugin1] = filter(proplists:get_value(<<"plugins">>, Plugins11), <<"name">>, <<"emqx_reloader">>),
-    ?assertEqual(<<"emqx_reloader">>, proplists:get_value(<<"name">>, Plugin1)),
-    ?assertEqual(true, proplists:get_value(<<"active">>, Plugin1)),
+    [Plugin1] = filter(maps:get(<<"plugins">>, Plugins11), <<"name">>, <<"emqx_reloader">>),
+    ?assertEqual(<<"emqx_reloader">>, maps:get(<<"name">>, Plugin1)),
+    ?assertEqual(true, maps:get(<<"active">>, Plugin1)),
 
     {ok, _} = request_api(put,
                           api_path(["plugins",
@@ -316,8 +315,8 @@ plugins(_) ->
                                  api_path(["nodes", atom_to_list(node()), "plugins"]),
                                  auth_header_()),
     [Plugin2] = filter(get(<<"data">>, Plugins2), <<"name">>, <<"emqx_reloader">>),
-    ?assertEqual(<<"emqx_reloader">>, proplists:get_value(<<"name">>, Plugin2)),
-    ?assertEqual(false, proplists:get_value(<<"active">>, Plugin2)),
+    ?assertEqual(<<"emqx_reloader">>, maps:get(<<"name">>, Plugin2)),
+    ?assertEqual(false, maps:get(<<"active">>, Plugin2)),
 
     {ok, _} = request_api(put,
                           api_path(["nodes",
@@ -330,8 +329,8 @@ plugins(_) ->
                                  api_path(["nodes", atom_to_list(node()), "plugins"]),
                                  auth_header_()),
     [Plugin3] = filter(get(<<"data">>, Plugins3), <<"name">>, <<"emqx_reloader">>),
-    ?assertEqual(<<"emqx_reloader">>, proplists:get_value(<<"name">>, Plugin3)),
-    ?assertEqual(true, proplists:get_value(<<"active">>, Plugin3)),
+    ?assertEqual(<<"emqx_reloader">>, maps:get(<<"name">>, Plugin3)),
+    ?assertEqual(true, maps:get(<<"active">>, Plugin3)),
 
     {ok, _} = request_api(put,
                           api_path(["nodes",
@@ -357,7 +356,7 @@ acl_cache(_) ->
     {ok, _, _} = emqtt:subscribe(C1, Topic, 2),
     %% get acl cache, should not be empty
     {ok, Result} = request_api(get, api_path(["clients", binary_to_list(ClientId), "acl_cache"]), [], auth_header_()),
-    #{<<"code">> := 0, <<"data">> := Caches} = jsx:decode(list_to_binary(Result), [return_maps]),
+    #{<<"code">> := 0, <<"data">> := Caches} = jiffy:decode(list_to_binary(Result), [return_maps]),
     ?assert(length(Caches) > 0),
     ?assertMatch(#{<<"access">> := <<"subscribe">>,
                    <<"topic">> := Topic,
@@ -365,10 +364,10 @@ acl_cache(_) ->
                    <<"updated_time">> := _}, hd(Caches)),
     %% clear acl cache
     {ok, Result2} = request_api(delete, api_path(["clients", binary_to_list(ClientId), "acl_cache"]), [], auth_header_()),
-    ?assertMatch(#{<<"code">> := 0}, jsx:decode(list_to_binary(Result2), [return_maps])),
+    ?assertMatch(#{<<"code">> := 0}, jiffy:decode(list_to_binary(Result2), [return_maps])),
     %% get acl cache again, after the acl cache is cleared
     {ok, Result3} = request_api(get, api_path(["clients", binary_to_list(ClientId), "acl_cache"]), [], auth_header_()),
-    #{<<"code">> := 0, <<"data">> := Caches3} = jsx:decode(list_to_binary(Result3), [return_maps]),
+    #{<<"code">> := 0, <<"data">> := Caches3} = jiffy:decode(list_to_binary(Result3), [return_maps]),
     ?assertEqual(0, length(Caches3)),
     ok.
 
@@ -383,48 +382,48 @@ pubsub(_) ->
     meck:new(emqx_mgmt, [passthrough, no_history]),
     meck:expect(emqx_mgmt, subscribe, 2, fun(_, _) -> {error, undefined} end),
     {ok, NotFound1} = request_api(post, api_path(["mqtt/subscribe"]), [], auth_header_(),
-                                 [{<<"clientid">>, ClientId},
-                                  {<<"topic">>, Topic},
-                                  {<<"qos">>, 2}]),
+                                 #{<<"clientid">> => ClientId,
+                                   <<"topic">> => Topic,
+                                   <<"qos">> => 2}),
     ?assertEqual(?ERROR12, get(<<"code">>, NotFound1)),
     meck:unload(emqx_mgmt),
 
     {ok, BadTopic1} = request_api(post, api_path(["mqtt/subscribe"]), [], auth_header_(),
-                                 [{<<"clientid">>, ClientId},
-                                  {<<"topics">>, <<"">>},
-                                  {<<"qos">>, 2}]),
+                                 #{<<"clientid">> => ClientId,
+                                   <<"topics">> => <<"">>,
+                                   <<"qos">> => 2}),
     ?assertEqual(?ERROR15, get(<<"code">>, BadTopic1)),
 
     {ok, BadTopic2} = request_api(post, api_path(["mqtt/publish"]), [], auth_header_(),
-                                 [{<<"clientid">>, ClientId},
-                                  {<<"topics">>, <<"">>},
-                                  {<<"qos">>, 1},
-                                  {<<"payload">>, <<"hello">>}]),
+                                 #{<<"clientid">> => ClientId,
+                                   <<"topics">> => <<"">>,
+                                   <<"qos">> => 1,
+                                   <<"payload">> => <<"hello">>}),
     ?assertEqual(?ERROR15, get(<<"code">>, BadTopic2)),       
 
     {ok, BadTopic3} = request_api(post, api_path(["mqtt/unsubscribe"]), [], auth_header_(),
-                                 [{<<"clientid">>, ClientId},
-                                  {<<"topic">>, <<"">>}]),
+                                 #{<<"clientid">> => ClientId,
+                                   <<"topic">> => <<"">>}),
     ?assertEqual(?ERROR15, get(<<"code">>, BadTopic3)),
 
     meck:new(emqx_mgmt, [passthrough, no_history]),
     meck:expect(emqx_mgmt, unsubscribe, 2, fun(_, _) -> {error, undefined} end),
     {ok, NotFound2} = request_api(post, api_path(["mqtt/unsubscribe"]), [], auth_header_(),
-                                 [{<<"clientid">>, ClientId},
-                                  {<<"topic">>, Topic}]),
+                                 #{<<"clientid">> => ClientId,
+                                   <<"topic">> => Topic}),
     ?assertEqual(?ERROR12, get(<<"code">>, NotFound2)),
     meck:unload(emqx_mgmt),
 
     {ok, Code} = request_api(post, api_path(["mqtt/subscribe"]), [], auth_header_(),
-                             [{<<"clientid">>, ClientId},
-                              {<<"topic">>, Topic},
-                              {<<"qos">>, 2}]),
+                             #{<<"clientid">> => ClientId,
+                               <<"topic">> => Topic,
+                               <<"qos">> => 2}),
     ?assertEqual(?SUCCESS, get(<<"code">>, Code)),
     {ok, Code} = request_api(post, api_path(["mqtt/publish"]), [], auth_header_(),
-                             [{<<"clientid">>, ClientId},
-                              {<<"topic">>, <<"mytopic">>},
-                              {<<"qos">>, 1},
-                              {<<"payload">>, <<"hello">>}]),
+                             #{<<"clientid">> => ClientId,
+                               <<"topic">> => <<"mytopic">>,
+                               <<"qos">> => 1,
+                               <<"payload">> => <<"hello">>}),
     ?assert(receive
                 {publish, #{payload := <<"hello">>}} ->
                     true
@@ -432,21 +431,21 @@ pubsub(_) ->
                     false
             end),
     {ok, Code} = request_api(post, api_path(["mqtt/unsubscribe"]), [], auth_header_(),
-                             [{<<"clientid">>, ClientId},
-                              {<<"topic">>, Topic}]),
+                             #{<<"clientid">> => ClientId,
+                              <<"topic">> => Topic}),
 
     %% tests subscribe_batch
     Topic_list = [<<"mytopic1">>, <<"mytopic2">>],
     [ {ok, _, [2]} = emqtt:subscribe(C1, Topics, 2) || Topics <- Topic_list],
 
-    Body1 = [[{<<"clientid">>, ClientId}, {<<"topic">>, Topics}, {<<"qos">>, 2}] || Topics <- Topic_list],
-    {ok, Data1} = request_api(post, api_path(["mqtt/subscribe_batch"]), [], auth_header_(),Body1),
-    loop(proplists:get_value(<<"data">>, jsx:decode(list_to_binary(Data1)))),
+    Body1 = [ #{<<"clientid">> => ClientId, <<"topic">> => Topics, <<"qos">> => 2} || Topics <- Topic_list],
+    {ok, Data1} = request_api(post, api_path(["mqtt/subscribe_batch"]), [], auth_header_(), Body1),
+    loop(maps:get(<<"data">>, jiffy:decode(list_to_binary(Data1), [return_maps]))),
 
     %% tests publish_batch
-    Body2 = [ [{<<"clientid">>, ClientId}, {<<"topic">>, Topics}, {<<"qos">>, 2}, {<<"retain">>, <<"false">>}, {<<"payload">>, <<"publish_batch">>}] || Topics <- Topic_list ],
-    {ok, Data2} = request_api(post, api_path(["mqtt/publish_batch"]), [], auth_header_(),Body2),
-    loop(proplists:get_value(<<"data">>, jsx:decode(list_to_binary(Data2)))),
+    Body2 = [ #{<<"clientid">> => ClientId, <<"topic">> => Topics, <<"qos">> => 2, <<"retain">> => <<"false">>, <<"payload">> => <<"publish_batch">>} || Topics <- Topic_list ],
+    {ok, Data2} = request_api(post, api_path(["mqtt/publish_batch"]), [], auth_header_(), Body2),
+    loop(maps:get(<<"data">>, jiffy:decode(list_to_binary(Data2), [return_maps]))),
     [ ?assert(receive
                     {publish, #{topic := Topics}} ->
                         true
@@ -455,16 +454,16 @@ pubsub(_) ->
                     end) || Topics <- Topic_list ],
 
     %% tests unsubscribe_batch
-    Body3 = [[{<<"clientid">>, ClientId}, {<<"topic">>, Topics}] || Topics <- Topic_list],
-    {ok, Data3} = request_api(post, api_path(["mqtt/unsubscribe_batch"]), [], auth_header_(),Body3),
-    loop(proplists:get_value(<<"data">>, jsx:decode(list_to_binary(Data3)))).
+    Body3 = [#{<<"clientid">> => ClientId, <<"topic">> => Topics} || Topics <- Topic_list],
+    {ok, Data3} = request_api(post, api_path(["mqtt/unsubscribe_batch"]), [], auth_header_(), Body3),
+    loop(maps:get(<<"data">>, jiffy:decode(list_to_binary(Data3), [return_maps]))).
 
 loop([]) -> [];
 
 loop(Data) ->
     [H | T] = Data,
     ct:pal("H: ~p~n", [H]),
-    ?assertEqual(0,proplists:get_value(<<"code">>, H)),
+    ?assertEqual(0, maps:get(<<"code">>, H)),
     loop(T).
 
 routes_and_subscriptions(_) ->
@@ -493,15 +492,15 @@ routes_and_subscriptions(_) ->
     {ok, _, [2]} = emqtt:subscribe(C1, Topic, qos2),
     {ok, Result} = request_api(get, api_path(["routes"]), auth_header_()),
     [Route] = get(<<"data">>, Result),
-    ?assertEqual(Topic, proplists:get_value(<<"topic">>, Route)),
+    ?assertEqual(Topic, maps:get(<<"topic">>, Route)),
 
     {ok, Result2} = request_api(get, api_path(["routes", binary_to_list(Topic)]), auth_header_()),
     [Route] = get(<<"data">>, Result2),
 
     {ok, Result3} = request_api(get, api_path(["subscriptions"]), auth_header_()),
     [Subscription] = get(<<"data">>, Result3),
-    ?assertEqual(Topic, proplists:get_value(<<"topic">>, Subscription)),
-    ?assertEqual(ClientId, proplists:get_value(<<"clientid">>, Subscription)),
+    ?assertEqual(Topic, maps:get(<<"topic">>, Subscription)),
+    ?assertEqual(ClientId, maps:get(<<"clientid">>, Subscription)),
 
     {ok, Result3} = request_api(get, api_path(["nodes", atom_to_list(node()), "subscriptions"]), auth_header_()),
 
@@ -560,5 +559,5 @@ api_path(Parts)->
 
 filter(List, Key, Value) ->
     lists:filter(fun(Item) ->
-        proplists:get_value(Key, Item) == Value
+        maps:get(Key, Item) == Value
     end, List).
