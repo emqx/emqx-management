@@ -33,7 +33,7 @@
 -export([list/2]).
 
 list(Bindings, _Params) when map_size(Bindings) == 0 ->
-    return({ok, [#{node => Node, metrics => Metrics}
+    return({ok, [#{node => Node, metrics => maps:from_list(Metrics)}
                               || {Node, Metrics} <- emqx_mgmt:get_metrics()]});
 
 list(#{node := Node}, _Params) ->
