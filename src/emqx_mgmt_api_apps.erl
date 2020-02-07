@@ -69,7 +69,7 @@ add_app(_Bindings, Params) ->
     Status = get_value(<<"status">>, Params),
     Expired = get_value(<<"expired">>, Params),
     case emqx_mgmt_auth:add_app(AppId, Name, Secret, Desc, Status, Expired) of
-        {ok, AppSecret} -> return({ok, [{secret, AppSecret}]});
+        {ok, AppSecret} -> return({ok, #{secret => AppSecret}});
         {error, Reason} -> return({error, ?ERROR2, Reason})
     end.
 
@@ -85,14 +85,14 @@ list_apps(_Bindings, _Params) ->
 lookup_app(#{appid := AppId}, _Params) ->
     case emqx_mgmt_auth:lookup_app(AppId) of
         {AppId, AppSecret, Name, Desc, Status, Expired} ->
-            return({ok, [{app_id, AppId},
-                                   {secret, AppSecret},
-                                   {name, Name},
-                                   {desc, Desc},
-                                   {status, Status},
-                                   {expired, Expired}]});
+            return({ok, #{app_id => AppId,
+                          secret => AppSecret,
+                          name => Name,
+                          desc => Desc,
+                          status => Status,
+                          expired => Expired}});
         undefined ->
-            return({ok, []})
+            return({ok, #{}})
     end.
 
 update_app(#{appid := AppId}, Params) ->

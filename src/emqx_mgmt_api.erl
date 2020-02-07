@@ -32,7 +32,7 @@ paginate(Tables, Params, RowFun) ->
     end,
     Rows = qlc:next_answers(Cursor, Limit),
     qlc:delete_cursor(Cursor),
-    #{meta  => [{page, Page}, {limit, Limit}, {count, Count}],
+    #{meta  => #{page => Page, limit => Limit, count => Count},
       data  => [RowFun(Row) || Row <- Rows]}.
 
 query_handle(Table) when is_atom(Table) ->

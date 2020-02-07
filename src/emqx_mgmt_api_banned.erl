@@ -58,7 +58,7 @@ create(_Bindings, Params) ->
         {ok, NParams} ->
             {ok, Banned} = pack_banned(NParams),
             ok = emqx_mgmt:create_banned(Banned),
-            return({ok, Params});
+            return({ok, maps:from_list(Params)});
         {error, Code, Message} -> 
             return({error, Code, Message})
     end.
