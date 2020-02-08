@@ -39,6 +39,7 @@
         , log/1
         , acl/1
         , mgmt/1
+        , reload/1
         ]).
 
 -define(PROC_INFOKEYS, [status,
@@ -143,7 +144,7 @@ broker(_) ->
                     {"broker stats",   "Show broker statistics of clients, topics, subscribers"},
                     {"broker metrics", "Show broker metrics"}]).
 
-%%-----------------------------------------------------------------------------
+%%--------------------------------------------------------------------
 %% @doc Cluster with other nodes
 
 cluster(["join", SNode]) ->
@@ -519,6 +520,20 @@ listeners(["stop", Proto, ListenOn]) ->
 listeners(_) ->
     emqx_ctl:usage([{"listeners",                        "List listeners"},
                     {"listeners stop    <Proto> <Port>", "Stop a listener"}]).
+
+%%--------------------------------------------------------------------
+%% Reload Modules
+
+reload([Module]) ->
+    case emqx_reloader:reload_module(list_to_existing_atom(Module)) of
+        {module, _Mod} ->
+            emqx_ctl:print("Reload module ~s successfully.~n", [Module]);
+        {error, Reason} ->
+            emqx_ctl:print("Failed to reload module ~s due to ~p.~n", [Module, Reason])
+    end;
+
+reload(_) ->
+    emqx_ctl:usage([{"reload <Module>", "Reload a module"}]).
 
 %%--------------------------------------------------------------------
 %% Dump ETS
