@@ -39,6 +39,6 @@ list(Bindings, _Params) when map_size(Bindings) == 0 ->
 list(#{node := Node}, _Params) ->
     case emqx_mgmt:get_metrics(Node) of
         {error, Reason} -> return({error, Reason});
-        Metrics         -> return({ok, Metrics})
+        Metrics         -> return({ok, maps:from_list(Metrics)})
     end.
 
