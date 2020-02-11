@@ -80,7 +80,7 @@ del_app(#{appid := AppId}, _Params) ->
     end.
 
 list_apps(_Bindings, _Params) ->
-    {ok, [{code, ?SUCCESS}, {data, [format(Apps)|| Apps <- emqx_mgmt_auth:list_apps()]}]}.
+    return({ok, [format(Apps)|| Apps <- emqx_mgmt_auth:list_apps()]}).
 
 lookup_app(#{appid := AppId}, _Params) ->
     case emqx_mgmt_auth:lookup_app(AppId) of
