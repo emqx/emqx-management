@@ -137,13 +137,10 @@ list_acl_cache(#{clientid := ClientId}, _Params) ->
         Caches -> return({ok, [format_acl_cache(Cache) || Cache <- Caches]})
     end.
 
-format([]) ->
-    #{};
 format(Items) when is_list(Items) ->
     [format(Item) || Item <- Items];
 format(Key) when is_tuple(Key) ->
     format(emqx_mgmt:item(client, Key));
-
 format(Data) when is_map(Data)->
     {IpAddr, Port} = maps:get(peername, Data),
     ConnectedAt = maps:get(connected_at, Data),
