@@ -91,9 +91,7 @@
         ]).
 
 %% Common Table API
--export([ count/1
-        , query_handle/1
-        , item/2
+-export([ item/2
         , max_row_limit/0
         ]).
 
@@ -117,14 +115,14 @@ node_info(Node) when Node =:= node() ->
     Memory  = emqx_vm:get_memory(),
     Info = maps:from_list([{K, list_to_binary(V)} || {K, V} <- emqx_vm:loads()]),
     BrokerInfo = emqx_sys:info(),
-    Info#{name              => node(),
+    Info#{node              => node(),
           otp_release       => iolist_to_binary(otp_rel()),
           memory_total      => get_value(allocated, Memory),
           memory_used       => get_value(used, Memory),
           process_available => erlang:system_info(process_limit),
           process_used      => erlang:system_info(process_count),
           max_fds           => get_value(max_fds, lists:usort(lists:flatten(erlang:system_info(check_io)))),
-          connections       => ets:info(emqx_conn, size),
+          connections       => ets:info(emqx_channel, size),
           node_status       => 'Running',
           uptime            => iolist_to_binary(proplists:get_value(uptime, BrokerInfo)),
           version           => iolist_to_binary(proplists:get_value(version, BrokerInfo))
@@ -147,7 +145,7 @@ lookup_broker(Node) ->
 
 broker_info(Node) when Node =:= node() ->
     Info = maps:from_list([{K, iolist_to_binary(V)} || {K, V} <- emqx_sys:info()]),
-    Info#{otp_release => iolist_to_binary(otp_rel()), node_status => 'Running'};
+    Info#{node => Node, otp_release => iolist_to_binary(otp_rel()), node_status => 'Running'};
 
 broker_info(Node) ->
     rpc_call(Node, broker_info, [Node]).
@@ -422,30 +420,6 @@ delete_banned(Who) ->
 %%--------------------------------------------------------------------
 %% Common Table API
 %%--------------------------------------------------------------------
-
-count(conns) ->
-    table_size(emqx_conn);
-
-count(sessions) ->
-    table_size(emqx_session);
-
-count(subscriptions) ->
-    table_size(emqx_suboption);
-
-count(routes) ->
-    lists:sum([table_size(Tab) || Tab <- emqx_route]).
-
-query_handle(conns) ->
-    qlc:q([Client || Client <- ets:table(emqx_conn)]);
-
-query_handle(sessions) ->
-    qlc:q([Session || Session <- ets:table(emqx_session)]);
-
-query_handle(subscriptions) ->
-    qlc:q([E || E <- ets:table(emqx_suboption)]);
-
-query_handle(routes) ->
-    qlc:append([qlc:q([E || E <- ets:table(Tab)]) || Tab <- emqx_route]).
 
 item(client, {ClientId, ChanPid}) ->
     Attrs = case emqx_cm:get_chan_info(ClientId, ChanPid) of
