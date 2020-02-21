@@ -37,7 +37,7 @@
         ]).
 
 list(_Bindings, _Params) ->
-    return({ok, [Info#{node => Node} || {Node, Info} <- emqx_mgmt:list_brokers()]}).
+    return({ok, [Info || {_Node, Info} <- emqx_mgmt:list_brokers()]}).
 
 get(#{node := Node}, _Params) ->
     case emqx_mgmt:lookup_broker(Node) of
