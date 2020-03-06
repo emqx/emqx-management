@@ -190,7 +190,8 @@ cluster(_) ->
 %% @doc ACL usage
 
 acl(["reload"]) ->
-    emqx_access_control:reload_acl();
+    emqx_access_control:reload_acl(),
+    emqx_ctl:print("ok~n");
 acl(_) ->
     emqx_ctl:usage([{"acl reload", "reload etc/acl.conf"}]).
 
@@ -205,7 +206,7 @@ clients(["show", ClientId]) ->
 
 clients(["kick", ClientId]) ->
     case emqx_cm:kick_session(bin(ClientId)) of
-        ok -> ok;
+        ok -> emqx_ctl:print("ok~n");
         _ -> emqx_ctl:print("Not Found.~n")
     end;
 
