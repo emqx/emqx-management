@@ -145,7 +145,7 @@ t_clients_cmd(_) ->
     timer:sleep(300),
     emqx_mgmt_cli:clients(["list"]),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:clients(["show", "client12"]), "client12")),
-    emqx_mgmt_cli:clients(["kick", "client12"]),
+    ?assertEqual((emqx_mgmt_cli:clients(["kick", "client12"])), "ok~n"),
     timer:sleep(500),
     ?assertMatch({match, _}, re:run(emqx_mgmt_cli:clients(["show", "client12"]), "Not Found")),
     receive
@@ -247,7 +247,7 @@ t_listeners(_) ->
 t_acl(_) ->
     ct:pal("Start testing the acl command"),
     print_mock(),
-    ?assertEqual(emqx_mgmt_cli:acl(["reload"]), ok).
+    ?assertEqual(emqx_mgmt_cli:acl(["reload"]), "ok~n").
 
 t_plugins(_) ->
     print_mock(),
