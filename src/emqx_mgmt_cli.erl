@@ -587,9 +587,9 @@ print({emqx_route, #route{topic = Topic, dest = {_, Node}}}) ->
 print({emqx_route, #route{topic = Topic, dest = Node}}) ->
     emqx_ctl:print("~s -> ~s~n", [Topic, Node]);
 
-print(#plugin{name = Name, version = Ver, descr = Descr, active = Active}) ->
-    emqx_ctl:print("Plugin(~s, version=~s, description=~s, active=~s)~n",
-                  [Name, Ver, Descr, Active]);
+print(#plugin{name = Name, descr = Descr, active = Active}) ->
+    emqx_ctl:print("Plugin(~s, description=~s, active=~s)~n",
+                  [Name, Descr, Active]);
 
 
 print({emqx_suboption, {{Pid, Topic}, Options}}) when is_pid(Pid) ->

@@ -332,39 +332,10 @@ unload_plugin(Node, Plugin) when Node =:= node() ->
 unload_plugin(Node, Plugin) ->
     rpc_call(Node, unload_plugin, [Node, Plugin]).
 
-reload_plugin(Node, Name) when Node =:= node() ->
-    try
-        Config = gen_config(Name),
-        Plugin = emqx_plugins:find_plugin(Name),
-        case Plugin#plugin.active of
-            false ->
-                load_plugin_with_config(Name, Config);
-            true ->
-                case emqx_plugins:unload(Name) of
-                    ok ->
-                        load_plugin_with_config(Name, Config);
-                    {error, Reason} ->
-                        {error, Reason}
-                end
-        end
-    catch _ : Error : Stacktrace ->
-        logger:error("[MGMT] Reload plugin crashed by error ~p, stacktrace: ~p~n", [Error, Stacktrace]),
-        {error, parse_config_file_failed}
-    end;
-
-reload_plugin(Node, Name) ->
-    rpc_call(Node, reload_plugin, [Node, Name]).
-
-gen_config(App) ->
-    Schema = cuttlefish_schema:files([filename:join([code:priv_dir(App), App]) ++ ".schema"]),
-    Conf = cuttlefish_conf:file(filename:join([emqx:get_env(plugins_etc_dir), App]) ++ ".conf"),
-    Configs = cuttlefish_generator:map(Schema, Conf),
-    proplists:get_value(App, Configs, []).
-
-load_plugin_with_config(Plugin, Config) ->
-    lists:foreach(fun({Key, _}) -> application:unset_env(Plugin, Key) end, application:get_all_env(Plugin)),
-    lists:foreach(fun({Key, Val}) -> application:set_env(Plugin, Key, Val) end, Config),
-    emqx_plugins:load(Plugin).
+reload_plugin(Node, Plugin) when Node =:= node() ->
+    emqx_plugins:reload(Plugin);
+reload_plugin(Node, Plugin) ->
+    rpc_call(Node, reload_plugin, [Node, Plugin]).
 
 %%--------------------------------------------------------------------
 %% Listeners
