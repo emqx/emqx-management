@@ -14,6 +14,10 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
+-define(APP, emqx_management).
+
+-record(app, {id, secret, enabled, expired}).
+
 %% Return Codes
 -define(SUCCESS, 0).  %% Success
 -define(ERROR1, 101). %% badrpc

@@ -16,34 +16,50 @@
 
 -module(emqx_mgmt_api_listeners).
 
--import(minirest, [return/1]).
+-export([ get/3
+        , list_listeners/2]).
 
--rest_api(#{name   => list_listeners,
-            method => 'GET',
-            path   => "/listeners/",
-            func   => list,
-            descr  => "A list of listeners in the cluster"}).
+-define(ALLOWED_METHODS, [<<"GET">>]).
 
--rest_api(#{name   => list_node_listeners,
-            method => 'GET',
-            path   => "/nodes/:atom:node/listeners",
-            func   => list,
-            descr  => "A list of listeners on the node"}).
+-http_api(#{resource => "/listeners",
+            allowed_methods => ?ALLOWED_METHODS,
+            get => #{func => get,
+                     qs => [{<<"node">>, optional, [fun emqx_mgmt_api:validate_node/1]}]}}).
 
--export([list/2]).
+get(#{<<"node">> := Node}, _, _) ->
+    case lists:member(Node, ekka_mnesia:cluster_nodes(all)) of
+        false ->
+            {200, []};
+        true ->
+            {200, list_listeners(Node)}
+    end;
+get(_, _, _) ->
+    {200, list_listeners(ekka_mnesia:running_nodes())}.
 
-%% List listeners on a node.
-list(#{node := Node}, _Params) ->
-    return({ok, format(emqx_mgmt:list_listeners(Node))});
+list_listeners(Node) when is_atom(Node) ->
+    list_listeners([Node]);
+list_listeners(Nodes) when is_list(Nodes) ->
+    list_listeners(Nodes, []).
 
-%% List listeners in the cluster.
-list(_Binding, _Params) ->
-    return({ok, [#{node => Node, listeners => format(Listeners)}
-                              || {Node, Listeners} <- emqx_mgmt:list_listeners()]}).
-
-format(Listeners) when is_list(Listeners) ->
-    [ Info#{listen_on => list_to_binary(esockd:to_string(ListenOn))}
-     || Info = #{listen_on := ListenOn} <- Listeners ];
-
-format({error, Reason}) -> [{error, Reason}].
-
+list_listeners([], Acc) ->
+    Acc;
+list_listeners([Node | More], Acc) when Node =:= node() ->
+    TCPListeners = lists:map(fun({{Protocol, ListenOn}, Pid}) ->
+                                 #{name           => Protocol,
+                                   listen_on      => list_to_binary(esockd:to_string(ListenOn)),
+                                   acceptors      => esockd:get_acceptors(Pid),
+                                   max_conns      => esockd:get_max_connections(Pid),
+                                   current_conns  => esockd:get_current_connections(Pid),
+                                   shutdown_count => maps:from_list(esockd:get_shutdown_count(Pid))}
+                    end, esockd:listeners()),
+    HTTPListeners = lists:map(fun({Protocol, Opts}) ->
+                              #{name           => Protocol,
+                                listen_on      => list_to_binary(esockd:to_string(proplists:get_value(port, Opts))),
+                                acceptors      => maps:get(num_acceptors, proplists:get_value(transport_options, Opts)),
+                                max_conns      => proplists:get_value(max_connections, Opts),
+                                current_conns  => proplists:get_value(all_connections, Opts),
+                                shutdown_count => #{}}
+                       end, ranch:info()),
+    list_listeners(More, [#{node => Node, listeners => TCPListeners ++ HTTPListeners} | Acc]);
+list_listeners(Nodes = [Node | _], Acc) ->
+    emqx_mgmt_api:remote_call(Node, list_listeners, [Nodes, Acc]).

@@ -14,15 +14,7 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(emqx_mgmt_api_routes).
+-module(emqx_mgmt_api_acl).
 
--export([get/3]).
+%% TODO
 
--http_api(#{resource => "/routes",
-            allowed_methods => [<<"GET">>],
-            get => #{qs => [{<<"topic">>, optional, [fun emqx_mgmt_api:validate_topic_filter/1]}]}}).
-
-get(#{<<"topic">> := _Topic}, _, _) ->
-    200;
-get(_, _, _) ->
-    200.

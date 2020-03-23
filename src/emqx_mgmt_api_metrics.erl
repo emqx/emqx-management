@@ -16,29 +16,35 @@
 
 -module(emqx_mgmt_api_metrics).
 
--import(minirest, [return/1]).
+-export([ get/3
+        , get_metrics/2]).
 
--rest_api(#{name   => list_all_metrics,
-            method => 'GET',
-            path   => "/metrics/",
-            func   => list,
-            descr  => "A list of metrics of all nodes in the cluster"}).
+-define(ALLOWED_METHODS, [<<"GET">>]).
 
--rest_api(#{name   => list_node_metrics,
-            method => 'GET',
-            path   => "/nodes/:atom:node/metrics/",
-            func   => list,
-            descr  => "A list of metrics of a node"}).
+-http_api(#{resource => "/metrics",
+            allowed_methods => ?ALLOWED_METHODS,
+            get => #{func => get,
+                     qs => [{<<"node">>, optional, [fun emqx_mgmt_api:validate_node/1]}]}}).
 
--export([list/2]).
+get(#{<<"node">> := Node}, _, _) ->
+    case lists:member(Node, ekka_mnesia:cluster_nodes(all)) of
+        false ->
+            Message = minirest_req:serialize("The node '~s' is not in the current cluster", [Node]),
+            {400, #{message => Message}};
+        true ->
+            {200, get_metrics(Node)}
+    end;
+get(_, _, _) ->
+    {200, get_metrics(ekka_mnesia:running_nodes())}.
 
-list(Bindings, _Params) when map_size(Bindings) == 0 ->
-    return({ok, [#{node => Node, metrics => maps:from_list(Metrics)}
-                              || {Node, Metrics} <- emqx_mgmt:get_metrics()]});
+get_metrics(Node) when is_atom(Node) ->
+    get_metrics([Node]);
+get_metrics(Nodes) when is_list(Nodes) ->
+    get_metrics(Nodes, []).
 
-list(#{node := Node}, _Params) ->
-    case emqx_mgmt:get_metrics(Node) of
-        {error, Reason} -> return({error, Reason});
-        Metrics         -> return({ok, maps:from_list(Metrics)})
-    end.
-
+get_metrics([], Acc) ->
+    Acc;
+get_metrics([Node | More], Acc) when Node =:= node() ->
+    get_metrics(More, [#{node => Node, metrics => maps:from_list(emqx_metrics:all())} | Acc]);
+get_metrics(Nodes = [Node | _], Acc) ->
+    emqx_mgmt_api:remote_call(Node, get_metrics, [Nodes, Acc]).

@@ -25,69 +25,49 @@
 
 -export([init/2]).
 
--include_lib("emqx/include/emqx.hrl").
+-include("emqx_mgmt.hrl").
 
--define(APP, emqx_management).
--define(EXCEPT_PLUGIN, [emqx_dashboard]).
--ifdef(TEST).
--define(EXCEPT, []).
--else.
--define(EXCEPT, [add_app, del_app, list_apps, lookup_app, update_app]).
--endif.
+% -include_lib("emqx/include/emqx.hrl").
+
+% -define(APP, emqx_management).
+% -define(EXCEPT_PLUGIN, [emqx_dashboard]).
+% -ifdef(TEST).
+% -define(EXCEPT, []).
+% -else.
+% -define(EXCEPT, [add_app, del_app, list_apps, lookup_app, update_app]).
+% -endif.
 
 %%--------------------------------------------------------------------
 %% Start/Stop Listeners
 %%--------------------------------------------------------------------
 
 start_listeners() ->
-    lists:foreach(fun start_listener/1, listeners()).
+    lists:foreach(fun({Proto, Port, Opts}) ->
+                      %% TODO: use map
+                      NOpts = normalize_opts([{proto, Proto},
+                                              {port, Port}] ++ Opts),
+                      Middlewares = minirest:default_middlewares() ++ [emqx_mgmt_middleware],
+                      minirest:start_listener(listener_name(Proto), NOpts, Middlewares)
+                  end, listeners()).
 
 stop_listeners() ->
-    lists:foreach(fun stop_listener/1, listeners()).
+    lists:foreach(fun({Proto, _, _}) ->
+                      minirest:stop_http(listener_name(Proto))
+                  end, listeners()).
 
-start_listener({Proto, Port, Options}) when Proto == http ->
-    Dispatch = [{"/status", emqx_mgmt_http, []},
-                {"/api/v4/[...]", minirest, http_handlers()}],
-    minirest:start_http(listener_name(Proto), ranch_opts(Port, Options), Dispatch);
-
-start_listener({Proto, Port, Options}) when Proto == https ->
-    Dispatch = [{"/status", emqx_mgmt_http, []},
-                {"/api/v4/[...]", minirest, http_handlers()}],
-    minirest:start_https(listener_name(Proto), ranch_opts(Port, Options), Dispatch).
-
-ranch_opts(Port, Options0) ->
-    NumAcceptors = get_value(num_acceptors, Options0, 4),
-    MaxConnections = get_value(max_connections, Options0, 512),
-    Options = lists:foldl(fun({K, _V}, Acc) when K =:= max_connections orelse K =:= num_acceptors ->
-                                 Acc;
-                             ({inet6, true}, Acc) -> [inet6 | Acc];
-                             ({inet6, false}, Acc) -> Acc;
-                             ({ipv6_v6only, true}, Acc) -> [{ipv6_v6only, true} | Acc];
-                             ({ipv6_v6only, false}, Acc) -> Acc;
-                             ({K, V}, Acc)->
-                                 [{K, V} | Acc]
-                          end, [], Options0),
-
-    Res = #{num_acceptors => NumAcceptors,
-            max_connections => MaxConnections,
-            socket_opts => [{port, Port} | Options]},
-    Res.
-
-stop_listener({Proto, _Port, _}) ->
-    minirest:stop_http(listener_name(Proto)).
+normalize_opts(Opts) ->
+    lists:foldl(fun({inet6, true}, Acc) -> [inet6 | Acc];
+                   ({inet6, false}, Acc) -> Acc;
+                   ({ipv6_v6only, true}, Acc) -> [{ipv6_v6only, true} | Acc];
+                   ({ipv6_v6only, false}, Acc) -> Acc;  %% Compat Windows OS
+                   ({K, V}, Acc)-> [{K, V} | Acc]
+                end, [], Opts).
 
 listeners() ->
     application:get_env(?APP, listeners, []).
 
 listener_name(Proto) ->
     list_to_atom(atom_to_list(Proto) ++ ":management").
-
-http_handlers() ->
-    Plugins = lists:map(fun(Plugin) -> Plugin#plugin.name end, emqx_plugins:list()),
-    [{"/api/v4", minirest:handler(#{apps   => Plugins -- ?EXCEPT_PLUGIN,
-                                    except => ?EXCEPT,
-                                    filter => fun filter/1}),
-                 [{authorization, fun authorize_appid/1}]}].
 
 %%--------------------------------------------------------------------
 %% Handle 'status' request
@@ -112,14 +92,14 @@ handle_request(<<"GET">>, <<"/status">>, Req) ->
 handle_request(_Method, _Path, Req) ->
     cowboy_req:reply(400, #{<<"content-type">> => <<"text/plain">>}, <<"Not found.">>, Req).
 
-authorize_appid(Req) ->
-    case cowboy_req:parse_header(<<"authorization">>, Req) of
-        {basic, AppId, AppSecret} -> emqx_mgmt_auth:is_authorized(AppId, AppSecret);
-         _  -> false
-    end.
+% authorize_appid(Req) ->
+%     case cowboy_req:parse_header(<<"authorization">>, Req) of
+%         {basic, AppId, AppSecret} -> emqx_mgmt_auth:is_authorized(AppId, AppSecret);
+%          _  -> false
+%     end.
 
-filter(#{app := App}) ->
-    case emqx_plugins:find_plugin(App) of
-        false -> false;
-        Plugin -> Plugin#plugin.active
-    end.
+% filter(#{app := App}) ->
+%     case emqx_plugins:find_plugin(App) of
+%         false -> false;
+%         Plugin -> Plugin#plugin.active
+%     end.
