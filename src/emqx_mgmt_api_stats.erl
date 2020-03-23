@@ -16,32 +16,34 @@
 
 -module(emqx_mgmt_api_stats).
 
--import(minirest, [return/1]).
+-export([ get/3
+        , get_stats/2]).
 
--rest_api(#{name   => list_stats,
-            method => 'GET',
-            path   => "/stats/",
-            func   => list,
-            descr  => "A list of stats of all nodes in the cluster"}).
+-define(ALLOWED_METHODS, [<<"GET">>]).
 
--rest_api(#{name   => lookup_node_stats,
-            method => 'GET',
-            path   => "/nodes/:atom:node/stats/",
-            func   => lookup,
-            descr  => "A list of stats of a node"}).
+-http_api(#{resource => "/stats",
+            allowed_methods => ?ALLOWED_METHODS,
+            get => #{qs => [{<<"node">>, optional, [fun emqx_mgmt_api:validate_node/1]}]}}).
 
--export([ list/2
-        , lookup/2
-        ]).
+get(#{<<"node">> := Node}, _, _) ->
+    case lists:member(Node, ekka_mnesia:cluster_nodes(all)) of
+        false ->
+            Message = minirest_req:serialize("The node '~s' is not in the current cluster", [Node]),
+            {400, #{message => Message}};
+        true ->
+            {200, get_stats(Node)}
+    end;
+get(_, _, _) ->
+    {200, get_stats(ekka_mnesia:running_nodes())}.
 
-%% List stats of all nodes
-list(Bindings, _Params) when map_size(Bindings) == 0 ->
-    return({ok, [#{node => Node, stats => maps:from_list(Stats)}
-                              || {Node, Stats} <- emqx_mgmt:get_stats()]}).
+get_stats(Node) when is_atom(Node) ->
+    get_stats([Node]);
+get_stats(Nodes) when is_list(Nodes) ->
+    get_stats(Nodes, []).
 
-%% List stats of a node
-lookup(#{node := Node}, _Params) ->
-    case emqx_mgmt:get_stats(Node) of
-        {error, Reason} -> return({error, Reason});
-        Stats -> return({ok, maps:from_list(Stats)})
-    end.
+get_stats([], Acc) ->
+    Acc;
+get_stats([Node | More], Acc) when Node =:= node() ->
+    get_stats(More, [#{node => Node, stats => maps:from_list(emqx_stats:getstats())} | Acc]);
+get_stats(Nodes = [Node | _], Acc) ->
+    emqx_mgmt_api:remote_call(Node, get_stats, [Nodes, Acc]).

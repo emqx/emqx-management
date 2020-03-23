@@ -16,148 +16,122 @@
 
 -module(emqx_mgmt_api_clients).
 
--include("emqx_mgmt.hrl").
-
--include_lib("emqx/include/emqx_mqtt.hrl").
--include_lib("emqx/include/emqx.hrl").
-
--import(minirest, [ return/0
-                  , return/1
-                  ]).
-
--rest_api(#{name   => list_clients,
-            method => 'GET',
-            path   => "/clients/",
-            func   => list,
-            descr  => "A list of clients on current node"}).
-
--rest_api(#{name   => list_node_clients,
-            method => 'GET',
-            path   => "nodes/:atom:node/clients/",
-            func   => list,
-            descr  => "A list of clients on specified node"}).
-
--rest_api(#{name   => lookup_client,
-            method => 'GET',
-            path   => "/clients/:bin:clientid",
-            func   => lookup,
-            descr  => "Lookup a client in the cluster"}).
-
--rest_api(#{name   => lookup_node_client,
-            method => 'GET',
-            path   => "nodes/:atom:node/clients/:bin:clientid",
-            func   => lookup,
-            descr  => "Lookup a client on the node"}).
-
--rest_api(#{name   => lookup_client_via_username,
-            method => 'GET',
-            path   => "/clients/username/:bin:username",
-            func   => lookup,
-            descr  => "Lookup a client via username in the cluster"
-           }).
-
--rest_api(#{name   => lookup_node_client_via_username,
-            method => 'GET',
-            path   => "/nodes/:atom:node/clients/username/:bin:username",
-            func   => lookup,
-            descr  => "Lookup a client via username on the node "
-           }).
-
--rest_api(#{name   => kickout_client,
-            method => 'DELETE',
-            path   => "/clients/:bin:clientid",
-            func   => kickout,
-            descr  => "Kick out the client in the cluster"}).
-
--rest_api(#{name   => clean_acl_cache,
-            method => 'DELETE',
-            path   => "/clients/:bin:clientid/acl_cache",
-            func   => clean_acl_cache,
-            descr  => "Clear the ACL cache of a specified client in the cluster"}).
-
--rest_api(#{name   => list_acl_cache,
-            method => 'GET',
-            path   => "/clients/:bin:clientid/acl_cache",
-            func   => list_acl_cache,
-            descr  => "List the ACL cache of a specified client in the cluster"}).
+-export([ get/3
+        , delete/3
+        ]).
 
 -import(emqx_mgmt_util, [ ntoa/1
                         , strftime/1
                         ]).
 
--export([ list/2
-        , lookup/2
-        , kickout/2
-        , clean_acl_cache/2
-        , list_acl_cache/2
-        ]).
+-http_api(#{resource => "/clients",
+            allowed_methods => [<<"GET">>],
+            get => #{qs => [{<<"username">>, optional, [nonempty]},
+                            {<<"node">>, optional, [fun emqx_mgmt_api:validate_node/1]}]}}).
 
-list(Bindings, Params) when map_size(Bindings) == 0 ->
-    list(#{node => node()}, Params);
+-http_api(#{resource => "/clients/:clientid",
+            allowed_methods => [<<"GET">>, <<"DELETE">>]}).
 
-list(#{node := Node}, Params) when Node =:= node() ->
-    return({ok, emqx_mgmt_api:paginate(emqx_channel, Params, fun format/1)});
+get(#{<<"clientid">> := ClientId}, _, _) ->
+    case lookup_client(ClientId) of
+        {error, not_found} ->
+            {404, #{message => <<"The specified client was not found">>}};
+        Client ->
+            {200, Client}
+    end;
+get(#{<<"username">> := Username, <<"node">> := Node}, _, _) ->
+    200;
+get(#{<<"username">> := Username}, _, _) ->
+    200;
+get(#{<<"node">> := Node}, _, _) ->
+    200.
 
-list(Bindings = #{node := Node}, Params) ->
-    case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
-        {badrpc, Reason} -> return({error, ?ERROR1, Reason});
-        Res -> Res
+delete(#{<<"clientid">> := ClientId}, _, _) ->
+    case emqx_cm:kick_session(ClientId) of
+        {error, not_found} ->
+            {404, #{message => <<"The specified client was not found">>}};
+        ok ->
+            204
     end.
 
-lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    return({ok, emqx_mgmt:lookup_client(Node, {clientid, http_uri:decode(ClientId)}, fun format/1)});
-
-lookup(#{clientid := ClientId}, _Params) ->
-    return({ok, emqx_mgmt:lookup_client({clientid, http_uri:decode(ClientId)}, fun format/1)});
-
-lookup(#{node := Node, username := Username}, _Params) ->
-    return({ok, emqx_mgmt:lookup_client(Node, {username, http_uri:decode(Username)}, fun format/1)});
-
-lookup(#{username := Username}, _Params) ->
-    return({ok, emqx_mgmt:lookup_client({username, http_uri:decode(Username)}, fun format/1)}).
-
-kickout(#{clientid := ClientId}, _Params) ->
-    case emqx_mgmt:kickout_client(http_uri:decode(ClientId)) of
-        ok -> return();
-        {error, not_found} -> return({error, ?ERROR12, not_found});
-        {error, Reason} -> return({error, ?ERROR1, Reason})
+lookup_client(ClientId) ->
+    case emqx_cm:lookup_channels(ClientId) of
+        [] -> {error, not_found};
+        Pids ->
+            lookup_client(ClientId, lists:last(Pids))
     end.
 
-clean_acl_cache(#{clientid := ClientId}, _Params) ->
-    case emqx_mgmt:clean_acl_cache(http_uri:decode(ClientId)) of
-        ok -> return();
-        {error, not_found} -> return({error, ?ERROR12, not_found});
-        {error, Reason} -> return({error, ?ERROR1, Reason})
+lookup_client(ClientId, ChanPid) when node(ChanPid) =:= node() ->
+    case ets:lookup(emqx_channel_info, {ClientId, ChanPid}) of
+        [] -> {error, not_found};
+        [ChanInfo] -> format(ChanInfo)
+    end;
+lookup_client(ClientId, ChanPid) ->
+    emqx_mgmt_api:remote_call(node(ChanPid), lookup_client, [ClientId, ChanPid]).
+
+% list_clients(Username) ->
+%     list_clients(ekka_mnesia:running_nodes(), Username).
+
+% list_clients(Nodes, Username) ->
+%     list_clients(Nodes, Username, []).
+
+% %% TODO: Support paginate
+% list_clients([], Username, Acc) ->
+%     Acc;
+% list_clients([Node | More], Username, Acc) when Node =:= node() ->
+%     Acc;
+% list_clients(Nodes = [Node | _], Username, Acc) ->
+%     emqx_mgmt_api:remote_call(Nodes, list_clients, [Nodes, Username, Acc]).
+
+
+format({_, Attrs, Stats}) ->
+    ClientInfo = maps:get(clientinfo, Attrs, #{}),
+    ConnInfo = maps:get(conninfo, Attrs, #{}),
+    Session = maps:get(session, Attrs, #{}),
+    ConnState = maps:with([conn_state], Attrs),
+    Fields = maps:to_list(ClientInfo) ++ maps:to_list(ConnInfo) ++ maps:to_list(Session)
+            ++ maps:to_list(ConnState) ++ [{node, node()}] ++ Stats,
+    maps:from_list(normalize_fields(Fields)).
+
+normalize_fields(Fields) ->
+    normalize_fields(Fields, []).
+
+normalize_fields([], Acc) ->
+    Acc;
+normalize_fields([{subscriptions_cnt, V} | More], Acc) ->
+    normalize_fields(More, [{subscriptions, V} | Acc]);
+normalize_fields([{subscriptions_max, V} | More], Acc) ->
+    normalize_fields(More, [{max_subscriptions, V} | Acc]);
+normalize_fields([{inflight_cnt, V} | More], Acc) ->
+    normalize_fields(More, [{inflight, V} | Acc]);
+normalize_fields([{inflight_max, V} | More], Acc) ->
+    normalize_fields(More, [{max_inflight, V} | Acc]);
+normalize_fields([{awaiting_rel_cnt, V} | More], Acc) ->
+    normalize_fields(More, [{awaiting_rel, V} | Acc]);
+normalize_fields([{awaiting_rel_max, V} | More], Acc) ->
+    normalize_fields(More, [{max_awaiting_rel, V} | Acc]);
+normalize_fields([{mqueue_max, V} | More], Acc) ->
+    normalize_fields(More, [{max_mqueue, V} | Acc]);
+normalize_fields([{conn_state, connected} | More], Acc) ->
+    normalize_fields(More, [{connected, true} | Acc]);
+normalize_fields([{conn_state, _} | More], Acc) ->
+    normalize_fields(More, [{connected, false} | Acc]);
+normalize_fields([{connected_at, ConnectedAt} | More], Acc) ->
+    normalize_fields(More, [{connected_at, iolist_to_binary(strftime(ConnectedAt))} | Acc]);
+normalize_fields([{disconnected_at, DisconnectedAt} | More], Acc) ->
+    normalize_fields(More, [{disconnected_at, iolist_to_binary(strftime(DisconnectedAt))} | Acc]);
+normalize_fields([{created_at, CreatedAt} | More], Acc) ->
+    normalize_fields(More, [{created_at, iolist_to_binary(strftime(CreatedAt))} | Acc]);
+normalize_fields([{peername, {IP, Port}} | More], Acc) ->
+    normalize_fields(More, [{ip_address, iolist_to_binary(ntoa(IP))}, {port, Port} | Acc]);
+normalize_fields([{K, V} | More], Acc) ->
+    case lists:member(K, [clientid, username, proto_name, proto_ver, clean_start, keepalive, expiry_interval,
+                          node, is_bridge, zone, mqueue_len, mqueue_dropped,
+                          recv_cnt, recv_msg, recv_oct, recv_pkt,
+                          send_cnt, send_msg, send_oct, send_pkt]) of
+        true ->
+            normalize_fields(More, [{K, V} | Acc]);
+        false ->
+            normalize_fields(More, Acc)
     end.
 
-list_acl_cache(#{clientid := ClientId}, _Params) ->
-    case emqx_mgmt:list_acl_cache(http_uri:decode(ClientId)) of
-        {error, not_found} -> return({error, ?ERROR12, not_found});
-        {error, Reason} -> return({error, ?ERROR1, Reason});
-        Caches -> return({ok, [format_acl_cache(Cache) || Cache <- Caches]})
-    end.
-
-format(Items) when is_list(Items) ->
-    [format(Item) || Item <- Items];
-format(Key) when is_tuple(Key) ->
-    format(emqx_mgmt:item(client, Key));
-format(Data) when is_map(Data)->
-    {IpAddr, Port} = maps:get(peername, Data),
-    ConnectedAt = maps:get(connected_at, Data),
-    CreatedAt = maps:get(created_at, Data),
-    Data1 = maps:without([peername], Data),
-    maps:merge(Data1#{node         => node(),
-                      ip_address   => iolist_to_binary(ntoa(IpAddr)),
-                      port         => Port,
-                      connected_at => iolist_to_binary(strftime(ConnectedAt)),
-                      created_at   => iolist_to_binary(strftime(CreatedAt))},
-               case maps:get(disconnected_at, Data, undefined) of
-                   undefined -> #{};
-                   DisconnectedAt -> #{disconnected_at => iolist_to_binary(strftime(DisconnectedAt))}
-               end).
-
-format_acl_cache({{PubSub, Topic}, {AclResult, Timestamp}}) ->
-    #{access => PubSub,
-      topic => Topic,
-      result => AclResult,
-      updated_time => Timestamp}.

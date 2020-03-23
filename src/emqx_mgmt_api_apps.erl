@@ -17,93 +17,90 @@
 -module(emqx_mgmt_api_apps).
 
 -include("emqx_mgmt.hrl").
+-include_lib("emqx/include/emqx.hrl").
 
--import(proplists, [get_value/2]).
-
--import(minirest, [ return/0
-                  , return/1
-                  ]).
-
--rest_api(#{name   => add_app,
-            method => 'POST',
-            path   => "/apps/",
-            func   => add_app,
-            descr  => "Add Application"}).
-
--rest_api(#{name   => del_app,
-            method => 'DELETE',
-            path   => "/apps/:bin:appid",
-            func   => del_app,
-            descr  => "Delete Application"}).
-
--rest_api(#{name   => list_apps,
-            method => 'GET',
-            path   => "/apps/",
-            func   => list_apps,
-            descr  => "List Applications"}).
-
--rest_api(#{name   => lookup_app,
-            method => 'GET',
-            path   => "/apps/:bin:appid",
-            func   => lookup_app,
-            descr  => "Lookup Application"}).
-
--rest_api(#{name   => update_app,
-            method => 'PUT',
-            path   => "/apps/:bin:appid",
-            func   => update_app,
-            descr  => "Update Application"}).
-
--export([ add_app/2
-        , del_app/2
-        , list_apps/2
-        , lookup_app/2
-        , update_app/2
+-export([ get/3
+        , post/3
+        , put/3
+        , delete/3
         ]).
 
-add_app(_Bindings, Params) ->
-    AppId = get_value(<<"app_id">>, Params),
-    Name = get_value(<<"name">>, Params),
-    Secret = get_value(<<"secret">>, Params),
-    Desc = get_value(<<"desc">>, Params),
-    Status = get_value(<<"status">>, Params),
-    Expired = get_value(<<"expired">>, Params),
-    case emqx_mgmt_auth:add_app(AppId, Name, Secret, Desc, Status, Expired) of
-        {ok, AppSecret} -> return({ok, #{secret => AppSecret}});
-        {error, Reason} -> return({error, ?ERROR2, Reason})
+-http_api(#{resource => "/apps",
+            allowed_methods => [<<"GET">>, <<"POST">>],
+            post => #{body => [{<<"appid">>, optional, [nonempty]},
+                               {<<"appsecret">>, optional, [nonempty]},
+                               {<<"enabled">>, {optional, true}, [bool]},
+                               {<<"expired">>, {optional, 0}, [int]}]}}).
+
+-http_api(#{resource => "/apps/:appid",
+            allowed_methods => [<<"GET">>, <<"PUT">>, <<"DELETE">>],
+            get => #{bindings => [{<<"appid">>, [nonempty]}]},
+            put => #{bindings => [{<<"appid">>, [nonempty]}],
+                     body => [{[<<"enabled">>, <<"expired">>], [at_least_one]},
+                              {<<"enabled">>, optional, [bool]},
+                              {<<"expired">>, optional, [int]}]},
+            delete => #{bindings => [{<<"appid">>, [nonempty]}]}}).
+
+get(#{<<"appid">> := AppID}, _, _) ->
+    case emqx_mgmt_auth:lookup(AppID) of
+        {error, not_found} ->
+            {404, #{message => <<"The specified application was not found">>}};
+        App ->
+            {200, format(App)}
+    end;
+get(_, _, _) ->
+    {200, format(emqx_mgmt_auth:list_apps())}.
+
+post(_, _, #{<<"appid">> := AppID,
+             <<"appsecret">> := AppSecret,
+             <<"enabled">> := Enabled,
+             <<"expired">> := Expired}) ->
+    case emqx_mgmt_auth:add_app(AppID, AppSecret, [{enabled, Enabled}, {expired, Expired}]) of
+        {ok, AppID, AppSecret} ->
+            {200, #{<<"appid">> => AppID, <<"appsecret">> => AppSecret}};
+        {error, alread_existed} ->
+            {409, #{message => <<"The specified AppID already exists">>}};
+        {error, Reason} ->
+            error(Reason)
+    end;
+post(_, _, #{<<"enabled">> := Enabled,
+             <<"expired">> := Expired}) ->
+    case emqx_mgmt_auth:add_app([{enabled, Enabled}, {expired, Expired}]) of
+        {ok, AppID, AppSecret} ->
+            {200, #{<<"appid">> => AppID, <<"appsecret">> => AppSecret}};
+        {error, Reason} ->
+            error(Reason)
     end.
 
-del_app(#{appid := AppId}, _Params) ->
-    case emqx_mgmt_auth:del_app(AppId) of
-        ok -> return();
-        {error, Reason} -> return({error, ?ERROR2, Reason})
+put(#{<<"appid">> := AppID}, _, Body) ->
+    case emqx_mgmt_auth:update_app(AppID, maps:to_list(Body)) of
+        {ok, AppID, AppSecret} ->
+            {200, #{<<"appid">> => AppID, <<"appsecret">> => AppSecret}};
+        {error, not_found} ->
+            %% TODO: Create a new application
+            {400, #{message => <<"The specified AppID was not found">>}};
+        {error, Reason} ->
+            error(Reason)
     end.
 
-list_apps(_Bindings, _Params) ->
-    return({ok, [format(Apps)|| Apps <- emqx_mgmt_auth:list_apps()]}).
-
-lookup_app(#{appid := AppId}, _Params) ->
-    case emqx_mgmt_auth:lookup_app(AppId) of
-        {AppId, AppSecret, Name, Desc, Status, Expired} ->
-            return({ok, #{app_id => AppId,
-                          secret => AppSecret,
-                          name => Name,
-                          desc => Desc,
-                          status => Status,
-                          expired => Expired}});
-        undefined ->
-            return({ok, #{}})
+delete(#{<<"appid">> := AppID}, _, _) ->
+    case emqx_mgmt_auth:delete_app(AppID) of
+        ok -> 204;
+        {error, Reason} -> error(Reason)
     end.
 
-update_app(#{appid := AppId}, Params) ->
-    Name = get_value(<<"name">>, Params),
-    Desc = get_value(<<"desc">>, Params),
-    Status = get_value(<<"status">>, Params),
-    Expired = get_value(<<"expired">>, Params),
-    case emqx_mgmt_auth:update_app(AppId, Name, Desc, Status, Expired) of
-        ok -> return();
-        {error, Reason} -> return({error, ?ERROR2, Reason})
-    end.
+format(Apps) when is_list(Apps) ->
+    [format(App) || App <- Apps];
+format(App) when is_record(App, app) ->
+    #{<<"appid">> => App#app.id,
+      <<"appsecret">> => App#app.secret,
+      <<"enabled">> => App#app.enabled,
+      <<"expired">> => App#app.expired}.
 
-format({AppId, _AppSecret, Name, Desc, Status, Expired}) ->
-    [{app_id, AppId}, {name, Name}, {desc, Desc}, {status, Status}, {expired, Expired}].
+% validate_expired(Expired) ->
+%     case Expired =< erlang:system_time(second) of
+%         true ->
+%             {error, };
+%         false ->
+
+%     end

@@ -16,30 +16,25 @@
 
 -module(emqx_mgmt_auth).
 
-%% Mnesia Bootstrap
+-include("emqx_mgmt.hrl").
+
+% Mnesia Bootstrap
 -export([mnesia/1]).
 -boot_mnesia({mnesia, [boot]}).
 -copy_mnesia({mnesia, [copy]}).
 
 %% APP Management API
--export([ add_default_app/0
+-export([ add_app/1
         , add_app/2
-        , add_app/5
-        , add_app/6
+        , add_app/3
         , lookup_app/1
-        , get_appsecret/1
         , update_app/2
-        , update_app/5
-        , del_app/1
+        , delete_app/1
         , list_apps/0
         ]).
 
 %% APP Auth/ACL API
 -export([is_authorized/2]).
-
--define(APP, emqx_management).
-
--record(mqtt_app, {id, secret, name, desc, status, expired}).
 
 -type(appid() :: binary()).
 
@@ -50,96 +45,84 @@
 %%--------------------------------------------------------------------
 
 mnesia(boot) ->
-    ok = ekka_mnesia:create_table(mqtt_app, [
+    ok = ekka_mnesia:create_table(app, [
                 {disc_copies, [node()]},
-                {record_name, mqtt_app},
-                {attributes, record_info(fields, mqtt_app)}]);
+                {record_name, app},
+                {attributes, record_info(fields, app)}]);
 
 mnesia(copy) ->
-    ok = ekka_mnesia:copy_table(mqtt_app, disc_copies).
+    ok = ekka_mnesia:copy_table(app, disc_copies).
 
 %%--------------------------------------------------------------------
 %% Manage Apps
 %%--------------------------------------------------------------------
--spec(add_default_app() -> ok | {ok, appsecret()} | {error, term()}).
-add_default_app() ->
-    AppId = application:get_env(?APP, default_application_id, undefined),
-    AppSecret = application:get_env(?APP, default_application_secret, undefined),
-    case {AppId, AppSecret} of
-        {undefined, _} -> ok;
-        {_, undefined} -> ok;
-        {_, _} ->
-            AppId1 = erlang:list_to_binary(AppId),
-            AppSecret1 = erlang:list_to_binary(AppSecret),
-            add_app(AppId1, <<"Default">>, AppSecret1, <<"Application user">>, true, undefined)
-    end.
+% -spec(add_default_app() -> ok | {ok, appsecret()} | {error, term()}).
+% add_default_app() ->
+%     AppID = application:get_env(?APP, default_application_id, undefined),
+%     AppSecret = application:get_env(?APP, default_application_secret, undefined),
+%     case {AppID, AppSecret} of
+%         {undefined, _} -> ok;
+%         {_, undefined} -> ok;
+%         {_, _} ->
+%             AppId1 = erlang:list_to_binary(AppID),
+%             AppSecret1 = erlang:list_to_binary(AppSecret),
+%             add_app(AppId1, <<"Default">>, AppSecret1, <<"Application user">>, true, undefined)
+%     end.
 
--spec(add_app(appid(), binary()) -> {ok, appsecret()} | {error, term()}).
-add_app(AppId, Name) when is_binary(AppId) ->
-    add_app(AppId, Name, <<"Application user">>, true, undefined).
+add_app(Opts) when is_list(Opts) ->
+    AddID = genrate_appid(),
+    %% TODO: Check is appid existing
+    AppSecret = genrate_appsecret(),
+    add_app(AddID, AppSecret, Opts).
 
--spec(add_app(appid(), binary(), binary(), boolean(), integer() | undefined)
-      -> {ok, appsecret()}
-       | {error, term()}).
-add_app(AppId, Name, Desc, Status, Expired) when is_binary(AppId) ->
-    add_app(AppId, Name, undefined, Desc, Status, Expired).
+add_app(AppID, AppSecret) when is_binary(AppID) andalso is_binary(AppSecret) ->
+    add_app(AppID, AppSecret, default_opts()).
 
--spec(add_app(appid(), binary(), binary(), binary(), boolean(), integer() | undefined)
-      -> {ok, appsecret()}
-       | {error, term()}).
-add_app(AppId, Name, Secret, Desc, Status, Expired) when is_binary(AppId) ->
-    Secret1 = generate_appsecret_if_need(Secret),
-    App = #mqtt_app{id = AppId,
-                    secret = Secret1,
-                    name = Name,
-                    desc = Desc,
-                    status = Status,
-                    expired = Expired},
+add_app(AppID, AppSecret, Opts) ->
+    NOpts = lists:ukeymerge(1, Opts, default_opts()),
+    App = #app{id = AppID,
+               secret = AppSecret,
+               enabled = enabled(NOpts),
+               expired = expired(NOpts)},
     AddFun = fun() ->
-                 case mnesia:wread({mqtt_app, AppId}) of
+                 case mnesia:wread({app, AppID}) of
                      [] -> mnesia:write(App);
                      _  -> mnesia:abort(alread_existed)
                  end
              end,
     case mnesia:transaction(AddFun) of
-        {atomic, ok} -> {ok, Secret1};
+        {atomic, ok} -> {ok, AppID, AppSecret};
         {aborted, Reason} -> {error, Reason}
     end.
 
--spec(generate_appsecret_if_need(binary() | undefined) -> binary()).
-generate_appsecret_if_need(InSecrt) when is_binary(InSecrt), byte_size(InSecrt) > 0 ->
-    InSecrt;
-generate_appsecret_if_need(_) ->
-    AppConf = application:get_env(?APP, application, []),
-    case proplists:get_value(default_secret,  AppConf) of
-       undefined -> emqx_guid:to_base62(emqx_guid:gen());
-       Secret when is_binary(Secret) -> Secret
-    end.
+genrate_appid() ->
+    <<>>.
 
--spec(get_appsecret(appid()) -> {appsecret() | undefined}).
-get_appsecret(AppId) when is_binary(AppId) ->
-    case mnesia:dirty_read(mqtt_app, AppId) of
-        [#mqtt_app{secret = Secret}] -> Secret;
-        [] -> undefined
-    end.
+genrate_appsecret() ->
+    <<>>.
+
+default_opts() ->
+    [{enabled, true}, {expired, 0}].
+
+enabled(Opts) ->
+    proplists:get_value(enabled, Opts).
+
+expired(Opts) ->
+    proplists:get_value(expired, Opts).
 
 -spec(lookup_app(appid()) -> {{appid(), appsecret(), binary(), binary(), boolean(), integer() | undefined} | undefined}).
-lookup_app(AppId) when is_binary(AppId) ->
-    case mnesia:dirty_read(mqtt_app, AppId) of
-        [#mqtt_app{id = AppId,
-                   secret = AppSecret,
-                   name = Name,
-                   desc = Desc,
-                   status = Status,
-                   expired = Expired}] -> {AppId, AppSecret, Name, Desc, Status, Expired};
-        [] -> undefined
+lookup_app(AppID) when is_binary(AppID) ->
+    case mnesia:dirty_read(app, AppID) of
+        [App] -> App;
+        [] -> {error, not_found}
     end.
 
--spec(update_app(appid(), boolean()) -> ok | {error, term()}).
-update_app(AppId, Status) ->
-    case mnesia:dirty_read(mqtt_app, AppId) of
-        [App = #mqtt_app{}] ->
-            case mnesia:transaction(fun() -> mnesia:write(App#mqtt_app{status = Status}) end) of
+update_app(AppID, Opts) ->
+    case mnesia:dirty_read(app, AppID) of
+        [App = #app{}] ->
+            NApp = App#app{enabled = proplists:get_value(enabled, Opts, App#app.enabled),
+                           expired = proplists:get_value(expired, Opts, App#app.expired)},
+            case mnesia:transaction(fun() -> mnesia:write(NApp) end) of
                 {atomic, ok} -> ok;
                 {aborted, Reason} -> {error, Reason}
             end;
@@ -147,49 +130,32 @@ update_app(AppId, Status) ->
             {error, not_found}
     end.
 
--spec(update_app(appid(), binary(), binary(), boolean(), integer() | undefined) -> ok | {error, term()}).
-update_app(AppId, Name, Desc, Status, Expired) ->
-    case mnesia:dirty_read(mqtt_app, AppId) of
-        [App = #mqtt_app{}] ->
-            case mnesia:transaction(fun() -> mnesia:write(App#mqtt_app{name = Name,
-                                                                       desc = Desc,
-                                                                       status = Status,
-                                                                       expired = Expired}) end) of
-                {atomic, ok} -> ok;
-                {aborted, Reason} -> {error, Reason}
-            end;
-        [] ->
-            {error, not_found}
-    end.
-
--spec(del_app(appid()) -> ok | {error, term()}).
-del_app(AppId) when is_binary(AppId) ->
-    case mnesia:transaction(fun mnesia:delete/1, [{mqtt_app, AppId}]) of
-        {atomic, Ok} -> Ok;
+delete_app(AppID) ->
+    case mnesia:transaction(fun mnesia:delete/1, [{app, AppID}]) of
+        {atomic, ok} -> ok;
         {aborted, Reason} -> {error, Reason}
     end.
 
--spec(list_apps() -> [{appid(), appsecret(), binary(), binary(), boolean(), integer() | undefined}]).
+
+% -spec(list_apps() -> [{appid(), appsecret(), binary(), binary(), boolean(), integer() | undefined}]).
 list_apps() ->
-    [ {AppId, AppSecret, Name, Desc, Status, Expired} || #mqtt_app{id = AppId,
-                                                                   secret = AppSecret,
-                                                                   name = Name,
-                                                                   desc = Desc,
-                                                                   status = Status,
-                                                                   expired = Expired} <- ets:tab2list(mqtt_app) ].
+    ets:tab2list(app).
+
 %%--------------------------------------------------------------------
 %% Authenticate App
 %%--------------------------------------------------------------------
 
 -spec(is_authorized(appid(), appsecret()) -> boolean()).
-is_authorized(AppId, AppSecret) ->
-    case lookup_app(AppId) of
-        {_, AppSecret1, _, _, Status, Expired} ->
-            Status andalso is_expired(Expired) andalso AppSecret =:= AppSecret1;
+is_authorized(AppID, AppSecret) ->
+    case lookup_app(AppID) of
+        #app{secret = AppSecret0, enabled = Enabled, expired = Expired} ->
+            Enabled andalso is_not_expired(Expired) andalso AppSecret =:= AppSecret0;
         _ ->
             false
     end.
 
-is_expired(undefined) -> true;
-is_expired(Expired)   -> Expired >= erlang:system_time(second).
+is_not_expired(0) ->
+    true;
+is_not_expired(Expired) ->
+    Expired >= erlang:system_time(second).
 

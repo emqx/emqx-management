@@ -16,104 +16,130 @@
 
 -module(emqx_mgmt_api_plugins).
 
--include("emqx_mgmt.hrl").
-
 -include_lib("emqx/include/emqx.hrl").
 
--import(minirest, [return/1]).
-
--rest_api(#{name   => list_all_plugins,
-            method => 'GET',
-            path   => "/plugins/",
-            func   => list,
-            descr  => "List all plugins in the cluster"}).
-
--rest_api(#{name   => list_node_plugins,
-            method => 'GET',
-            path   => "/nodes/:atom:node/plugins/",
-            func   => list,
-            descr  => "List all plugins on a node"}).
-
--rest_api(#{name   => load_node_plugin,
-            method => 'PUT',
-            path   => "/nodes/:atom:node/plugins/:atom:plugin/load",
-            func   => load,
-            descr  => "Load a plugin"}).
-
--rest_api(#{name   => unload_node_plugin,
-            method => 'PUT',
-            path   => "/nodes/:atom:node/plugins/:atom:plugin/unload",
-            func   => unload,
-            descr  => "Unload a plugin"}).
-
--rest_api(#{name   => reload_node_plugin,
-            method => 'PUT',
-            path   => "/nodes/:atom:node/plugins/:atom:plugin/reload",
-            func   => reload,
-            descr  => "Reload a plugin"}).
-
--rest_api(#{name   => unload_plugin,
-            method => 'PUT',
-            path   => "/plugins/:atom:plugin/unload",
-            func   => unload,
-            descr  => "Unload a plugin in the cluster"}).
-
--rest_api(#{name   => reload_plugin,
-            method => 'PUT',
-            path   => "/plugins/:atom:plugin/reload",
-            func   => reload,
-            descr  => "Reload a plugin in the cluster"}).
-
--export([ list/2
-        , load/2
-        , unload/2
-        , reload/2
+-export([ get/3
+        , put/3
         ]).
 
-list(#{node := Node}, _Params) ->
-    return({ok, [format(Plugin) || Plugin <- emqx_mgmt:list_plugins(Node)]});
+-export([validate_operation/1]).
 
-list(_Bindings, _Params) ->
-    return({ok, [format({Node, Plugins}) || {Node, Plugins} <- emqx_mgmt:list_plugins()]}).
+-export([ list_plugins/2
+        , operate/4]).
 
-load(#{node := Node, plugin := Plugin}, _Params) ->
-    return(emqx_mgmt:load_plugin(Node, Plugin)).
+-http_api(#{resource => "/plugins",
+            allowed_methods => [<<"GET">>, <<"PUT">>],
+            get => #{qs => [{<<"node">>, optional, [fun emqx_mgmt_api:validate_node/1]}]},
+            put => #{qs => [{<<"name">>, [atom]},
+                            {<<"node">>, optional, [fun emqx_mgmt_api:validate_node/1]}],
+                     body => [{<<"operation">>, [atom, fun ?MODULE:validate_operation/1]}]}}).
 
-unload(#{node := Node, plugin := Plugin}, _Params) ->
-    return(emqx_mgmt:unload_plugin(Node, Plugin));
+get(#{<<"node">> := Node}, _, _) ->
+    case lists:member(Node, ekka_mnesia:cluster_nodes(all)) of
+        false ->
+            {200, []};
+        true ->
+            {200, list_plugins(Node)}
+    end;
+get(_, _, _) ->
+    {200, list_plugins(ekka_mnesia:running_nodes())}.
 
-unload(#{plugin := Plugin}, _Params) ->
-    Results = [emqx_mgmt:unload_plugin(Node, Plugin) || {Node, _Info} <- emqx_mgmt:list_nodes()],
-    case lists:filter(fun(Item) -> Item =/= ok end, Results) of
-        [] ->
-            return(ok);
-        Errors ->
-            return(lists:last(Errors))
+put(#{<<"name">> := Name,
+      <<"node">> := Node}, _, #{<<"operation">> := Operation}) ->
+    case operate(Node, Operation, Name) of
+        #{success := 0} = Details ->
+            {400, #{message => <<"Failed to complete operation">>,
+                    details => Details}};
+        _ ->
+            204
+    end;
+put(#{<<"name">> := Name}, _, #{<<"operation">> := Operation}) ->
+    case operate(Operation, Name) of
+        #{success := 0} = Details ->
+            {400, #{message => <<"Failed to complete operation">>,
+                    details => Details}};
+        #{failed := 0} -> 204;
+        Details ->
+            {400, #{message => <<"Failed to complete all operations">>,
+                    details => Details}}
     end.
 
-reload(#{node := Node, plugin := Plugin}, _Params) ->
-    return(emqx_mgmt:reload_plugin(Node, Plugin));
+list_plugins(Node) when is_atom(Node) ->
+    list_plugins([Node]);
+list_plugins(Nodes) when is_list(Nodes) ->
+    list_plugins(Nodes, []).
 
-reload(#{plugin := Plugin}, _Params) ->
-    Results = [emqx_mgmt:reload_plugin(Node, Plugin) || {Node, _Info} <- emqx_mgmt:list_nodes()],
-    case lists:filter(fun(Item) -> Item =/= ok end, Results) of
-        [] ->
-            return(ok);
-        Errors ->
-            return(lists:last(Errors))
+list_plugins([], Acc) ->
+    Acc;
+list_plugins([Node | More], Acc) when Node =:= node() ->
+    list_plugins(More, [#{node => Node, plugins => format(emqx_plugins:list())} | Acc]);
+list_plugins(Nodes = [Node | _], Acc) ->
+    emqx_mgmt_api:remote_call(Node, list_plugins, [Nodes, Acc]).
+
+format(Plugins) ->
+    format(Plugins, []).
+
+format([], Acc) ->
+    Acc;
+format([#plugin{name = Name, descr = Descr, active = Active, type = Type} | More], Acc) ->
+    NAcc = [#{name        => Name,
+              description => iolist_to_binary(Descr),
+              active      => Active,
+              type        => Type} | Acc],
+    format(More, NAcc).
+
+operate(Operation, Name) ->
+    operate(ekka_mnesia:running_nodes(), Operation, Name).
+
+operate(Node, Operation, Name) when is_atom(Node) ->
+    operate([Node], Operation, Name);
+operate(Nodes, Operation, Name) when is_list(Nodes) ->
+    operate(Nodes, Operation, Name, #{success => 0, failed => 0, errors => []}).
+
+operate([], _, _, Acc) ->
+    Acc;
+operate([Node | More], Operation, Name, #{success := Success,
+                                          failed := Failed,
+                                          errors := Errors} = Acc) when Node =:= node() ->
+    case Operation(Name) of
+        ok ->
+            operate(More, Operation, Name, Acc#{success := Success + 1});
+        {error, Error} ->
+            NErrors = [#{data => #{<<"operation">> => Operation,
+                                   <<"name">> => Name,
+                                   <<"node">> => Node}, error => Error} | Errors],
+            operate(More, Operation, Name, Acc#{failed := Failed + 1, errors := NErrors})
+    end;
+operate(Nodes = [Node | _], Operation, Name, Acc) ->
+    emqx_mgmt_api:remote_call(Node, operate, [Nodes, Operation, Name, Acc]).
+
+load(Name) ->
+    case emqx_plugin:load(Name) of
+        ok -> ok;
+        {error, already_started} -> ok;
+        {error, not_found} -> {error, <<"The specified plugin was not found">>};
+        {error, Reason} -> {error, minirest_req:serialize("Failed to load plugin due to ~p", [Reason])}
     end.
 
-format({Node, Plugins}) ->
-    #{node => Node, plugins => [format(Plugin) || Plugin <- Plugins]};
+unload(Name) ->
+    case emqx_plugin:unload(Name) of
+        ok -> ok;
+        {error, not_started} -> ok;
+        {error, not_found} -> {error, <<"The specified plugin was not found">>};
+        {error, Reason} -> {error, minirest_req:serialize("Failed to unload plugin due to ~p", [Reason])}
+    end.
 
-format(#plugin{name = Name,
-               version = Ver,
-               descr = Descr,
-               active = Active,
-               type = Type}) ->
-    #{name => Name,
-      version => iolist_to_binary(Ver),
-      description => iolist_to_binary(Descr),
-      active => Active,
-      type => Type}.
+reload(Name) ->
+    ok.
+    % case emqx_plugin:reload(Name) of
+    %     ok -> ok;
+    %     {error, not_started} -> ok;
+    %     {error, not_found} -> {error, <<"The specified plugin was not found">>};
+    %     {error, Reason} -> {error, minirest_req:serialize("Failed to unload plugin due to ~p", [Reason])}
+    % end.
 
+validate_operation(Operation) ->
+    case minirest:within(Operation, [load, unload, reload]) of
+        true -> ok;
+        false -> {error, not_valid_operation}
+    end.

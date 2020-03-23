@@ -16,76 +16,147 @@
 
 -module(emqx_mgmt_api_subscriptions).
 
--include_lib("emqx/include/emqx.hrl").
-
--import(minirest, [return/1]).
-
--rest_api(#{name   => list_subscriptions,
-            method => 'GET',
-            path   => "/subscriptions/",
-            func   => list,
-            descr  => "A list of subscriptions in the cluster"}).
-
--rest_api(#{name   => list_node_subscriptions,
-            method => 'GET',
-            path   => "/nodes/:atom:node/subscriptions/",
-            func   => list,
-            descr  => "A list of subscriptions on a node"}).
-
--rest_api(#{name   => lookup_client_subscriptions,
-            method => 'GET',
-            path   => "/subscriptions/:bin:clientid",
-            func   => lookup,
-            descr  => "A list of subscriptions of a client"}).
-
--rest_api(#{name   => lookup_client_subscriptions_with_node,
-            method => 'GET',
-            path   => "/nodes/:atom:node/subscriptions/:bin:clientid",
-            func   => lookup,
-            descr  => "A list of subscriptions of a client on the node"}).
-
--export([ list/2
-        , lookup/2
+-export([ get/3
+        , post/3
+        , delete/3
         ]).
 
-list(Bindings, Params) when map_size(Bindings) == 0 ->
-    %%TODO: across nodes?
-    list(#{node => node()}, Params);
+-export([ validate_qos/1
+        , validate_nl/1
+        , validate_rap/1
+        , validate_rh/1
+        ]).
 
-list(#{node := Node}, Params) when Node =:= node() ->
-    return({ok, emqx_mgmt_api:paginate(emqx_suboption, Params, fun format/1)});
+-export([ do_subscribe/3
+        , do_unsubscribe/3
+        ]).
 
-list(#{node := Node} = Bindings, Params) ->
-    case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
-        {badrpc, Reason} -> return({error, Reason});
-        Res -> Res
+-http_api(#{resource => "/subscriptions",
+            allowed_methods => [<<"GET">>, <<"POST">>, <<"DELETE">>],
+            get => #{qs => [{[<<"clientid">>, <<"node">>], [at_most_one]},
+                            {<<"clientid">>, optional, [nonempty]},
+                            {<<"node">>, optional, [fun emqx_mgmt_api:validate_node/1]}]},
+            post => #{body => [{<<"clientid">>, [nonempty]},
+                               {<<"topic">>, [fun emqx_mgmt_api:validate_topic_filter/1]},
+                               {<<"qos">>, {optional, 0}, [int, fun ?MODULE:validate_qos/1]},
+                               {<<"nl">>, {optional, 0}, [int, fun ?MODULE:validate_nl/1]},
+                               {<<"rap">>, {optional, 0}, [int, fun ?MODULE:validate_rap/1]},
+                               {<<"rh">>, {optional, 0}, [int, fun ?MODULE:validate_rh/1]}]},
+            delete => #{qs => [{<<"clientid">>, [nonempty]},
+                               {<<"topic">>, [fun emqx_mgmt_api:validate_topic_filter/1]}]}}).
+
+get(_, _, _) ->
+    200.
+
+post(_, _, Body) ->
+    case subscribe(Body) of
+        [] ->
+            201;
+        Details ->
+            {400, #{message => <<"Failed to complete all operations">>,
+                    details => Details}}
+    end.  
+
+delete(Params, _, _) ->
+    case unsubscribe(Params) of
+        [] ->
+            204;
+        Details ->
+            {400, #{message => <<"Failed to complete all operations">>,
+                    details => Details}}
+    end.  
+
+subscribe(RawData) when is_map(RawData) ->
+    subscribe([RawData], []).
+
+subscribe([], Acc) ->
+    Acc;
+subscribe([#{<<"clientid">> := ClientId,
+             <<"topic">> := Topic,
+             <<"qos">> := QoS,
+             <<"nl">> := NoLocal,
+             <<"rap">> := RetainAsPublished,
+             <<"rh">> := RetainHandling} = Data | More], Acc) ->
+    case do_subscribe(ClientId, {Topic, #{qos => QoS,
+                                          nl => NoLocal,
+                                          rap => RetainAsPublished,
+                                          rh => RetainHandling}}) of
+        {error, not_found} ->
+            NAcc = [#{data => Data,
+                      error => <<"The specified client was not found">>} | Acc],
+            subscribe(More, NAcc);
+        ok ->
+            subscribe(More, Acc)
     end.
 
-lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    case ets:lookup(emqx_subid, http_uri:decode(ClientId)) of
-        [] ->
-            return({ok, []});
-        [{_, Pid}] ->
-            return({ok, format(emqx_mgmt:lookup_subscriptions(Node, Pid))})
-    end;
-
-lookup(#{clientid := ClientId}, _Params) ->
-    case ets:lookup(emqx_subid, http_uri:decode(ClientId)) of
-        [] ->
-            return({ok, []});
-        [{_, Pid}] ->
-            return({ok, format(emqx_mgmt:lookup_subscriptions(Pid))})
+do_subscribe(ClientId, Subscriptions) ->
+    case emqx_cm:lookup_channels(ClientId) of
+        [] -> {error, not_found};
+        Pids ->
+            do_subscribe(ClientId, lists:last(Pids), Subscriptions)
     end.
 
-format(Items) when is_list(Items) ->
-    [format(Item) || Item <- Items];
+do_subscribe(_ClientId, ChanPid, Subscriptions) when node(ChanPid) =:= node() ->
+    ChanPid ! {subscribe, Subscriptions};
+do_subscribe(ClientId, ChanPid, Subscriptions) ->
+    emqx_mgmt_api:remote_call(node(ChanPid), do_subscribe, [ClientId, ChanPid, Subscriptions]).
 
-format({{Subscriber, Topic}, Options}) ->
-    format({Subscriber, Topic, Options});
+unsubscribe(RawData) when is_map(RawData) ->
+    unsubscribe([RawData], []).
 
-format({_Subscriber, Topic, Options = #{share := Group}}) ->
-    QoS = maps:get(qos, Options),
-    #{node => node(), topic => filename:join([<<"$share">>, Group, Topic]), clientid => maps:get(subid, Options), qos => QoS};
-format({_Subscriber, Topic, Options}) ->
-    QoS = maps:get(qos, Options),
-    #{node => node(), topic => Topic, clientid => maps:get(subid, Options), qos => QoS}.
+unsubscribe([], Acc) ->
+    Acc;
+unsubscribe([#{<<"clientid">> := ClientId,
+               <<"topic">> := Topic} = Data | More], Acc) ->
+    case do_unsubscribe(ClientId, Topic) of
+        {error, not_found} ->
+            NAcc = [#{data => Data,
+                      error => <<"The specified client was not found">>} | Acc],
+            unsubscribe(More, NAcc);
+        ok ->
+            unsubscribe(More, Acc)
+    end.
+
+do_unsubscribe(ClientId, Topic) ->
+    case emqx_cm:lookup_channels(ClientId) of
+        [] -> {error, not_found};
+        Pids ->
+            do_unsubscribe(ClientId, lists:last(Pids), Topic)
+    end.
+
+do_unsubscribe(_ClientId, ChanPid, Topic) when node(ChanPid) =:= node() ->
+    ChanPid ! {unsubscribe, Topic};
+do_unsubscribe(ClientId, ChanPid, Topic) ->
+    emqx_mgmt_api:remote_call(node(ChanPid), do_unsubscribe, [ClientId, ChanPid, Topic]).
+
+validate_qos(0) ->
+    ok;
+validate_qos(1) ->
+    ok;
+validate_qos(2) ->
+    ok;
+validate_qos(_) ->
+    {error, not_valid_qos}.
+
+validate_nl(0) ->
+    ok;
+validate_nl(1) ->
+    ok;
+validate_nl(_) ->
+    {error, not_valid_nl}.
+
+validate_rap(0) ->
+    ok;
+validate_rap(1) ->
+    ok;
+validate_rap(_) ->
+    {error, not_valid_rap}.
+
+validate_rh(0) ->
+    ok;
+validate_rh(1) ->
+    ok;
+validate_rh(2) ->
+    ok;
+validate_rh(_) ->
+    {error, not_valid_rh}.
