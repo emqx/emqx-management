@@ -81,7 +81,7 @@ node_query(Node, Params, QsSchema, RowFun) ->
     {_, _NStart, Rows} = do_query(Node, TabQs, Start, Limit+1),
     Meta = #{page => Page, limit => Limit},
     NMeta = case is_empty_qs(TabQs) of
-                true -> Meta#{count => count(Tab), hasnext => length(Rows) - Limit};
+                true -> Meta#{count => count(Tab), hasnext => length(Rows) > Limit};
                _ -> Meta#{count => -1, hasnext => length(Rows) > Limit}
             end,
     #{meta => NMeta, data => [RowFun(Row) || Row <- lists:sublist(Rows, Limit)]}.
