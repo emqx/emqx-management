@@ -20,13 +20,13 @@
 
 -rest_api(#{name   => list_all_metrics,
             method => 'GET',
-            path   => "/metrics/",
+            path   => "/metrics",
             func   => list,
             descr  => "A list of metrics of all nodes in the cluster"}).
 
 -rest_api(#{name   => list_node_metrics,
             method => 'GET',
-            path   => "/nodes/:atom:node/metrics/",
+            path   => "/nodes/:atom:node/metrics",
             func   => list,
             descr  => "A list of metrics of a node"}).
 
