@@ -251,6 +251,10 @@ t_acl(_) ->
 
 t_plugins(_) ->
     print_mock(),
+    meck:new(emqx_plugins, [non_strict, passthrough]),
+    meck:expect(emqx_plugins, load, fun(_) -> ok end),
+    meck:expect(emqx_plugins, unload, fun(_) -> ok end),
+    meck:expect(emqx_plugins, reload, fun(_) -> ok end),
     ?assertEqual(emqx_mgmt_cli:plugins(["list"]), ok),
     ?assertEqual(emqx_mgmt_cli:plugins(["unload", "emqx_reloader"]), "Plugin emqx_reloader unloaded successfully.\n"),
     ?assertEqual(emqx_mgmt_cli:plugins(["load", "emqx_reloader"]),"Plugin emqx_reloader loaded successfully.\n"),

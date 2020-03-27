@@ -330,7 +330,7 @@ plugins(_) ->
                                  auth_header_()),
     [Plugin3] = filter(get(<<"data">>, Plugins3), <<"name">>, <<"emqx_reloader">>),
     ?assertEqual(<<"emqx_reloader">>, maps:get(<<"name">>, Plugin3)),
-    ?assertEqual(true, maps:get(<<"active">>, Plugin3)),
+    ?assertEqual(false, maps:get(<<"active">>, Plugin3)),
 
     {ok, _} = request_api(put,
                           api_path(["nodes",

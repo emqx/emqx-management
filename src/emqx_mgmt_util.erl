@@ -20,6 +20,7 @@
         , datetime/1
         , kmg/1
         , ntoa/1
+        , merge_maps/2
         ]).
 
 -define(KB, 1024).
@@ -62,3 +63,11 @@ ntoa({0,0,0,0,0,16#ffff,AB,CD}) ->
 ntoa(IP) ->
     inet_parse:ntoa(IP).
 
+merge_maps(Default, New) ->
+    maps:fold(fun(K, V, Acc) ->
+        case maps:get(K, Acc, undefined) of
+            OldV when is_map(OldV),
+                      is_map(V) -> Acc#{K => merge_maps(OldV, V)};
+            _ -> Acc#{K => V}
+        end
+    end, Default, New).
