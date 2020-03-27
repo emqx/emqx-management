@@ -174,7 +174,7 @@ get_topic_metrics(Topic) ->
     [{Node, get_topic_metrics(Node, Topic)} || Node <- ekka_mnesia:running_nodes()].
 
 get_topic_metrics(Node, Topic) when Node =:= node() ->
-    emqx_topic_metrics:metrics(Topic);
+    emqx_mod_topic_metrics:metrics(Topic);
 get_topic_metrics(Node, Topic) ->
     rpc_call(Node, get_topic_metrics, [Node, Topic]).
 
@@ -182,7 +182,7 @@ register_topic_metrics(Topic) ->
     [{Node, register_topic_metrics(Node, Topic)} || Node <- ekka_mnesia:running_nodes()].
 
 register_topic_metrics(Node, Topic) when Node =:= node() ->
-    emqx_topic_metrics:register(Topic);
+    emqx_mod_topic_metrics:register(Topic);
 register_topic_metrics(Node, Topic) ->
     rpc_call(Node, register_topic_metrics, [Node, Topic]).
 
@@ -190,7 +190,7 @@ unregister_topic_metrics(Topic) ->
     [{Node, unregister_topic_metrics(Node, Topic)} || Node <- ekka_mnesia:running_nodes()].
 
 unregister_topic_metrics(Node, Topic) when Node =:= node() ->
-    emqx_topic_metrics:unregister(Topic);
+    emqx_mod_topic_metrics:unregister(Topic);
 unregister_topic_metrics(Node, Topic) ->
     rpc_call(Node, unregister_topic_metrics, [Node, Topic]).
 
@@ -198,7 +198,7 @@ unregister_all_topic_metrics() ->
     [unregister_all_topic_metrics(Node) || Node <- ekka_mnesia:running_nodes()], ok.
 
 unregister_all_topic_metrics(Node) when Node =:= node() ->
-    emqx_topic_metrics:unregister_all();
+    emqx_mod_topic_metrics:unregister_all();
 unregister_all_topic_metrics(Node) ->
     rpc_call(Node, unregister_topic_metrics, [Node]).
 
