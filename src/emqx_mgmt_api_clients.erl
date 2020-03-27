@@ -25,6 +25,22 @@
                   , return/1
                   ]).
 
+-define(CLIENT_QS_SCHEMA, {emqx_channel_info,
+          [{<<"clientid">>, binary},
+           {<<"username">>, binary},
+           {<<"zone">>, atom},
+           {<<"ip_address">>, ip},
+           {<<"conn_state">>, atom},
+           {<<"clean_start">>, atom},
+           {<<"proto_name">>, binary},
+           {<<"proto_ver">>, integer},
+           {<<"_like_clientid">>, binary},
+           {<<"_like_username">>, binary},
+           {<<"_gte_created_at">>, timestamp},
+           {<<"_lte_created_at">>, timestamp},
+           {<<"_gte_connected_at">>, timestamp},
+           {<<"_lte_connected_at">>, timestamp}], fun qs2ms/1}).
+
 -rest_api(#{name   => list_clients,
             method => 'GET',
             path   => "/clients/",
@@ -93,10 +109,10 @@
         ]).
 
 list(Bindings, Params) when map_size(Bindings) == 0 ->
-    list(#{node => node()}, Params);
+    return({ok, emqx_mgmt_api:cluster_query(Params, ?CLIENT_QS_SCHEMA, fun format/1)});
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    return({ok, emqx_mgmt_api:paginate(emqx_channel, Params, fun format/1)});
+    return({ok, emqx_mgmt_api:node_query(Node, Params, ?CLIENT_QS_SCHEMA, fun format/1)});
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
@@ -137,6 +153,9 @@ list_acl_cache(#{clientid := ClientId}, _Params) ->
         Caches -> return({ok, [format_acl_cache(Cache) || Cache <- Caches]})
     end.
 
+%%--------------------------------------------------------------------
+%% Format
+
 format(Items) when is_list(Items) ->
     [format(Item) || Item <- Items];
 format(Key) when is_tuple(Key) ->
@@ -161,3 +180,105 @@ format_acl_cache({{PubSub, Topic}, {AclResult, Timestamp}}) ->
       topic => Topic,
       result => AclResult,
       updated_time => Timestamp}.
+
+%%--------------------------------------------------------------------
+%% Query String to Match Spec
+
+-spec qs2ms(list()) -> ets:match_spec().
+qs2ms(Qs) ->
+    {MtchHead, Conds} = qs2ms(Qs, 2, {#{}, []}),
+    [{{'$1', MtchHead, '_'}, Conds, ['$1']}].
+
+qs2ms([], _, {MtchHead, Conds}) ->
+    {MtchHead, lists:reverse(Conds)};
+
+qs2ms([Qs|Rest], N, {MtchHead, Conds}) ->
+    Holder = binary_to_atom(iolist_to_binary(["$", integer_to_list(N)]), utf8),
+    NMtchHead = emqx_mgmt_util:merge_maps(MtchHead, ms(element(1, Qs), Holder)),
+    NConds = put_conds(Qs, Holder, Conds),
+    qs2ms(Rest, N+1, {NMtchHead, NConds}).
+
+put_conds({_, Op, V}, Holder, Conds) ->
+    [{Op, Holder, V} | Conds];
+put_conds({_, Op1, V1, Op2, V2}, Holder, Conds) ->
+    [{Op2, Holder, V2},
+     {Op1, Holder, V1} | Conds].
+
+ms(clientid, X) ->
+    #{clientinfo => #{clientid => X}};
+ms(username, X) ->
+    #{clientinfo => #{username => X}};
+ms(zone, X) ->
+    #{clientinfo => #{zone => X}};
+ms(ip_address, X) ->
+    #{clientinfo => #{peerhost => X}};
+ms(conn_state, X) ->
+    #{conn_state => X};
+ms(clean_start, X) ->
+    #{conninfo => #{clean_start => X}};
+ms(proto_name, X) ->
+    #{conninfo => #{proto_name => X}};
+ms(proto_ver, X) ->
+    #{conninfo => #{proto_ver => X}};
+ms(connected_at, X) ->
+    #{conninfo => #{connected_at => X}};
+ms(created_at, X) ->
+    #{session => #{created_at => X}}.
+
+%%--------------------------------------------------------------------
+%% EUnits
+%%--------------------------------------------------------------------
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+compile_test() ->
+    Params = [{<<"clientid">>, <<"abc">>},
+              {<<"username">>, <<"def">>},
+              {<<"zone">>, <<"external">>},
+              {<<"ip_address">>, <<"127.0.0.1">>},
+              {<<"conn_state">>, <<"connected">>},
+              {<<"clean_start">>, true},
+              {<<"proto_name">>, <<"MQTT">>},
+              {<<"proto_ver">>, 4},
+              {<<"_gte_created_at">>, 123456},
+              {<<"_lte_created_at">>, 234567},
+              {<<"_gte_connected_at">>, 123456},
+              {<<"_lte_connected_at">>, 234567},
+              {<<"_like_clientid">>, <<"a">>},
+              {<<"_like_username">>, <<"e">>}
+             ],
+    ExpectedMtchHead =
+        #{clientinfo => #{clientid => '$2',
+                          username => '$3',
+                          zone => '$4',
+                          peerhost => '$5'
+                         },
+          conn_state => '$6',
+          conninfo => #{clean_start => '$7',
+                        proto_name => '$8',
+                        proto_ver => '$9',
+                        connected_at => '$11'},
+          session => #{created_at => '$10'}},
+    ExpectedCondi = [{'=:=','$2',<<"abc">>},
+                     {'=:=','$3',<<"def">>},
+                     {'=:=','$4',external},
+                     {'=:=','$5',{127,0,0,1}},
+                     {'=:=','$6',connected},
+                     {'=:=','$7',true},
+                     {'=:=','$8',<<"MQTT">>},
+                     {'=:=','$9',4},
+                     {'>=','$10',123456},
+                     {'=<','$10',234567},
+                     {'>=','$11',123456},
+                     {'=<','$11',234567}],
+    {emqx_channel_info, [{{'$1', MtchHead, _}, Condi, _}], []} = emqx_mgmt_api:compile(Params, ?CLIENT_QS_SCHEMA),
+    ?assertEqual(ExpectedMtchHead, MtchHead),
+    ?assertEqual(ExpectedCondi, Condi),
+
+    %% Compile
+    {emqx_channel_info, [{{'$1', #{}, '_'}, [], ['$1']}], []} = emqx_mgmt_api:compile([{not_a_predefined_params, val}], ?CLIENT_QS_SCHEMA),
+    {emqx_channel_info, [{{'$1', #{}, '_'}, [], ['$1']}], [{clientid, like, <<"ab">>}]} = emqx_mgmt_api:compile([{<<"_like_clientid">>, <<"ab">>}], ?CLIENT_QS_SCHEMA).
+
+-endif.
+
