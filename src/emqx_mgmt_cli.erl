@@ -19,6 +19,8 @@
 -include_lib("emqx/include/emqx.hrl").
 -include_lib("emqx/include/emqx_mqtt.hrl").
 
+-include_lib("emqx_rule_engine/include/rule_engine.hrl").
+
 -define(PRINT_CMD(Cmd, Descr), io:format("~-48s# ~s~n", [Cmd, Descr])).
 
 -import(lists, [foreach/2]).
@@ -39,6 +41,7 @@
         , log/1
         , acl/1
         , mgmt/1
+        , data/1
         ]).
 
 -define(PROC_INFOKEYS, [status,
@@ -51,7 +54,9 @@
 
 -define(MAX_LIMIT, 10000).
 
--define(APP, emqx).
+-define(MAIN_APP, emqx).
+
+-define(VERSION, 1).
 
 -spec(load() -> ok).
 load() ->
@@ -116,11 +121,11 @@ mgmt(_) ->
 status([]) ->
     {InternalStatus, _ProvidedStatus} = init:get_status(),
         emqx_ctl:print("Node ~p is ~p~n", [node(), InternalStatus]),
-    case lists:keysearch(?APP, 1, application:which_applications()) of
+    case lists:keysearch(?MAIN_APP, 1, application:which_applications()) of
         false ->
-            emqx_ctl:print("~s is not running~n", [?APP]);
-        {value, {?APP, _Desc, Vsn}} ->
-            emqx_ctl:print("~s ~s is running~n", [?APP, Vsn])
+            emqx_ctl:print("~s is not running~n", [?MAIN_APP]);
+        {value, {?MAIN_APP, _Desc, Vsn}} ->
+            emqx_ctl:print("~s ~s is running~n", [?MAIN_APP, Vsn])
     end;
 status(_) ->
      emqx_ctl:usage("status", "Show broker status").
@@ -520,6 +525,194 @@ listeners(["stop", Proto, ListenOn]) ->
 listeners(_) ->
     emqx_ctl:usage([{"listeners",                        "List listeners"},
                     {"listeners stop    <Proto> <Port>", "Stop a listener"}]).
+
+%%--------------------------------------------------------------------
+%% @doc data Command
+
+data(["export"]) ->
+    {ok, Dir} = file:get_cwd(),
+    data(["export", filename:join([Dir, "data"])]);
+
+data(["export", Directory]) ->
+    case filelib:is_dir(Directory) of
+        false ->
+            emqx_ctl:print("Please enter an existing directory.~n");
+        true ->
+            case list_to_binary(Directory) of
+                <<"/", _/binary>> ->
+                    Rules = export_rules(),
+                    Resources = export_resources(),
+                    Blacklist = export_blacklist(),
+                    Apps = export_applications(),
+                    Users = export_users(),
+                    Seconds = erlang:system_time(second),
+                    {{Y, M, D}, _} = emqx_mgmt_util:datetime(Seconds),
+                    Filename = io_lib:format("emqx-export-~p-~p-~p.json", [Y, M, D]),
+                    NFilename = filename:join([Directory, Filename]),
+                    Data = [{version, ?VERSION},
+                            {date, erlang:list_to_binary(emqx_mgmt_util:strftime(Seconds))},
+                            {rules, Rules},
+                            {resources, Resources},
+                            {blacklist, Blacklist},
+                            {apps, Apps},
+                            {users, Users}],
+                    case file:write_file(NFilename, emqx_json:encode(Data)) of
+                        ok ->
+                            emqx_ctl:print("The emqx data has been successfully exported to ~s.~n", [NFilename]);
+                        {error, Reason} ->
+                            emqx_ctl:print("The emqx data export failed due to ~p.~n", [Reason])
+                    end;
+                _ ->
+                    emqx_ctl:print("Please enter a directory using an absolute path.~n")
+            end            
+    end;
+
+data(["import", Filename]) ->
+    case file:read_file(Filename) of
+        {ok, Json} ->
+            Data = emqx_json:decode(Json, [return_maps]),
+            case maps:get(<<"version">>, Data) of
+                ?VERSION ->
+                    try
+                        import_resources(maps:get(<<"resources">>, Data)),
+                        import_rules(maps:get(<<"rules">>, Data)),
+                        import_blacklist(maps:get(<<"blacklist">>, Data)),
+                        import_applications(maps:get(<<"apps">>, Data)),
+                        import_users(maps:get(<<"users">>, Data)),
+                        emqx_ctl:print("The emqx data has been imported successfully.~n")
+                    catch _Class:Reason ->
+                        emqx_ctl:print("The emqx data import failed due to ~p.~n", [Reason])
+                    end;
+                Version ->
+                    emqx_ctl:print("Unsupported version: ~p~n", [Version])
+            end;
+        {error, Reason} ->
+            emqx_ctl:print("The emqx data import failed due to ~p while reading ~s.~n", [Reason, Filename])
+    end.
+
+export_rules() ->
+    lists:foldl(fun({_, RuleId, _, RawSQL, _, _, _, _, _, Actions, Enabled, Desc}, Acc) ->
+                    NActions = [[{id, ActionInstId},
+                                 {name, Name},
+                                 {args, Args}] || #action_instance{id = ActionInstId, name = Name, args = Args} <- Actions],
+                    [[{id, RuleId},
+                      {rawsql, RawSQL},
+                      {actions, NActions},
+                      {enabled, Enabled},
+                      {description, Desc}] | Acc]
+               end, [], emqx_rule_registry:get_rules()).
+
+export_resources() ->
+    lists:foldl(fun({_, Id, Type, Config, CreatedAt, Desc}, Acc) ->
+                    NCreatedAt = case CreatedAt of
+                                     undefined -> null;
+                                     _ -> CreatedAt
+                                 end,
+                    [[{id, Id},
+                      {type, Type},
+                      {config, maps:to_list(Config)},
+                      {created_at, NCreatedAt},
+                      {description, Desc}] | Acc]
+               end, [], emqx_rule_registry:get_resources()).
+
+
+export_blacklist() ->
+    lists:foldl(fun(#banned{who = Who, by = By, reason = Reason, at = At, until = Until}, Acc) ->
+                    NWho = case Who of
+                               {peerhost, Peerhost} -> {peerhost, inet:ntoa(Peerhost)};
+                               _ -> Who
+                           end,
+                    [[{who, [NWho]}, {by, By}, {reason, Reason}, {at, At}, {until, Until}] | Acc]
+                end, [], ets:tab2list(emqx_banned)).
+
+export_applications() ->
+    lists:foldl(fun({_, AppID, AppSecret, Name, Desc, Status, Expired}, Acc) ->
+                    [[{id, AppID}, {secret, AppSecret}, {name, Name}, {desc, Desc}, {status, Status}, {expired, Expired}] | Acc]
+                end, [], ets:tab2list(mqtt_app)).
+
+export_users() ->
+    lists:foldl(fun({_, Username, Password, Tags}, Acc) ->
+                    [[{username, Username}, {password, base64:encode(Password)}, {tags, Tags}] | Acc]
+                end, [], ets:tab2list(mqtt_admin)).
+
+import_rules(Rules) ->
+    lists:foreach(fun(#{<<"id">> := RuleId,
+                        <<"rawsql">> := RawSQL,
+                        <<"actions">> := Actions,
+                        <<"enabled">> := Enabled,
+                        <<"description">> := Desc}) ->
+                      NActions = lists:foldl(fun(#{<<"id">> := ActionInstId, <<"name">> := Name, <<"args">> := Args}, Acc) ->
+                                                 [#action_instance{id = ActionInstId, name = Name, args = Args} | Acc]
+                                             end, [], Actions),
+                      case emqx_rule_sqlparser:parse_select(RawSQL) of
+                          {ok, Select} ->
+                              Rule = #rule{id = RuleId,
+                                           rawsql = RawSQL,
+                                           for = emqx_rule_sqlparser:select_from(Select),
+                                           is_foreach = emqx_rule_sqlparser:select_is_foreach(Select),
+                                           fields = emqx_rule_sqlparser:select_fields(Select),
+                                           doeach = emqx_rule_sqlparser:select_doeach(Select),
+                                           incase = emqx_rule_sqlparser:select_incase(Select),
+                                           conditions = emqx_rule_sqlparser:select_where(Select),
+                                           actions = NActions,
+                                           enabled = Enabled,
+                                           description = Desc},
+                              ok = emqx_rule_registry:add_rule(Rule);
+                          Error ->
+                              error(Error)
+                      end
+                  end, Rules). 
+
+import_resources(Reources) ->
+    lists:foreach(fun(#{<<"id">> := Id,
+                        <<"type">> := Type,
+                        <<"config">> := Config,
+                        <<"created_at">> := CreatedAt,
+                        <<"description">> := Desc}) ->
+                      NCreatedAt = case CreatedAt of
+                                       null -> undefined;
+                                       _ -> CreatedAt
+                                   end,
+                      emqx_rule_registry:add_resource(#resource{id = Id, type = Type, config = Config, created_at = NCreatedAt, description = Desc})
+                  end, Reources).  
+
+import_blacklist(Blacklist) ->
+    lists:foreach(fun(#{<<"who">> := Who,
+                        <<"by">> := By,
+                        <<"reason">> := Reason,
+                        <<"at">> := At,
+                        <<"until">> := Until}) ->
+                      NWho = case Who of
+                                 #{<<"peerhost">> := Peerhost} ->
+                                     {ok, NPeerhost} = inet:parse_address(binary_to_list(Peerhost)),
+                                     {peerhost, NPeerhost};
+                                 #{<<"clientid">> := ClientId} -> {clientid, ClientId};
+                                 #{<<"username">> := Username} -> {username, Username}
+                             end,
+                     emqx_banned:create(#banned{who = NWho, by = By, reason = Reason, at = At, until = Until})
+                  end, Blacklist).
+
+import_applications(Apps) ->
+    lists:foreach(fun(#{<<"id">> := AppID,
+                        <<"secret">> := AppSecret,
+                        <<"name">> := Name,
+                        <<"desc">> := Desc,
+                        <<"status">> := Status,
+                        <<"expired">> := Expired}) ->
+                      NExpired = case is_integer(Expired) of
+                                     true -> Expired;
+                                     false -> undefined
+                                 end,
+                      emqx_mgmt_auth:force_add_app(AppID, Name, AppSecret, Desc, Status, NExpired)
+                  end, Apps).
+
+import_users(Users) ->
+    lists:foreach(fun(#{<<"username">> := Username,
+                        <<"password">> := Password,
+                        <<"tags">> := Tags}) ->
+                      NPassword = base64:decode(Password),
+                      emqx_dashboard_admin:force_add_user(Username, NPassword, Tags)
+                  end, Users).
 
 %%--------------------------------------------------------------------
 %% Dump ETS
