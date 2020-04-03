@@ -253,4 +253,9 @@ match_fun(Ms, Fuzzy) ->
 run_fuzzy_match(_, []) ->
     true;
 run_fuzzy_match(E = {_, #{clientinfo := ClientInfo}, _}, [{Key, _, RE}|Fuzzy]) ->
-    re:run(maps:get(Key, ClientInfo, ""), RE, [{capture, none}]) == match andalso run_fuzzy_match(E, Fuzzy).
+    Val = case maps:get(Key, ClientInfo, "") of
+              undefined -> "";
+              V -> V
+          end,
+    re:run(Val, RE, [{capture, none}]) == match andalso run_fuzzy_match(E, Fuzzy).
+
