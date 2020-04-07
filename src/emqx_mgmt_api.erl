@@ -72,7 +72,7 @@ limit(Params) ->
 %%--------------------------------------------------------------------
 
 node_query(Node, Params, QsSchema, RowFun) ->
-    {Tab, _, _} = TabQs = compile(Params, QsSchema),
+    {_, {Tab, _, _}} = {CodCnt, TabQs} = compile(Params, QsSchema),
     Limit = limit(Params),
     Page  = page(Params),
     Start = if Page > 1 -> (Page-1) * Limit;
@@ -80,7 +80,7 @@ node_query(Node, Params, QsSchema, RowFun) ->
             end,
     {_, _NStart, Rows} = do_query(Node, TabQs, Start, Limit+1),
     Meta = #{page => Page, limit => Limit},
-    NMeta = case is_empty_qs(TabQs) of
+    NMeta = case CodCnt =:= 0 of
                 true -> Meta#{count => count(Tab), hasnext => length(Rows) > Limit};
                 _ -> Meta#{count => -1, hasnext => length(Rows) > Limit}
             end,
@@ -108,7 +108,7 @@ rpc_call(Node, M, F, A, T) ->
 %%--------------------------------------------------------------------
 
 cluster_query(Params, QsSchema, RowFun) ->
-    {Tab, _, _} = TabQs = compile(Params, QsSchema),
+    {_, {Tab, _, _}} = {CodCnt, TabQs} = compile(Params, QsSchema),
     Limit = limit(Params),
     Page  = page(Params),
     Start = if Page > 1 -> (Page-1) * Limit;
@@ -117,7 +117,7 @@ cluster_query(Params, QsSchema, RowFun) ->
     Nodes = ekka_mnesia:running_nodes(),
     Rows = do_cluster_query(Nodes, TabQs, Start, Limit+1, []),
     Meta = #{page => Page, limit => Limit},
-    NMeta = case is_empty_qs(TabQs) of
+    NMeta = case CodCnt =:= 0 of
                 true -> Meta#{count => count(Tab, Nodes), hasnext => length(Rows) > Limit};
                 _ -> Meta#{count => -1, hasnext => length(Rows) > Limit}
             end,
@@ -159,7 +159,7 @@ traverse_one_by_one(Tab, K, MatchFun, Start, Limit, Acc) ->
 
 compile(Params, {Tab, QsKits, Convertor}) ->
     {Qs, Fuzzy} = pick_params_to_qs(Params, QsKits, [], []),
-    {Tab, Convertor(Qs), Fuzzy}.
+    {length(Qs) + length(Fuzzy), {Tab, Convertor(Qs), Fuzzy}}.
 
 pick_params_to_qs([], _, Acc1, Acc2) ->
     NAcc2 = [E || E <- Acc2, not lists:keymember(element(1, E), 1, Acc1)],
@@ -203,9 +203,6 @@ params2qs(K1, V1, K2, V2, Type) ->
     {Key, Op1, NV1} = params2qs(K1, V1, Type),
     {Key, Op2, NV2} = params2qs(K2, V2, Type),
     {Key, Op1, NV1, Op2, NV2}.
-
-is_empty_qs({_Tab, [{_, [], _}], []}) -> true;
-is_empty_qs(_) -> false.
 
 %%--------------------------------------------------------------------
 %% Types

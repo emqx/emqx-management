@@ -195,11 +195,17 @@ qs2ms([], _, {MtchHead, Conds}) ->
 qs2ms([{Key, '=:=', Value} | Rest], N, {MtchHead, Conds}) ->
     NMtchHead = emqx_mgmt_util:merge_maps(MtchHead, ms(Key, Value)),
     qs2ms(Rest, N, {NMtchHead, Conds});
-qs2ms([{Key, Op1, V1, Op2, V2} | Rest], N, {MtchHead, Conds}) ->
+qs2ms([Qs | Rest], N, {MtchHead, Conds}) ->
     Holder = binary_to_atom(iolist_to_binary(["$", integer_to_list(N)]), utf8),
-    NMtchHead = emqx_mgmt_util:merge_maps(MtchHead, ms(Key, Holder)),
-    NConds = [{Op2, Holder, V2}, {Op1, Holder, V1} | Conds],
+    NMtchHead = emqx_mgmt_util:merge_maps(MtchHead, ms(element(1, Qs), Holder)),
+    NConds = put_conds(Qs, Holder, Conds),
     qs2ms(Rest, N+1, {NMtchHead, NConds}).
+
+put_conds({_, Op, V}, Holder, Conds) ->
+    [{Op, Holder, V} | Conds];
+put_conds({_, Op1, V1, Op2, V2}, Holder, Conds) ->
+    [{Op2, Holder, V2},
+     {Op1, Holder, V1} | Conds].
 
 ms(clientid, X) ->
     #{clientinfo => #{clientid => X}};
@@ -261,13 +267,13 @@ compile_test() ->
                      {'=<','$2',234567},
                      {'>=','$3',123456},
                      {'=<','$3',234567}],
-    {emqx_channel_info, [{{'$1', MtchHead, _}, Condi, _}], []} = emqx_mgmt_api:compile(Params, ?CLIENT_QS_SCHEMA),
+    {10, {emqx_channel_info, [{{'$1', MtchHead, _}, Condi, _}], []}} = emqx_mgmt_api:compile(Params, ?CLIENT_QS_SCHEMA),
     ?assertEqual(ExpectedMtchHead, MtchHead),
     ?assertEqual(ExpectedCondi, Condi),
 
     %% Compile
-    {emqx_channel_info, [{{'$1', #{}, '_'}, [], ['$1']}], []} = emqx_mgmt_api:compile([{not_a_predefined_params, val}], ?CLIENT_QS_SCHEMA),
-    {emqx_channel_info, [{{'$1', #{}, '_'}, [], ['$1']}], [{clientid, like, <<"ab">>}]} = emqx_mgmt_api:compile([{<<"_like_clientid">>, <<"ab">>}], ?CLIENT_QS_SCHEMA).
+    {0, {emqx_channel_info, [{{'$1', #{}, '_'}, [], ['$1']}], []}} = emqx_mgmt_api:compile([{not_a_predefined_params, val}], ?CLIENT_QS_SCHEMA),
+    {1, {emqx_channel_info, [{{'$1', #{}, '_'}, [], ['$1']}], [{clientid, like, <<"ab">>}]}} = emqx_mgmt_api:compile([{<<"_like_clientid">>, <<"ab">>}], ?CLIENT_QS_SCHEMA).
 
 -endif.
 
