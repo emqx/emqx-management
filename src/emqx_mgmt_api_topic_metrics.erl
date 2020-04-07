@@ -24,23 +24,11 @@
             func   => list,
             descr  => "A list of specfied topic metrics of all nodes in the cluster"}).
 
--rest_api(#{name   => list_node_topic_metrics,
-            method => 'GET',
-            path   => "/nodes/:atom:node/topic-metrics/:bin:topic",
-            func   => list,
-            descr  => "A list of specfied topic metrics of a node"}).
-
 -rest_api(#{name   => register_topic_metrics,
             method => 'POST',
             path   => "/topic-metrics/:bin:topic",
             func   => register,
             descr  => "Register topic metrics"}).
-
--rest_api(#{name   => register_node_topic_metrics,
-            method => 'POST',
-            path   => "/nodes/:atom:node/topic-metrics/:bin:topic",
-            func   => register,
-            descr  => "Register topic metrics of a node"}).
 
 -rest_api(#{name   => unregister_all_topic_metrics,
             method => 'DELETE',
@@ -54,44 +42,17 @@
             func   => unregister,
             descr  => "Unregister topic metrics"}).
 
--rest_api(#{name   => unregister_node_all_topic_metrics,
-            method => 'DELETE',
-            path   => "/nodes/:atom:node/topic-metrics",
-            func   => unregister,
-            descr  => "Unregister all topic metrics"}).
-
--rest_api(#{name   => unregister_node_topic_metrics,
-            method => 'DELETE',
-            path   => "/nodes/:atom:node/topic-metrics/:bin:topic",
-            func   => unregister,
-            descr  => "Unregister topic metrics of a node"}).
-
 -export([ list/2
         , register/2
         , unregister/2
         ]).
 
-list(#{node := Node, topic := Topic0}, _Params) ->
-    Topic = http_uri:decode(Topic0),
-    case emqx_mgmt:get_topic_metrics(Node, Topic) of
-        {error, Reason} -> return({error, Reason});
-        Metrics         -> return({ok, maps:from_list(Metrics)})
-    end;
-
 list(#{topic := Topic0}, _Params) ->
     Topic = http_uri:decode(Topic0),
-    Result = 
-        lists:foldl(fun({_Node, {error, _}}, Acc) ->
-                        Acc;
-                    ({Node, Metrics}, Acc) ->
-                        [#{node => Node, metrics => maps:from_list(Metrics)} | Acc]
-                    end, [], emqx_mgmt:get_topic_metrics(Topic)),
-    return({ok, Result}).
-
-register(#{node := Node, topic := Topic0}, _Params) ->
-    Topic = http_uri:decode(Topic0),
-    emqx_mgmt:register_topic_metrics(Node, Topic),
-    return(ok);
+    case emqx_mgmt:get_topic_metrics(Topic) of
+        {error, Reason} -> return({error, Reason});
+        Metrics         -> return({ok, maps:from_list(Metrics)})
+    end.
 
 register(#{topic := Topic0}, _Params) ->
     Topic = http_uri:decode(Topic0),
@@ -100,15 +61,6 @@ register(#{topic := Topic0}, _Params) ->
 
 unregister(Bindings, _Params) when map_size(Bindings) =:= 0 ->
     emqx_mgmt:unregister_all_topic_metrics(),
-    return(ok);
-
-unregister(#{node := Node, topic := Topic0}, _Params) ->
-    Topic = http_uri:decode(Topic0),
-    emqx_mgmt:unregister_topic_metrics(Node, Topic),
-    return(ok);
-
-unregister(#{node := Node}, _Params) ->
-    emqx_mgmt:unregister_all_topic_metrics(Node),
     return(ok);
 
 unregister(#{topic := Topic0}, _Params) ->
