@@ -213,15 +213,15 @@ match_fun(Ms, Fuzzy) ->
                   {ok, RE} = re:compile(S),
                   {K, like, RE}
               end, Fuzzy),
-    fun(E) ->
-         case ets:match_spec_run([E], MsC) of
-             [] ->
-                 false;
-             [Return] ->
-                 case run_fuzzy_match(E, REFuzzy) of
-                    true -> {ok, Return};
-                     _ -> false
-                 end
+    fun(Rows) ->
+         case ets:match_spec_run(Rows, MsC) of
+             [] -> [];
+             Ls ->
+                 lists:filtermap(fun(E) ->
+                    case run_fuzzy_match(E, REFuzzy) of
+                        false -> false;
+                        true -> {true, element(1, E)}
+                    end end, Ls)
          end
     end.
 
@@ -240,7 +240,7 @@ run_fuzzy_match(E = {_, #{clientinfo := ClientInfo}, _}, [{Key, _, RE}|Fuzzy]) -
 -spec qs2ms(list()) -> ets:match_spec().
 qs2ms(Qs) ->
     {MtchHead, Conds} = qs2ms(Qs, 2, {#{}, []}),
-    [{{'$1', MtchHead, '_'}, Conds, ['$1']}].
+    [{{'$1', MtchHead, '_'}, Conds, ['$_']}].
 
 qs2ms([], _, {MtchHead, Conds}) ->
     {MtchHead, lists:reverse(Conds)};

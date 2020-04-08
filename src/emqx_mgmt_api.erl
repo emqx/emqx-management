@@ -134,28 +134,37 @@ do_cluster_query([Node|Nodes], Qs, QueryFun, Start, Limit, Acc) ->
 
 traverse_table(Tab, MatchFun, Start, Limit) ->
     ets:safe_fixtable(Tab, true),
-    Result = traverse_one_by_one(Tab, ets:first(Tab), MatchFun, Start, Limit, []),
+    Result = traverse_n_by_one(Tab, ets:first(Tab), MatchFun, Start, Limit, []),
     ets:safe_fixtable(Tab, false),
     Result.
 
 %% @private
-traverse_one_by_one(_, '$end_of_table', _, Start, _, Acc) ->
+traverse_n_by_one(_, '$end_of_table', _, Start, _, Acc) ->
     {Start, lists:reverse(Acc)};
-traverse_one_by_one(_, _, _, Start, _Limit=0, Acc) ->
+traverse_n_by_one(_, _, _, Start, _Limit=0, Acc) ->
     {Start, lists:reverse(Acc)};
-traverse_one_by_one(Tab, K, MatchFun, Start, Limit, Acc) ->
-    [E] = ets:lookup(Tab, K),
-    K2 = ets:next(Tab, K),
-    case MatchFun(E) of
-        {ok, Return} ->
-            case Start of
-                0 ->
-                    traverse_one_by_one(Tab, K2, MatchFun, Start, Limit-1, [Return | Acc]);
+traverse_n_by_one(Tab, K, MatchFun, Start, Limit, Acc) ->
+    GetRows = fun _GetRows('$end_of_table', _, Ks) ->
+                      {'$end_of_table', Ks};
+                  _GetRows(Kn,  1, Ks) ->
+                      {ets:next(Tab, Kn), [ets:lookup(Tab, Kn) | Ks]};
+                  _GetRows(Kn, N, Ks) ->
+                      _GetRows(ets:next(Tab, Kn), N-1, [ets:lookup(Tab, Kn) | Ks])
+              end,
+    {K2, Rows} = GetRows(K, 100, []),
+    case MatchFun(lists:flatten(Rows)) of
+        [] ->
+            traverse_n_by_one(Tab, K2, MatchFun, Start, Limit, Acc);
+        Ls ->
+            case Start - length(Ls) of
+                N when N > 0 -> %% Skip
+                    traverse_n_by_one(Tab, K2, MatchFun, N, Limit, Acc);
                 _ ->
-                    traverse_one_by_one(Tab, K2, MatchFun, Start-1, Limit, Acc)
-            end;
-        _ ->
-            traverse_one_by_one(Tab, K2, MatchFun, Start, Limit, Acc)
+                    Got = lists:sublist(Ls, Start+1, Limit),
+                    NAcc = lists:append(Got, Acc),
+                    NLimit = Limit - length(Got),
+                    traverse_n_by_one(Tab, K2, MatchFun, 0, NLimit, NAcc)
+            end
     end.
 
 params2qs(Params, QsSchema) ->
