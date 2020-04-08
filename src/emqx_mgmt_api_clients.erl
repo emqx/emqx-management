@@ -26,20 +26,20 @@
                   ]).
 
 -define(CLIENT_QS_SCHEMA, {emqx_channel_info,
-          [{<<"clientid">>, binary},
-           {<<"username">>, binary},
-           {<<"zone">>, atom},
-           {<<"ip_address">>, ip},
-           {<<"conn_state">>, atom},
-           {<<"clean_start">>, atom},
-           {<<"proto_name">>, binary},
-           {<<"proto_ver">>, integer},
-           {<<"_like_clientid">>, binary},
-           {<<"_like_username">>, binary},
-           {<<"_gte_created_at">>, timestamp},
-           {<<"_lte_created_at">>, timestamp},
-           {<<"_gte_connected_at">>, timestamp},
-           {<<"_lte_connected_at">>, timestamp}], fun qs2ms/1}).
+        [{<<"clientid">>, binary},
+         {<<"username">>, binary},
+         {<<"zone">>, atom},
+         {<<"ip_address">>, ip},
+         {<<"conn_state">>, atom},
+         {<<"clean_start">>, atom},
+         {<<"proto_name">>, binary},
+         {<<"proto_ver">>, integer},
+         {<<"_like_clientid">>, binary},
+         {<<"_like_username">>, binary},
+         {<<"_gte_created_at">>, timestamp},
+         {<<"_lte_created_at">>, timestamp},
+         {<<"_gte_connected_at">>, timestamp},
+         {<<"_lte_connected_at">>, timestamp}]}).
 
 -rest_api(#{name   => list_clients,
             method => 'GET',
@@ -109,10 +109,10 @@
         ]).
 
 list(Bindings, Params) when map_size(Bindings) == 0 ->
-    return({ok, emqx_mgmt_api:cluster_query(Params, ?CLIENT_QS_SCHEMA, fun format/1)});
+    return({ok, emqx_mgmt_api:cluster_query(Params, ?CLIENT_QS_SCHEMA, fun query/3, fun format/1)});
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    return({ok, emqx_mgmt_api:node_query(Node, Params, ?CLIENT_QS_SCHEMA, fun format/1)});
+    return({ok, emqx_mgmt_api:node_query(Node, Params, ?CLIENT_QS_SCHEMA, fun query/3, fun format/1)});
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
@@ -182,7 +182,60 @@ format_acl_cache({{PubSub, Topic}, {AclResult, Timestamp}}) ->
       updated_time => Timestamp}.
 
 %%--------------------------------------------------------------------
-%% Query String to Match Spec
+%% Query Functions
+%%--------------------------------------------------------------------
+
+query({Qs, []}, Start, Limit) ->
+    Ms = qs2ms(Qs),
+    case ets:select(emqx_channel_info, Ms, Start+Limit) of
+        '$end_of_table' ->
+            {Start, []};
+        {Rows, _} ->
+            case Start - length(Rows) of
+                N when N > 0 ->
+                    {N, []};
+                _ ->
+                    {0, lists:sublist(Rows, Start+1, Limit)}
+            end
+    end;
+
+query({Qs, Fuzzy}, Start, Limit) ->
+    Ms = qs2ms(Qs),
+    MatchFun = match_fun(Ms, Fuzzy),
+    emqx_mgmt_api:traverse_table(emqx_channel_info, MatchFun, Start, Limit).
+
+%%--------------------------------------------------------------------
+%% Match funcs
+
+match_fun(Ms, Fuzzy) ->
+    MsC = ets:match_spec_compile(Ms),
+    REFuzzy = lists:map(fun({K, like, S}) ->
+                  {ok, RE} = re:compile(S),
+                  {K, like, RE}
+              end, Fuzzy),
+    fun(E) ->
+         case ets:match_spec_run([E], MsC) of
+             [] ->
+                 false;
+             [Return] ->
+                 case run_fuzzy_match(E, REFuzzy) of
+                    true -> {ok, Return};
+                     _ -> false
+                 end
+         end
+    end.
+
+run_fuzzy_match(_, []) ->
+    true;
+run_fuzzy_match(E = {_, #{clientinfo := ClientInfo}, _}, [{Key, _, RE}|Fuzzy]) ->
+    Val = case maps:get(Key, ClientInfo, "") of
+              undefined -> "";
+              V -> V
+          end,
+    re:run(Val, RE, [{capture, none}]) == match andalso run_fuzzy_match(E, Fuzzy).
+
+%%--------------------------------------------------------------------
+%% QueryString to Match Spec
 
 -spec qs2ms(list()) -> ets:match_spec().
 qs2ms(Qs) ->
@@ -235,7 +288,8 @@ ms(created_at, X) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-compile_test() ->
+params2qs_test() ->
+    QsSchema = element(2, ?CLIENT_QS_SCHEMA),
     Params = [{<<"clientid">>, <<"abc">>},
               {<<"username">>, <<"def">>},
               {<<"zone">>, <<"external">>},
@@ -267,13 +321,14 @@ compile_test() ->
                      {'=<','$2',234567},
                      {'>=','$3',123456},
                      {'=<','$3',234567}],
-    {10, {emqx_channel_info, [{{'$1', MtchHead, _}, Condi, _}], []}} = emqx_mgmt_api:compile(Params, ?CLIENT_QS_SCHEMA),
+    {10, {Qs1, []}} = emqx_mgmt_api:params2qs(Params, QsSchema),
+    [{{'$1', MtchHead, _}, Condi, _}] = qs2ms(Qs1),
     ?assertEqual(ExpectedMtchHead, MtchHead),
     ?assertEqual(ExpectedCondi, Condi),
 
     %% Compile
-    {0, {emqx_channel_info, [{{'$1', #{}, '_'}, [], ['$1']}], []}} = emqx_mgmt_api:compile([{not_a_predefined_params, val}], ?CLIENT_QS_SCHEMA),
-    {1, {emqx_channel_info, [{{'$1', #{}, '_'}, [], ['$1']}], [{clientid, like, <<"ab">>}]}} = emqx_mgmt_api:compile([{<<"_like_clientid">>, <<"ab">>}], ?CLIENT_QS_SCHEMA).
+    {0, {[], []}} = emqx_mgmt_api:params2qs([{not_a_predefined_params, val}], QsSchema),
+    [{{'$1', #{}, '_'}, [], ['$1']}] = qs2ms([]),
+    {1, {[], [{clientid, like, <<"ab">>}]}} = emqx_mgmt_api:params2qs([{<<"_like_clientid">>, <<"ab">>}], QsSchema).
 
 -endif.
-
