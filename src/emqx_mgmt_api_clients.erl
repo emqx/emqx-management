@@ -192,7 +192,10 @@ qs2ms(Qs) ->
 qs2ms([], _, {MtchHead, Conds}) ->
     {MtchHead, lists:reverse(Conds)};
 
-qs2ms([Qs|Rest], N, {MtchHead, Conds}) ->
+qs2ms([{Key, '=:=', Value} | Rest], N, {MtchHead, Conds}) ->
+    NMtchHead = emqx_mgmt_util:merge_maps(MtchHead, ms(Key, Value)),
+    qs2ms(Rest, N, {NMtchHead, Conds});
+qs2ms([Qs | Rest], N, {MtchHead, Conds}) ->
     Holder = binary_to_atom(iolist_to_binary(["$", integer_to_list(N)]), utf8),
     NMtchHead = emqx_mgmt_util:merge_maps(MtchHead, ms(element(1, Qs), Holder)),
     NConds = put_conds(Qs, Holder, Conds),
@@ -249,36 +252,28 @@ compile_test() ->
               {<<"_like_username">>, <<"e">>}
              ],
     ExpectedMtchHead =
-        #{clientinfo => #{clientid => '$2',
-                          username => '$3',
-                          zone => '$4',
-                          peerhost => '$5'
+        #{clientinfo => #{clientid => <<"abc">>,
+                          username => <<"def">>,
+                          zone => external,
+                          peerhost => {127,0,0,1}
                          },
-          conn_state => '$6',
-          conninfo => #{clean_start => '$7',
-                        proto_name => '$8',
-                        proto_ver => '$9',
-                        connected_at => '$11'},
-          session => #{created_at => '$10'}},
-    ExpectedCondi = [{'=:=','$2',<<"abc">>},
-                     {'=:=','$3',<<"def">>},
-                     {'=:=','$4',external},
-                     {'=:=','$5',{127,0,0,1}},
-                     {'=:=','$6',connected},
-                     {'=:=','$7',true},
-                     {'=:=','$8',<<"MQTT">>},
-                     {'=:=','$9',4},
-                     {'>=','$10',123456},
-                     {'=<','$10',234567},
-                     {'>=','$11',123456},
-                     {'=<','$11',234567}],
-    {emqx_channel_info, [{{'$1', MtchHead, _}, Condi, _}], []} = emqx_mgmt_api:compile(Params, ?CLIENT_QS_SCHEMA),
+          conn_state => connected,
+          conninfo => #{clean_start => true,
+                        proto_name => <<"MQTT">>,
+                        proto_ver => 4,
+                        connected_at => '$3'},
+          session => #{created_at => '$2'}},
+    ExpectedCondi = [{'>=','$2',123456},
+                     {'=<','$2',234567},
+                     {'>=','$3',123456},
+                     {'=<','$3',234567}],
+    {10, {emqx_channel_info, [{{'$1', MtchHead, _}, Condi, _}], []}} = emqx_mgmt_api:compile(Params, ?CLIENT_QS_SCHEMA),
     ?assertEqual(ExpectedMtchHead, MtchHead),
     ?assertEqual(ExpectedCondi, Condi),
 
     %% Compile
-    {emqx_channel_info, [{{'$1', #{}, '_'}, [], ['$1']}], []} = emqx_mgmt_api:compile([{not_a_predefined_params, val}], ?CLIENT_QS_SCHEMA),
-    {emqx_channel_info, [{{'$1', #{}, '_'}, [], ['$1']}], [{clientid, like, <<"ab">>}]} = emqx_mgmt_api:compile([{<<"_like_clientid">>, <<"ab">>}], ?CLIENT_QS_SCHEMA).
+    {0, {emqx_channel_info, [{{'$1', #{}, '_'}, [], ['$1']}], []}} = emqx_mgmt_api:compile([{not_a_predefined_params, val}], ?CLIENT_QS_SCHEMA),
+    {1, {emqx_channel_info, [{{'$1', #{}, '_'}, [], ['$1']}], [{clientid, like, <<"ab">>}]}} = emqx_mgmt_api:compile([{<<"_like_clientid">>, <<"ab">>}], ?CLIENT_QS_SCHEMA).
 
 -endif.
 
