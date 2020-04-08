@@ -588,7 +588,11 @@ data(["import", Filename]) ->
             end;
         {error, Reason} ->
             emqx_ctl:print("The emqx data import failed due to ~p while reading ~s.~n", [Reason, Filename])
-    end.
+    end;
+
+data(_) ->
+    emqx_ctl:usage([{"import <File>",   "Import data from the specified file"},
+                    {"export [<Path>]", "Export data to the specified path"}]).
 
 export_rules() ->
     lists:foldl(fun({_, RuleId, _, RawSQL, _, _, _, _, _, Actions, Enabled, Desc}, Acc) ->
