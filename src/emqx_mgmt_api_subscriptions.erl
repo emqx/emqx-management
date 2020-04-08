@@ -121,14 +121,10 @@ query({Qs, Fuzzy}, Start, Limit) ->
 
 match_fun(Ms, Fuzzy) ->
     MsC = ets:match_spec_compile(Ms),
-    fun(E) ->
-         case ets:match_spec_run([E], MsC) of
-             [] -> false;
-             [Return] ->
-                 case run_fuzzy_match(E, Fuzzy) of
-                    true -> {ok, Return};
-                     _ -> false
-                 end
+    fun(Rows) ->
+         case ets:match_spec_run(Rows, MsC) of
+             [] -> [];
+             Ls -> lists:filter(fun(E) -> run_fuzzy_match(E, Fuzzy) end, Ls)
          end
     end.
 
