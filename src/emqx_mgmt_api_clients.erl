@@ -186,7 +186,7 @@ format_acl_cache({{PubSub, Topic}, {AclResult, Timestamp}}) ->
 %%--------------------------------------------------------------------
 
 query({Qs, []}, Start, Limit) ->
-    Ms = qs2ms(Qs),
+    Ms = qs2ms_k(Qs),
     case ets:select(emqx_channel_info, Ms, Start+Limit) of
         '$end_of_table' ->
             {Start, []};
@@ -241,6 +241,10 @@ run_fuzzy_match(E = {_, #{clientinfo := ClientInfo}, _}, [{Key, _, RE}|Fuzzy]) -
 qs2ms(Qs) ->
     {MtchHead, Conds} = qs2ms(Qs, 2, {#{}, []}),
     [{{'$1', MtchHead, '_'}, Conds, ['$_']}].
+
+qs2ms_k(Qs) ->
+    {MtchHead, Conds} = qs2ms(Qs, 2, {#{}, []}),
+    [{{'$1', MtchHead, '_'}, Conds, ['$1']}].
 
 qs2ms([], _, {MtchHead, Conds}) ->
     {MtchHead, lists:reverse(Conds)};
@@ -298,10 +302,10 @@ params2qs_test() ->
               {<<"clean_start">>, true},
               {<<"proto_name">>, <<"MQTT">>},
               {<<"proto_ver">>, 4},
-              {<<"_gte_created_at">>, 123456},
-              {<<"_lte_created_at">>, 234567},
-              {<<"_gte_connected_at">>, 123456},
-              {<<"_lte_connected_at">>, 234567},
+              {<<"_gte_created_at">>, 1},
+              {<<"_lte_created_at">>, 5},
+              {<<"_gte_connected_at">>, 1},
+              {<<"_lte_connected_at">>, 5},
               {<<"_like_clientid">>, <<"a">>},
               {<<"_like_username">>, <<"e">>}
              ],
@@ -317,18 +321,16 @@ params2qs_test() ->
                         proto_ver => 4,
                         connected_at => '$3'},
           session => #{created_at => '$2'}},
-    ExpectedCondi = [{'>=','$2',123456},
-                     {'=<','$2',234567},
-                     {'>=','$3',123456},
-                     {'=<','$3',234567}],
+    ExpectedCondi = [{'>=','$2', 1},
+                     {'=<','$2', 5},
+                     {'>=','$3', 1},
+                     {'=<','$3', 5}],
     {10, {Qs1, []}} = emqx_mgmt_api:params2qs(Params, QsSchema),
     [{{'$1', MtchHead, _}, Condi, _}] = qs2ms(Qs1),
     ?assertEqual(ExpectedMtchHead, MtchHead),
     ?assertEqual(ExpectedCondi, Condi),
 
-    %% Compile
-    {0, {[], []}} = emqx_mgmt_api:params2qs([{not_a_predefined_params, val}], QsSchema),
-    [{{'$1', #{}, '_'}, [], ['$1']}] = qs2ms([]),
-    {1, {[], [{clientid, like, <<"ab">>}]}} = emqx_mgmt_api:params2qs([{<<"_like_clientid">>, <<"ab">>}], QsSchema).
+    [{{'$1', #{}, '_'}, [], ['$_']}] = qs2ms([]),
+    [{{'$1', #{}, '_'}, [], ['$1']}] = qs2ms_k([]).
 
 -endif.
