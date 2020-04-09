@@ -256,3 +256,41 @@ to_timestamp(B) when is_binary(B) ->
 
 aton(B) when is_binary(B) ->
     list_to_tuple([binary_to_integer(T) || T <- re:split(B, "[.]")]).
+
+%%--------------------------------------------------------------------
+%% EUnits
+%%--------------------------------------------------------------------
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+params2qs_test() ->
+    Schema = [{<<"str">>, binary},
+              {<<"int">>, integer},
+              {<<"atom">>, atom},
+              {<<"ts">>, timestamp},
+              {<<"_gte_range">>, integer},
+              {<<"_lte_range">>, integer},
+              {<<"_like_fuzzy">>, binary},
+              {<<"_match_topic">>, binary}],
+    Params = [{<<"str">>, <<"abc">>},
+              {<<"int">>, <<"123">>},
+              {<<"atom">>, <<"connected">>},
+              {<<"ts">>, <<"156000">>},
+              {<<"_gte_range">>, <<"1">>},
+              {<<"_lte_range">>, <<"5">>},
+              {<<"_like_fuzzy">>, <<"user">>},
+              {<<"_match_topic">>, <<"t/#">>}],
+    ExpectedQs = [{str, '=:=', <<"abc">>},
+                  {int, '=:=', 123},
+                  {atom, '=:=', connected},
+                  {ts, '=:=', 156000},
+                  {range, '>=', 1, '=<', 5}
+                 ],
+    FuzzyQs = [{fuzzy, like, <<"user">>},
+               {topic, match, <<"t/#">>}],
+    ?assertEqual({7, {ExpectedQs, FuzzyQs}}, params2qs(Params, Schema)),
+
+    {0, {[], []}} = params2qs([{not_a_predefined_params, val}], Schema).
+
+-endif.
