@@ -43,13 +43,13 @@ groups() ->
         t_status_cmd,
         t_clients_cmd,
         t_vm_cmd,
-        t_plugins,
+        t_plugins_cmd,
+        t_modules_cmd,
         t_trace_cmd,
         t_broker_cmd,
         t_router_cmd,
         t_subscriptions_cmd,
-        t_acl,
-        t_listeners
+        t_listeners_cmd
        ]}].
 
 apps() ->
@@ -239,17 +239,12 @@ t_subscriptions_cmd(_) ->
     ?assertEqual(emqx_mgmt_cli:subscriptions(["add", "client", "b/b/c", "0"]), "ok~n"),
     ?assertEqual(emqx_mgmt_cli:subscriptions(["del", "client", "b/b/c"]), "ok~n").
 
-t_listeners(_) ->
+t_listeners_cmd(_) ->
     print_mock(),
     ?assertEqual(emqx_mgmt_cli:listeners([]), ok),
     ?assertEqual(emqx_mgmt_cli:listeners(["stop", "wss", "8084"]), "Stop wss listener on 8084 successfully.\n").
 
-t_acl(_) ->
-    ct:pal("Start testing the acl command"),
-    print_mock(),
-    ?assertEqual(emqx_mgmt_cli:acl(["reload"]), "ok~n").
-
-t_plugins(_) ->
+t_plugins_cmd(_) ->
     print_mock(),
     meck:new(emqx_plugins, [non_strict, passthrough]),
     meck:expect(emqx_plugins, load, fun(_) -> ok end),
@@ -259,6 +254,16 @@ t_plugins(_) ->
     ?assertEqual(emqx_mgmt_cli:plugins(["unload", "emqx_reloader"]), "Plugin emqx_reloader unloaded successfully.\n"),
     ?assertEqual(emqx_mgmt_cli:plugins(["load", "emqx_reloader"]),"Plugin emqx_reloader loaded successfully.\n"),
     ?assertEqual(emqx_mgmt_cli:plugins(["unload", "emqx_management"]), "Plugin emqx_management can not be unloaded.~n").
+
+t_modules_cmd(_) ->
+    print_mock(),
+    meck:new(emqx_modules, [non_strict, passthrough]),
+    meck:expect(emqx_modules, load, fun(_) -> ok end),
+    meck:expect(emqx_modules, unload, fun(_) -> ok end),
+    meck:expect(emqx_modules, reload, fun(_) -> ok end),
+    ?assertEqual(emqx_mgmt_cli:modules(["list"]), ok),
+    ?assertEqual(emqx_mgmt_cli:modules(["load", "emqx_mod_presence"]),"Module emqx_mod_presence loaded successfully.\n"),
+    ?assertEqual(emqx_mgmt_cli:modules(["unload", "emqx_mod_presence"]), "Module emqx_mod_presence unloaded successfully.\n").
 
 t_cli(_) ->
     print_mock(),
@@ -273,7 +278,6 @@ t_cli(_) ->
     [?assertMatch({match, _}, re:run(Value, "vm")) || Value <- emqx_mgmt_cli:vm([""])],
     [?assertMatch({match, _}, re:run(Value, "mnesia")) || Value <- emqx_mgmt_cli:mnesia([""])],
     [?assertMatch({match, _}, re:run(Value, "trace")) || Value <- emqx_mgmt_cli:trace([""])],
-    [?assertMatch({match, _}, re:run(Value, "acl")) || Value <- emqx_mgmt_cli:acl([""])],
     [?assertMatch({match, _}, re:run(Value, "mgmt")) || Value <- emqx_mgmt_cli:mgmt([""])].
 
 print_mock() ->

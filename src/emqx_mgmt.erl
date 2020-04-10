@@ -83,6 +83,14 @@
         , reload_plugin/2
         ]).
 
+%% Modules
+-export([ list_modules/0
+        , list_modules/1
+        , load_module/2
+        , unload_module/2
+        , reload_module/2
+        ]).
+
 %% Listeners
 -export([ list_listeners/0
         , list_listeners/1
@@ -402,6 +410,33 @@ reload_plugin(Node, Plugin) when Node =:= node() ->
 reload_plugin(Node, Plugin) ->
     rpc_call(Node, reload_plugin, [Node, Plugin]).
 
+
+%%--------------------------------------------------------------------
+%% Modules
+%%--------------------------------------------------------------------
+
+list_modules() ->
+    [{Node, list_modules(Node)} || Node <- ekka_mnesia:running_nodes()].
+
+list_modules(Node) when Node =:= node() ->
+    emqx_modules:list();
+list_modules(Node) ->
+    rpc_call(Node, list_modules, [Node]).
+
+load_module(Node, Module) when Node =:= node() ->
+    emqx_modules:load(Module);
+load_module(Node, Module) ->
+    rpc_call(Node, load_module, [Node, Module]).
+
+unload_module(Node, Module) when Node =:= node() ->
+    emqx_modules:unload(Module);
+unload_module(Node, Module) ->
+    rpc_call(Node, unload_module, [Node, Module]).
+
+reload_module(Node, Module) when Node =:= node() ->
+    emqx_modules:reload(Module);
+reload_module(Node, Module) ->
+    rpc_call(Node, reload_module, [Node, Module]).
 %%--------------------------------------------------------------------
 %% Listeners
 %%--------------------------------------------------------------------
