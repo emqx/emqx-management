@@ -110,7 +110,7 @@ query({Qs, []}, Start, Limit) ->
                 N when N > 0 ->
                     {N, []};
                 _ ->
-                    {0, lists:sublist(Rows, Start+1, Limit)}
+                    {0, lists:reverse(lists:sublist(Rows, 1, Limit))}
             end
     end;
 
