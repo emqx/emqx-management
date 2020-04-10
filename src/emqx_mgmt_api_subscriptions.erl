@@ -130,7 +130,7 @@ match_fun(Ms, Fuzzy) ->
 
 run_fuzzy_match(_, []) ->
     true;
-run_fuzzy_match(E = {{_, TopicFilter}, _}, [{topic, match, Topic}|Fuzzy]) ->
+run_fuzzy_match(E = {{_, Topic}, _}, [{topic, match, TopicFilter}|Fuzzy]) ->
     emqx_topic:match(Topic, TopicFilter) andalso run_fuzzy_match(E, Fuzzy).
 
 %%--------------------------------------------------------------------
