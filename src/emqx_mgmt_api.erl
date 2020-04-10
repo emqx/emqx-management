@@ -25,6 +25,7 @@
         , node_query/5
         , cluster_query/4
         , traverse_table/4
+        , select_table/4
         ]).
 
 paginate(Tables, Params, RowFun) ->
@@ -164,6 +165,33 @@ traverse_n_by_one(Tab, K, MatchFun, Start, Limit, Acc) ->
                     NLimit = Limit - length(Got),
                     traverse_n_by_one(Tab, K2, MatchFun, 0, NLimit, [Got|Acc])
             end
+    end.
+
+select_table(Tab, Ms, 0, Limit) ->
+    case ets:select(Tab, Ms, Limit) of
+        '$end_of_table' ->
+            {0, []};
+        {Rows, _} ->
+            {0, lists:reverse(Rows)}
+    end;
+
+select_table(Tab, Ms, Start, Limit) ->
+    select_n_by_one(ets:select(Tab, Ms, Limit), Start, Limit, []).
+
+select_n_by_one('$end_of_table', Start, _Limit, Acc) ->
+    {Start, lists:flatten(lists:reverse(Acc))};
+select_n_by_one(_, Start, _Limit = 0, Acc) ->
+    {Start, lists:flatten(lists:reverse(Acc))};
+
+select_n_by_one({Rows0, Cons}, Start, Limit, Acc) ->
+    Rows = lists:reverse(Rows0),
+    case Start - length(Rows) of
+        N when N > 0 -> %% Skip
+            select_n_by_one(ets:select(Cons), N, Limit, Acc);
+        _ ->
+            Got = lists:sublist(Rows, Start+1, Limit),
+            NLimit = Limit - length(Got),
+            select_n_by_one(ets:select(Cons), 0, NLimit, [Got|Acc])
     end.
 
 params2qs(Params, QsSchema) ->

@@ -187,17 +187,7 @@ format_acl_cache({{PubSub, Topic}, {AclResult, Timestamp}}) ->
 
 query({Qs, []}, Start, Limit) ->
     Ms = qs2ms_k(Qs),
-    case ets:select(emqx_channel_info, Ms, Start+Limit) of
-        '$end_of_table' ->
-            {Start, []};
-        {Rows, _} ->
-            case Start - length(Rows) of
-                N when N >= 0 ->
-                    {N, []};
-                _ ->
-                    {0, lists:reverse(lists:sublist(Rows, 1, Limit))}
-            end
-    end;
+    emqx_mgmt_api:select_table(emqx_channel_info, Ms, Start, Limit);
 
 query({Qs, Fuzzy}, Start, Limit) ->
     Ms = qs2ms(Qs),
