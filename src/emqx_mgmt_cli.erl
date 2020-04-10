@@ -37,8 +37,8 @@
         , mnesia/1
         , trace/1
         , log/1
-        , acl/1
         , mgmt/1
+        , modules/1
         ]).
 
 -define(PROC_INFOKEYS, [status,
@@ -187,15 +187,6 @@ cluster(_) ->
                     {"cluster status",            "Cluster status"}]).
 
 %%--------------------------------------------------------------------
-%% @doc ACL usage
-
-acl(["reload"]) ->
-    emqx_access_control:reload_acl(),
-    emqx_ctl:print("ok~n");
-acl(_) ->
-    emqx_ctl:usage([{"acl reload", "reload etc/acl.conf"}]).
-
-%%--------------------------------------------------------------------
 %% @doc Query clients
 
 clients(["list"]) ->
@@ -321,26 +312,49 @@ plugins(["reload", Name]) ->
             emqx_ctl:print("Reload plugin ~s error: The plugin doesn't exist.~n", [Name])
     end;
 
-% plugins(["add", Name]) ->
-%     {ok, Path} = emqx:env(expand_plugins_dir),
-%     Dir = Path ++ Name,
-%     zip:unzip(Dir, [{cwd, Path}]),
-%     Plugin = filename:basename(Dir, ".zip"),
-%     case emqx_plugins:load_expand_plugin(Path ++ Plugin) of
-%         ok ->
-%             emqx_ctl:print("Add plugin:~p successfully.~n", [Plugin]);
-%         {error, {already_loaded,_}} ->
-%             emqx_ctl:print("Already loaded plugin:~p ~n", [Plugin]);
-%         {error, Error} ->
-%             emqx_ctl:print("Add plugin:~p error: ~n", [Plugin, Error])
-%     end;
-
 plugins(_) ->
     emqx_ctl:usage([{"plugins list",            "Show loaded plugins"},
                     {"plugins load <Plugin>",   "Load plugin"},
                     {"plugins unload <Plugin>", "Unload plugin"},
                     {"plugins reload <Plugin>", "Reload plugin"}
-                    % {"plugins add <Plugin.zip>", "Add plugin"}
+                   ]).
+
+%%--------------------------------------------------------------------
+%% @doc Modules Command
+modules(["list"]) ->
+    foreach(fun(Module) -> print({module, Module}) end, emqx_modules:list());
+
+modules(["load", Name]) ->
+    case emqx_modules:load(list_to_atom(Name)) of
+        ok ->
+            emqx_ctl:print("Module ~s loaded successfully.~n", [Name]);
+        {error, Reason}   ->
+            emqx_ctl:print("Load module ~s error: ~p.~n", [Name, Reason])
+    end;
+
+modules(["unload", Name]) ->
+    case emqx_modules:unload(list_to_atom(Name)) of
+        ok ->
+            emqx_ctl:print("Module ~s unloaded successfully.~n", [Name]);
+        {error, Reason} ->
+            emqx_ctl:print("Unload module ~s error: ~p.~n", [Name, Reason])
+    end;
+
+modules(["reload", "emqx_mod_acl_internal" = Name]) ->
+    case emqx_modules:unload(list_to_atom(Name)) of
+        ok ->
+            emqx_ctl:print("Module ~s reloaded successfully.~n", [Name]);
+        {error, Reason} ->
+            emqx_ctl:print("Reload module ~s error: ~p.~n", [Name, Reason])
+    end;
+modules(["reload", Name]) ->
+    emqx_ctl:print("Module: ~p does not need to be reloaded.~n", [Name]);
+
+modules(_) ->
+    emqx_ctl:usage([{"modules list",            "Show loaded modules"},
+                    {"modules load <Module>",   "Load module"},
+                    {"modules unload <Module>", "Unload module"},
+                    {"modules reload <Module>", "Reload module"}
                    ]).
 
 %%--------------------------------------------------------------------
@@ -591,6 +605,9 @@ print(#plugin{name = Name, descr = Descr, active = Active}) ->
     emqx_ctl:print("Plugin(~s, description=~s, active=~s)~n",
                   [Name, Descr, Active]);
 
+print({module, {Name, Active}}) ->
+    emqx_ctl:print("Module(~s, description=~s, active=~s)~n",
+                  [Name, Name:description(), Active]);
 
 print({emqx_suboption, {{Pid, Topic}, Options}}) when is_pid(Pid) ->
     emqx_ctl:print("~s -> ~s~n", [maps:get(subid, Options), Topic]).
