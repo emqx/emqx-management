@@ -192,7 +192,7 @@ query({Qs, []}, Start, Limit) ->
             {Start, []};
         {Rows, _} ->
             case Start - length(Rows) of
-                N when N > 0 ->
+                N when N >= 0 ->
                     {N, []};
                 _ ->
                     {0, lists:reverse(lists:sublist(Rows, 1, Limit))}
