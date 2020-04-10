@@ -353,7 +353,6 @@ modules(_) ->
     emqx_modules:load_module(emqx_mod_presence, false),
     timer:sleep(50),
     {ok, Modules1} = request_api(get, api_path(["modules"]), auth_header_()),
-    ct:pal("-----~p~n", [Modules1]),
     [Modules11] = filter(get(<<"data">>, Modules1), <<"node">>, atom_to_binary(node(), utf8)),
     [Module1] = filter(maps:get(<<"modules">>, Modules11), <<"name">>, <<"emqx_mod_presence">>),
     ?assertEqual(<<"emqx_mod_presence">>, maps:get(<<"name">>, Module1)),
