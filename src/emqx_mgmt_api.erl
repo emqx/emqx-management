@@ -140,9 +140,9 @@ traverse_table(Tab, MatchFun, Start, Limit) ->
 
 %% @private
 traverse_n_by_one(_, '$end_of_table', _, Start, _, Acc) ->
-    {Start, lists:reverse(Acc)};
+    {Start, lists:flatten(lists:reverse(Acc))};
 traverse_n_by_one(_, _, _, Start, _Limit=0, Acc) ->
-    {Start, lists:reverse(Acc)};
+    {Start, lists:flatten(lists:reverse(Acc))};
 traverse_n_by_one(Tab, K, MatchFun, Start, Limit, Acc) ->
     GetRows = fun _GetRows('$end_of_table', _, Ks) ->
                       {'$end_of_table', Ks};
@@ -152,7 +152,7 @@ traverse_n_by_one(Tab, K, MatchFun, Start, Limit, Acc) ->
                       _GetRows(ets:next(Tab, Kn), N-1, [ets:lookup(Tab, Kn) | Ks])
               end,
     {K2, Rows} = GetRows(K, 100, []),
-    case MatchFun(lists:flatten(Rows)) of
+    case MatchFun(lists:flatten(lists:reverse(Rows))) of
         [] ->
             traverse_n_by_one(Tab, K2, MatchFun, Start, Limit, Acc);
         Ls ->
@@ -161,9 +161,8 @@ traverse_n_by_one(Tab, K, MatchFun, Start, Limit, Acc) ->
                     traverse_n_by_one(Tab, K2, MatchFun, N, Limit, Acc);
                 _ ->
                     Got = lists:sublist(Ls, Start+1, Limit),
-                    NAcc = lists:append(Got, Acc),
                     NLimit = Limit - length(Got),
-                    traverse_n_by_one(Tab, K2, MatchFun, 0, NLimit, NAcc)
+                    traverse_n_by_one(Tab, K2, MatchFun, 0, NLimit, [Got|Acc])
             end
     end.
 
