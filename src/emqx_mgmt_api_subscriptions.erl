@@ -56,10 +56,10 @@
         ]).
 
 list(Bindings, Params) when map_size(Bindings) == 0 ->
-    return({ok, emqx_mgmt_api:cluster_query(Params, ?SUBS_QS_SCHEMA, fun query/3, fun format/1)});
+    return({ok, emqx_mgmt_api:cluster_query(Params, ?SUBS_QS_SCHEMA, fun query/3)});
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    return({ok, emqx_mgmt_api:node_query(Node, Params, ?SUBS_QS_SCHEMA, fun query/3, fun format/1)});
+    return({ok, emqx_mgmt_api:node_query(Node, Params, ?SUBS_QS_SCHEMA, fun query/3)});
 
 list(#{node := Node} = Bindings, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
@@ -102,12 +102,12 @@ format({_Subscriber, Topic, Options}) ->
 
 query({Qs, []}, Start, Limit) ->
     Ms = qs2ms(Qs),
-    emqx_mgmt_api:select_table(emqx_suboption, Ms, Start, Limit);
+    emqx_mgmt_api:select_table(emqx_suboption, Ms, Start, Limit, fun format/1);
 
 query({Qs, Fuzzy}, Start, Limit) ->
     Ms = qs2ms(Qs),
     MatchFun = match_fun(Ms, Fuzzy),
-    emqx_mgmt_api:traverse_table(emqx_suboption, MatchFun, Start, Limit).
+    emqx_mgmt_api:traverse_table(emqx_suboption, MatchFun, Start, Limit, fun format/1).
 
 match_fun(Ms, Fuzzy) ->
     MsC = ets:match_spec_compile(Ms),

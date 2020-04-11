@@ -109,10 +109,10 @@
         ]).
 
 list(Bindings, Params) when map_size(Bindings) == 0 ->
-    return({ok, emqx_mgmt_api:cluster_query(Params, ?CLIENT_QS_SCHEMA, fun query/3, fun format/1)});
+    return({ok, emqx_mgmt_api:cluster_query(Params, ?CLIENT_QS_SCHEMA, fun query/3)});
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    return({ok, emqx_mgmt_api:node_query(Node, Params, ?CLIENT_QS_SCHEMA, fun query/3, fun format/1)});
+    return({ok, emqx_mgmt_api:node_query(Node, Params, ?CLIENT_QS_SCHEMA, fun query/3)});
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
@@ -187,12 +187,12 @@ format_acl_cache({{PubSub, Topic}, {AclResult, Timestamp}}) ->
 
 query({Qs, []}, Start, Limit) ->
     Ms = qs2ms_k(Qs),
-    emqx_mgmt_api:select_table(emqx_channel_info, Ms, Start, Limit);
+    emqx_mgmt_api:select_table(emqx_channel_info, Ms, Start, Limit, fun format/1);
 
 query({Qs, Fuzzy}, Start, Limit) ->
     Ms = qs2ms(Qs),
     MatchFun = match_fun(Ms, Fuzzy),
-    emqx_mgmt_api:traverse_table(emqx_channel_info, MatchFun, Start, Limit).
+    emqx_mgmt_api:traverse_table(emqx_channel_info, MatchFun, Start, Limit, fun format/1).
 
 %%--------------------------------------------------------------------
 %% Match funcs

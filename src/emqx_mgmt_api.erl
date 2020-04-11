@@ -22,11 +22,13 @@
 
 %% first_next query APIs
 -export([ params2qs/2
-        , node_query/5
-        , cluster_query/4
-        , traverse_table/4
-        , select_table/4
+        , node_query/4
+        , cluster_query/3
+        , traverse_table/5
+        , select_table/5
         ]).
+
+-export([do_query/5]).
 
 paginate(Tables, Params, RowFun) ->
     Qh = query_handle(Tables),
@@ -73,7 +75,7 @@ limit(Params) ->
 %% Node Query
 %%--------------------------------------------------------------------
 
-node_query(Node, Params, {Tab, QsSchema}, QueryFun, FmtFun) ->
+node_query(Node, Params, {Tab, QsSchema}, QueryFun) ->
     {CodCnt, Qs} = params2qs(Params, QsSchema),
     Limit = limit(Params),
     Page  = page(Params),
@@ -86,7 +88,7 @@ node_query(Node, Params, {Tab, QsSchema}, QueryFun, FmtFun) ->
                 true -> Meta#{count => count(Tab), hasnext => length(Rows) > Limit};
                 _ -> Meta#{count => -1, hasnext => length(Rows) > Limit}
             end,
-    #{meta => NMeta, data => [FmtFun(Row) || Row <- lists:sublist(Rows, Limit)]}.
+    #{meta => NMeta, data => lists:sublist(Rows, Limit)}.
 
 %% @private
 do_query(Node, Qs, QueryFun, Start, Limit) when Node =:= node() ->
@@ -105,7 +107,7 @@ rpc_call(Node, M, F, A, T) ->
 %% Cluster Query
 %%--------------------------------------------------------------------
 
-cluster_query(Params, {Tab, QsSchema}, QueryFun, FmtFun) ->
+cluster_query(Params, {Tab, QsSchema}, QueryFun) ->
     {CodCnt, Qs} = params2qs(Params, QsSchema),
     Limit = limit(Params),
     Page  = page(Params),
@@ -119,7 +121,7 @@ cluster_query(Params, {Tab, QsSchema}, QueryFun, FmtFun) ->
                 true -> Meta#{count => count(Tab, Nodes), hasnext => length(Rows) > Limit};
                 _ -> Meta#{count => -1, hasnext => length(Rows) > Limit}
             end,
-    #{meta => NMeta, data => [FmtFun(Row) || Row <- lists:sublist(Rows, Limit)]}.
+    #{meta => NMeta, data => lists:sublist(Rows, Limit)}.
 
 %% @private
 do_cluster_query([], _, _, _, _, Acc) ->
@@ -133,11 +135,11 @@ do_cluster_query([Node|Nodes], Qs, QueryFun, Start, Limit, Acc) ->
             lists:append(lists:reverse([Rows|Acc]))
     end.
 
-traverse_table(Tab, MatchFun, Start, Limit) ->
+traverse_table(Tab, MatchFun, Start, Limit, FmtFun) ->
     ets:safe_fixtable(Tab, true),
-    Result = traverse_n_by_one(Tab, ets:first(Tab), MatchFun, Start, Limit, []),
+    {NStart, Rows} = traverse_n_by_one(Tab, ets:first(Tab), MatchFun, Start, Limit, []),
     ets:safe_fixtable(Tab, false),
-    Result.
+    {NStart, lists:map(FmtFun, Rows)}.
 
 %% @private
 traverse_n_by_one(_, '$end_of_table', _, Start, _, Acc) ->
@@ -167,16 +169,17 @@ traverse_n_by_one(Tab, K, MatchFun, Start, Limit, Acc) ->
             end
     end.
 
-select_table(Tab, Ms, 0, Limit) ->
+select_table(Tab, Ms, 0, Limit, FmtFun) ->
     case ets:select(Tab, Ms, Limit) of
         '$end_of_table' ->
             {0, []};
         {Rows, _} ->
-            {0, lists:reverse(Rows)}
+            {0, lists:map(FmtFun, lists:reverse(Rows))}
     end;
 
-select_table(Tab, Ms, Start, Limit) ->
-    select_n_by_one(ets:select(Tab, Ms, Limit), Start, Limit, []).
+select_table(Tab, Ms, Start, Limit, FmtFun) ->
+    {NStart, Rows} = select_n_by_one(ets:select(Tab, Ms, Limit), Start, Limit, []),
+    {NStart, lists:map(FmtFun, Rows)}.
 
 select_n_by_one('$end_of_table', Start, _Limit, Acc) ->
     {Start, lists:flatten(lists:reverse(Acc))};
