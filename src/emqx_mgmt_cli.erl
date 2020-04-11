@@ -570,7 +570,12 @@ data(["export", Directory]) ->
                             {blacklist, Blacklist},
                             {apps, Apps},
                             {users, Users}],
-                    case file:write_file(NFilename, emqx_json:encode(Data)) of
+                    Data2 = case ets:info(emqx_schema) of
+                        undefined -> Data;
+                        _ ->
+                            Data ++ [{schemas, export_schemas()}]
+                    end,
+                    case file:write_file(NFilename, emqx_json:encode(Data2)) of
                         ok ->
                             emqx_ctl:print("The emqx data has been successfully exported to ~s.~n", [NFilename]);
                         {error, Reason} ->
@@ -593,6 +598,7 @@ data(["import", Filename]) ->
                         import_blacklist(maps:get(<<"blacklist">>, Data)),
                         import_applications(maps:get(<<"apps">>, Data)),
                         import_users(maps:get(<<"users">>, Data)),
+                        import_schemas(maps:get(<<"schemas">>, Data, undefined)),
                         emqx_ctl:print("The emqx data has been imported successfully.~n")
                     catch _Class:Reason ->
                         emqx_ctl:print("The emqx data import failed due to ~p.~n", [Reason])
@@ -633,7 +639,6 @@ export_resources() ->
                       {description, Desc}] | Acc]
                end, [], emqx_rule_registry:get_resources()).
 
-
 export_blacklist() ->
     lists:foldl(fun(#banned{who = Who, by = By, reason = Reason, at = At, until = Until}, Acc) ->
                     NWho = case Who of
@@ -653,6 +658,9 @@ export_users() ->
                     [[{username, Username}, {password, base64:encode(Password)}, {tags, Tags}] | Acc]
                 end, [], ets:tab2list(mqtt_admin)).
 
+export_schemas() ->
+    [emqx_schema_api:format_schema(Schema) || Schema <- emqx_schema_registry:get_all_schemas()].
+
 import_rules(Rules) ->
     lists:foreach(fun(#{<<"id">> := RuleId,
                         <<"rawsql">> := RawSQL,
@@ -660,7 +668,7 @@ import_rules(Rules) ->
                         <<"enabled">> := Enabled,
                         <<"description">> := Desc}) ->
                       NActions = lists:foldl(fun(#{<<"id">> := ActionInstId, <<"name">> := Name, <<"args">> := Args}, Acc) ->
-                                                 [#action_instance{id = ActionInstId, name = Name, args = Args} | Acc]
+                                                 [#action_instance{id = ActionInstId, name = any_to_atom(Name), args = Args} | Acc]
                                              end, [], Actions),
                       case emqx_rule_sqlparser:parse_select(RawSQL) of
                           {ok, Select} ->
@@ -691,8 +699,8 @@ import_resources(Reources) ->
                                        null -> undefined;
                                        _ -> CreatedAt
                                    end,
-                      emqx_rule_registry:add_resource(#resource{id = Id, type = Type, config = Config, created_at = NCreatedAt, description = Desc})
-                  end, Reources).  
+                      emqx_rule_registry:add_resource(#resource{id = Id, type = any_to_atom(Type), config = Config, created_at = NCreatedAt, description = Desc})
+                  end, Reources).
 
 import_blacklist(Blacklist) ->
     lists:foreach(fun(#{<<"who">> := Who,
@@ -702,7 +710,7 @@ import_blacklist(Blacklist) ->
                         <<"until">> := Until}) ->
                       NWho = case Who of
                                  #{<<"peerhost">> := Peerhost} ->
-                                     {ok, NPeerhost} = inet:parse_address(binary_to_list(Peerhost)),
+                                     {ok, NPeerhost} = inet:parse_address(Peerhost),
                                      {peerhost, NPeerhost};
                                  #{<<"clientid">> := ClientId} -> {clientid, ClientId};
                                  #{<<"username">> := Username} -> {username, Username}
@@ -731,6 +739,11 @@ import_users(Users) ->
                       NPassword = base64:decode(Password),
                       emqx_dashboard_admin:force_add_user(Username, NPassword, Tags)
                   end, Users).
+
+import_schemas(undefined) -> ok;
+import_schemas(Schemas) ->
+    [emqx_schema_registry:add_schema(emqx_schema_api:make_schema_params(Schema)) || Schema <- Schemas].
+
 
 %%--------------------------------------------------------------------
 %% Dump ETS
