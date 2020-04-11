@@ -26,20 +26,20 @@
                   ]).
 
 -define(CLIENT_QS_SCHEMA, {emqx_channel_info,
-          [{<<"clientid">>, binary},
-           {<<"username">>, binary},
-           {<<"zone">>, atom},
-           {<<"ip_address">>, ip},
-           {<<"conn_state">>, atom},
-           {<<"clean_start">>, atom},
-           {<<"proto_name">>, binary},
-           {<<"proto_ver">>, integer},
-           {<<"_like_clientid">>, binary},
-           {<<"_like_username">>, binary},
-           {<<"_gte_created_at">>, timestamp},
-           {<<"_lte_created_at">>, timestamp},
-           {<<"_gte_connected_at">>, timestamp},
-           {<<"_lte_connected_at">>, timestamp}], fun qs2ms/1}).
+        [{<<"clientid">>, binary},
+         {<<"username">>, binary},
+         {<<"zone">>, atom},
+         {<<"ip_address">>, ip},
+         {<<"conn_state">>, atom},
+         {<<"clean_start">>, atom},
+         {<<"proto_name">>, binary},
+         {<<"proto_ver">>, integer},
+         {<<"_like_clientid">>, binary},
+         {<<"_like_username">>, binary},
+         {<<"_gte_created_at">>, timestamp},
+         {<<"_lte_created_at">>, timestamp},
+         {<<"_gte_connected_at">>, timestamp},
+         {<<"_lte_connected_at">>, timestamp}]}).
 
 -rest_api(#{name   => list_clients,
             method => 'GET',
@@ -109,10 +109,10 @@
         ]).
 
 list(Bindings, Params) when map_size(Bindings) == 0 ->
-    return({ok, emqx_mgmt_api:cluster_query(Params, ?CLIENT_QS_SCHEMA, fun format/1)});
+    return({ok, emqx_mgmt_api:cluster_query(Params, ?CLIENT_QS_SCHEMA, fun query/3)});
 
 list(#{node := Node}, Params) when Node =:= node() ->
-    return({ok, emqx_mgmt_api:node_query(Node, Params, ?CLIENT_QS_SCHEMA, fun format/1)});
+    return({ok, emqx_mgmt_api:node_query(Node, Params, ?CLIENT_QS_SCHEMA, fun query/3)});
 
 list(Bindings = #{node := Node}, Params) ->
     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
@@ -182,17 +182,67 @@ format_acl_cache({{PubSub, Topic}, {AclResult, Timestamp}}) ->
       updated_time => Timestamp}.
 
 %%--------------------------------------------------------------------
-%% Query String to Match Spec
+%% Query Functions
+%%--------------------------------------------------------------------
+
+query({Qs, []}, Start, Limit) ->
+    Ms = qs2ms_k(Qs),
+    emqx_mgmt_api:select_table(emqx_channel_info, Ms, Start, Limit, fun format/1);
+
+query({Qs, Fuzzy}, Start, Limit) ->
+    Ms = qs2ms(Qs),
+    MatchFun = match_fun(Ms, Fuzzy),
+    emqx_mgmt_api:traverse_table(emqx_channel_info, MatchFun, Start, Limit, fun format/1).
+
+%%--------------------------------------------------------------------
+%% Match funcs
+
+match_fun(Ms, Fuzzy) ->
+    MsC = ets:match_spec_compile(Ms),
+    REFuzzy = lists:map(fun({K, like, S}) ->
+                  {ok, RE} = re:compile(S),
+                  {K, like, RE}
+              end, Fuzzy),
+    fun(Rows) ->
+         case ets:match_spec_run(Rows, MsC) of
+             [] -> [];
+             Ls ->
+                 lists:filtermap(fun(E) ->
+                    case run_fuzzy_match(E, REFuzzy) of
+                        false -> false;
+                        true -> {true, element(1, E)}
+                    end end, Ls)
+         end
+    end.
+
+run_fuzzy_match(_, []) ->
+    true;
+run_fuzzy_match(E = {_, #{clientinfo := ClientInfo}, _}, [{Key, _, RE}|Fuzzy]) ->
+    Val = case maps:get(Key, ClientInfo, "") of
+              undefined -> "";
+              V -> V
+          end,
+    re:run(Val, RE, [{capture, none}]) == match andalso run_fuzzy_match(E, Fuzzy).
+
+%%--------------------------------------------------------------------
+%% QueryString to Match Spec
 
 -spec qs2ms(list()) -> ets:match_spec().
 qs2ms(Qs) ->
+    {MtchHead, Conds} = qs2ms(Qs, 2, {#{}, []}),
+    [{{'$1', MtchHead, '_'}, Conds, ['$_']}].
+
+qs2ms_k(Qs) ->
     {MtchHead, Conds} = qs2ms(Qs, 2, {#{}, []}),
     [{{'$1', MtchHead, '_'}, Conds, ['$1']}].
 
 qs2ms([], _, {MtchHead, Conds}) ->
     {MtchHead, lists:reverse(Conds)};
 
-qs2ms([Qs|Rest], N, {MtchHead, Conds}) ->
+qs2ms([{Key, '=:=', Value} | Rest], N, {MtchHead, Conds}) ->
+    NMtchHead = emqx_mgmt_util:merge_maps(MtchHead, ms(Key, Value)),
+    qs2ms(Rest, N, {NMtchHead, Conds});
+qs2ms([Qs | Rest], N, {MtchHead, Conds}) ->
     Holder = binary_to_atom(iolist_to_binary(["$", integer_to_list(N)]), utf8),
     NMtchHead = emqx_mgmt_util:merge_maps(MtchHead, ms(element(1, Qs), Holder)),
     NConds = put_conds(Qs, Holder, Conds),
@@ -232,7 +282,8 @@ ms(created_at, X) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-compile_test() ->
+params2qs_test() ->
+    QsSchema = element(2, ?CLIENT_QS_SCHEMA),
     Params = [{<<"clientid">>, <<"abc">>},
               {<<"username">>, <<"def">>},
               {<<"zone">>, <<"external">>},
@@ -241,44 +292,35 @@ compile_test() ->
               {<<"clean_start">>, true},
               {<<"proto_name">>, <<"MQTT">>},
               {<<"proto_ver">>, 4},
-              {<<"_gte_created_at">>, 123456},
-              {<<"_lte_created_at">>, 234567},
-              {<<"_gte_connected_at">>, 123456},
-              {<<"_lte_connected_at">>, 234567},
+              {<<"_gte_created_at">>, 1},
+              {<<"_lte_created_at">>, 5},
+              {<<"_gte_connected_at">>, 1},
+              {<<"_lte_connected_at">>, 5},
               {<<"_like_clientid">>, <<"a">>},
               {<<"_like_username">>, <<"e">>}
              ],
     ExpectedMtchHead =
-        #{clientinfo => #{clientid => '$2',
-                          username => '$3',
-                          zone => '$4',
-                          peerhost => '$5'
+        #{clientinfo => #{clientid => <<"abc">>,
+                          username => <<"def">>,
+                          zone => external,
+                          peerhost => {127,0,0,1}
                          },
-          conn_state => '$6',
-          conninfo => #{clean_start => '$7',
-                        proto_name => '$8',
-                        proto_ver => '$9',
-                        connected_at => '$11'},
-          session => #{created_at => '$10'}},
-    ExpectedCondi = [{'=:=','$2',<<"abc">>},
-                     {'=:=','$3',<<"def">>},
-                     {'=:=','$4',external},
-                     {'=:=','$5',{127,0,0,1}},
-                     {'=:=','$6',connected},
-                     {'=:=','$7',true},
-                     {'=:=','$8',<<"MQTT">>},
-                     {'=:=','$9',4},
-                     {'>=','$10',123456},
-                     {'=<','$10',234567},
-                     {'>=','$11',123456},
-                     {'=<','$11',234567}],
-    {emqx_channel_info, [{{'$1', MtchHead, _}, Condi, _}], []} = emqx_mgmt_api:compile(Params, ?CLIENT_QS_SCHEMA),
+          conn_state => connected,
+          conninfo => #{clean_start => true,
+                        proto_name => <<"MQTT">>,
+                        proto_ver => 4,
+                        connected_at => '$3'},
+          session => #{created_at => '$2'}},
+    ExpectedCondi = [{'>=','$2', 1},
+                     {'=<','$2', 5},
+                     {'>=','$3', 1},
+                     {'=<','$3', 5}],
+    {10, {Qs1, []}} = emqx_mgmt_api:params2qs(Params, QsSchema),
+    [{{'$1', MtchHead, _}, Condi, _}] = qs2ms(Qs1),
     ?assertEqual(ExpectedMtchHead, MtchHead),
     ?assertEqual(ExpectedCondi, Condi),
 
-    %% Compile
-    {emqx_channel_info, [{{'$1', #{}, '_'}, [], ['$1']}], []} = emqx_mgmt_api:compile([{not_a_predefined_params, val}], ?CLIENT_QS_SCHEMA),
-    {emqx_channel_info, [{{'$1', #{}, '_'}, [], ['$1']}], [{clientid, like, <<"ab">>}]} = emqx_mgmt_api:compile([{<<"_like_clientid">>, <<"ab">>}], ?CLIENT_QS_SCHEMA).
+    [{{'$1', #{}, '_'}, [], ['$_']}] = qs2ms([]),
+    [{{'$1', #{}, '_'}, [], ['$1']}] = qs2ms_k([]).
 
 -endif.
-

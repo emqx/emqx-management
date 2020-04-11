@@ -83,6 +83,14 @@
         , reload_plugin/2
         ]).
 
+%% Modules
+-export([ list_modules/0
+        , list_modules/1
+        , load_module/2
+        , unload_module/2
+        , reload_module/2
+        ]).
+
 %% Listeners
 -export([ list_listeners/0
         , list_listeners/1
@@ -171,7 +179,20 @@ get_metrics(Node) ->
     rpc_call(Node, get_metrics, [Node]).
 
 get_topic_metrics(Topic) ->
-    [{Node, get_topic_metrics(Node, Topic)} || Node <- ekka_mnesia:running_nodes()].
+    lists:foldl(fun(Node, Acc) ->
+                    case get_topic_metrics(Node, Topic) of
+                        {error, _Reason} ->
+                            Acc;
+                        Metrics ->
+                            case Acc of
+                                [] -> Metrics;
+                                _ ->
+                                    lists:foldl(fun({K, V}, Acc0) ->
+                                                    [{K, V + proplists:get_value(K, Metrics, 0)} | Acc0]
+                                                end, [], Acc)
+                            end
+                    end
+                end, [], ekka_mnesia:running_nodes()).
 
 get_topic_metrics(Node, Topic) when Node =:= node() ->
     emqx_mod_topic_metrics:metrics(Topic);
@@ -179,7 +200,11 @@ get_topic_metrics(Node, Topic) ->
     rpc_call(Node, get_topic_metrics, [Node, Topic]).
 
 register_topic_metrics(Topic) ->
-    [{Node, register_topic_metrics(Node, Topic)} || Node <- ekka_mnesia:running_nodes()].
+    Results = [register_topic_metrics(Node, Topic) || Node <- ekka_mnesia:running_nodes()],
+    case lists:any(fun(Item) -> Item =:= ok end, Results) of
+        true  -> ok;
+        false -> lists:last(Results)
+    end.
 
 register_topic_metrics(Node, Topic) when Node =:= node() ->
     emqx_mod_topic_metrics:register(Topic);
@@ -187,7 +212,11 @@ register_topic_metrics(Node, Topic) ->
     rpc_call(Node, register_topic_metrics, [Node, Topic]).
 
 unregister_topic_metrics(Topic) ->
-    [{Node, unregister_topic_metrics(Node, Topic)} || Node <- ekka_mnesia:running_nodes()].
+    Results = [unregister_topic_metrics(Node, Topic) || Node <- ekka_mnesia:running_nodes()],
+    case lists:any(fun(Item) -> Item =:= ok end, Results) of
+        true  -> ok;
+        false -> lists:last(Results)
+    end.
 
 unregister_topic_metrics(Node, Topic) when Node =:= node() ->
     emqx_mod_topic_metrics:unregister(Topic);
@@ -195,7 +224,11 @@ unregister_topic_metrics(Node, Topic) ->
     rpc_call(Node, unregister_topic_metrics, [Node, Topic]).
 
 unregister_all_topic_metrics() ->
-    [unregister_all_topic_metrics(Node) || Node <- ekka_mnesia:running_nodes()], ok.
+    Results = [unregister_all_topic_metrics(Node) || Node <- ekka_mnesia:running_nodes()],
+    case lists:any(fun(Item) -> Item =:= ok end, Results) of
+        true  -> ok;
+        false -> lists:last(Results)
+    end.
 
 unregister_all_topic_metrics(Node) when Node =:= node() ->
     emqx_mod_topic_metrics:unregister_all();
@@ -377,6 +410,33 @@ reload_plugin(Node, Plugin) when Node =:= node() ->
 reload_plugin(Node, Plugin) ->
     rpc_call(Node, reload_plugin, [Node, Plugin]).
 
+
+%%--------------------------------------------------------------------
+%% Modules
+%%--------------------------------------------------------------------
+
+list_modules() ->
+    [{Node, list_modules(Node)} || Node <- ekka_mnesia:running_nodes()].
+
+list_modules(Node) when Node =:= node() ->
+    emqx_modules:list();
+list_modules(Node) ->
+    rpc_call(Node, list_modules, [Node]).
+
+load_module(Node, Module) when Node =:= node() ->
+    emqx_modules:load(Module);
+load_module(Node, Module) ->
+    rpc_call(Node, load_module, [Node, Module]).
+
+unload_module(Node, Module) when Node =:= node() ->
+    emqx_modules:unload(Module);
+unload_module(Node, Module) ->
+    rpc_call(Node, unload_module, [Node, Module]).
+
+reload_module(Node, Module) when Node =:= node() ->
+    emqx_modules:reload(Module);
+reload_module(Node, Module) ->
+    rpc_call(Node, reload_module, [Node, Module]).
 %%--------------------------------------------------------------------
 %% Listeners
 %%--------------------------------------------------------------------

@@ -26,6 +26,7 @@
         , add_app/2
         , add_app/5
         , add_app/6
+        , force_add_app/6
         , lookup_app/1
         , get_appsecret/1
         , update_app/2
@@ -103,6 +104,20 @@ add_app(AppId, Name, Secret, Desc, Status, Expired) when is_binary(AppId) ->
              end,
     case mnesia:transaction(AddFun) of
         {atomic, ok} -> {ok, Secret1};
+        {aborted, Reason} -> {error, Reason}
+    end.
+
+force_add_app(AppId, Name, Secret, Desc, Status, Expired) ->
+    AddFun = fun() ->
+                 mnesia:write(#mqtt_app{id = AppId,
+                                        secret = Secret,
+                                        name = Name,
+                                        desc = Desc,
+                                        status = Status,
+                                        expired = Expired})
+             end,
+    case mnesia:transaction(AddFun) of
+        {atomic, ok} -> ok;
         {aborted, Reason} -> {error, Reason}
     end.
 

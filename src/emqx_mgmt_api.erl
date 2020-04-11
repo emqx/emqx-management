@@ -21,10 +21,14 @@
 -export([paginate/3]).
 
 %% first_next query APIs
--export([ compile/2
+-export([ params2qs/2
         , node_query/4
         , cluster_query/3
+        , traverse_table/5
+        , select_table/5
         ]).
+
+-export([do_query/5]).
 
 paginate(Tables, Params, RowFun) ->
     Qh = query_handle(Tables),
@@ -71,32 +75,28 @@ limit(Params) ->
 %% Node Query
 %%--------------------------------------------------------------------
 
-node_query(Node, Params, QsSchema, RowFun) ->
-    {Tab, _, _} = TabQs = compile(Params, QsSchema),
+node_query(Node, Params, {Tab, QsSchema}, QueryFun) ->
+    {CodCnt, Qs} = params2qs(Params, QsSchema),
     Limit = limit(Params),
     Page  = page(Params),
     Start = if Page > 1 -> (Page-1) * Limit;
                true -> 0
             end,
-    {_, _NStart, Rows} = do_query(Node, TabQs, Start, Limit+1),
+    {_, Rows} = do_query(Node, Qs, QueryFun, Start, Limit+1),
     Meta = #{page => Page, limit => Limit},
-    NMeta = case is_empty_qs(TabQs) of
+    NMeta = case CodCnt =:= 0 of
                 true -> Meta#{count => count(Tab), hasnext => length(Rows) > Limit};
                 _ -> Meta#{count => -1, hasnext => length(Rows) > Limit}
             end,
-    #{meta => NMeta, data => [RowFun(Row) || Row <- lists:sublist(Rows, Limit)]}.
+    #{meta => NMeta, data => lists:sublist(Rows, Limit)}.
 
-do_query(Node, TabQs, Start, Limit) when Node =:= node() ->
-    {Tab, Ms, Fuzzy} = TabQs,
-    MatchFun = match_fun(Ms, Fuzzy),
-    ets:safe_fixtable(Tab, true),
-    Result = traverse_one_by_one(Tab, ets:first(Tab), MatchFun, Start, Limit, []),
-    ets:safe_fixtable(Tab, false),
-    Result;
+%% @private
+do_query(Node, Qs, QueryFun, Start, Limit) when Node =:= node() ->
+    QueryFun(Qs, Start, Limit);
+do_query(Node, Qs, QueryFun, Start, Limit) ->
+    rpc_call(Node, ?MODULE, do_query, [Node, Qs, QueryFun, Start, Limit], 50000).
 
-do_query(Node, TabQs, Start, Limit) ->
-    rpc_call(Node, ?MODULE, do_query, [Node, TabQs, Start, Limit], 50000).
-
+%% @private
 rpc_call(Node, M, F, A, T) ->
     case rpc:call(Node, M, F, A, T) of
         {badrpc, _} = R -> {error, R};
@@ -107,59 +107,102 @@ rpc_call(Node, M, F, A, T) ->
 %% Cluster Query
 %%--------------------------------------------------------------------
 
-cluster_query(Params, QsSchema, RowFun) ->
-    {Tab, _, _} = TabQs = compile(Params, QsSchema),
+cluster_query(Params, {Tab, QsSchema}, QueryFun) ->
+    {CodCnt, Qs} = params2qs(Params, QsSchema),
     Limit = limit(Params),
     Page  = page(Params),
     Start = if Page > 1 -> (Page-1) * Limit;
                true -> 0
             end,
     Nodes = ekka_mnesia:running_nodes(),
-    Rows = do_cluster_query(Nodes, TabQs, Start, Limit+1, []),
+    Rows = do_cluster_query(Nodes, Qs, QueryFun, Start, Limit+1, []),
     Meta = #{page => Page, limit => Limit},
-    NMeta = case is_empty_qs(TabQs) of
+    NMeta = case CodCnt =:= 0 of
                 true -> Meta#{count => count(Tab, Nodes), hasnext => length(Rows) > Limit};
                 _ -> Meta#{count => -1, hasnext => length(Rows) > Limit}
             end,
-    #{meta => NMeta, data => [RowFun(Row) || Row <- lists:sublist(Rows, Limit)]}.
+    #{meta => NMeta, data => lists:sublist(Rows, Limit)}.
 
-do_cluster_query([], _, _, _, Acc) ->
+%% @private
+do_cluster_query([], _, _, _, _, Acc) ->
     lists:append(lists:reverse(Acc));
-do_cluster_query([Node|Nodes], TabQs, Start, Limit, Acc) ->
-    {_, NStart, Rows} = do_query(Node, TabQs, Start, Limit),
+do_cluster_query([Node|Nodes], Qs, QueryFun, Start, Limit, Acc) ->
+    {NStart, Rows} = do_query(Node, Qs, QueryFun, Start, Limit),
     case Limit - length(Rows) of
         Rest when Rest > 0 ->
-            do_cluster_query(Nodes, TabQs, NStart, Limit, [Rows|Acc]);
+            do_cluster_query(Nodes, Qs, QueryFun, NStart, Limit, [Rows|Acc]);
         0 ->
             lists:append(lists:reverse([Rows|Acc]))
     end.
 
-%%--------------------------------------------------------------------
-%% Intenal funcs
+traverse_table(Tab, MatchFun, Start, Limit, FmtFun) ->
+    ets:safe_fixtable(Tab, true),
+    {NStart, Rows} = traverse_n_by_one(Tab, ets:first(Tab), MatchFun, Start, Limit, []),
+    ets:safe_fixtable(Tab, false),
+    {NStart, lists:map(FmtFun, Rows)}.
 
-
-traverse_one_by_one(_, '$end_of_table', _, Start, _, Acc) ->
-    {'$end_of_table', Start, lists:reverse(Acc)};
-traverse_one_by_one(_, _, _, Start, _Limit=0, Acc) ->
-    {continue, Start, lists:reverse(Acc)};
-traverse_one_by_one(Tab, K, MatchFun, Start, Limit, Acc) ->
-    [E] = ets:lookup(Tab, K),
-    K2 = ets:next(Tab, K),
-    case MatchFun(E) of
-        true ->
-            case Start of
-                0 ->
-                    traverse_one_by_one(Tab, K2, MatchFun, Start, Limit-1, [element(1, E) | Acc]);
+%% @private
+traverse_n_by_one(_, '$end_of_table', _, Start, _, Acc) ->
+    {Start, lists:flatten(lists:reverse(Acc))};
+traverse_n_by_one(_, _, _, Start, _Limit=0, Acc) ->
+    {Start, lists:flatten(lists:reverse(Acc))};
+traverse_n_by_one(Tab, K, MatchFun, Start, Limit, Acc) ->
+    GetRows = fun _GetRows('$end_of_table', _, Ks) ->
+                      {'$end_of_table', Ks};
+                  _GetRows(Kn,  1, Ks) ->
+                      {ets:next(Tab, Kn), [ets:lookup(Tab, Kn) | Ks]};
+                  _GetRows(Kn, N, Ks) ->
+                      _GetRows(ets:next(Tab, Kn), N-1, [ets:lookup(Tab, Kn) | Ks])
+              end,
+    {K2, Rows} = GetRows(K, 100, []),
+    case MatchFun(lists:flatten(lists:reverse(Rows))) of
+        [] ->
+            traverse_n_by_one(Tab, K2, MatchFun, Start, Limit, Acc);
+        Ls ->
+            case Start - length(Ls) of
+                N when N > 0 -> %% Skip
+                    traverse_n_by_one(Tab, K2, MatchFun, N, Limit, Acc);
                 _ ->
-                    traverse_one_by_one(Tab, K2, MatchFun, Start-1, Limit, Acc)
-            end;
-        _ ->
-            traverse_one_by_one(Tab, K2, MatchFun, Start, Limit, Acc)
+                    Got = lists:sublist(Ls, Start+1, Limit),
+                    NLimit = Limit - length(Got),
+                    traverse_n_by_one(Tab, K2, MatchFun, 0, NLimit, [Got|Acc])
+            end
     end.
 
-compile(Params, {Tab, QsKits, Convertor}) ->
-    {Qs, Fuzzy} = pick_params_to_qs(Params, QsKits, [], []),
-    {Tab, Convertor(Qs), Fuzzy}.
+select_table(Tab, Ms, 0, Limit, FmtFun) ->
+    case ets:select(Tab, Ms, Limit) of
+        '$end_of_table' ->
+            {0, []};
+        {Rows, _} ->
+            {0, lists:map(FmtFun, lists:reverse(Rows))}
+    end;
+
+select_table(Tab, Ms, Start, Limit, FmtFun) ->
+    {NStart, Rows} = select_n_by_one(ets:select(Tab, Ms, Limit), Start, Limit, []),
+    {NStart, lists:map(FmtFun, Rows)}.
+
+select_n_by_one('$end_of_table', Start, _Limit, Acc) ->
+    {Start, lists:flatten(lists:reverse(Acc))};
+select_n_by_one(_, Start, _Limit = 0, Acc) ->
+    {Start, lists:flatten(lists:reverse(Acc))};
+
+select_n_by_one({Rows0, Cons}, Start, Limit, Acc) ->
+    Rows = lists:reverse(Rows0),
+    case Start - length(Rows) of
+        N when N > 0 -> %% Skip
+            select_n_by_one(ets:select(Cons), N, Limit, Acc);
+        _ ->
+            Got = lists:sublist(Rows, Start+1, Limit),
+            NLimit = Limit - length(Got),
+            select_n_by_one(ets:select(Cons), 0, NLimit, [Got|Acc])
+    end.
+
+params2qs(Params, QsSchema) ->
+    {Qs, Fuzzy} = pick_params_to_qs(Params, QsSchema, [], []),
+    {length(Qs) + length(Fuzzy), {Qs, Fuzzy}}.
+
+%%--------------------------------------------------------------------
+%% Intenal funcs
 
 pick_params_to_qs([], _, Acc1, Acc2) ->
     NAcc2 = [E || E <- Acc2, not lists:keymember(element(1, E), 1, Acc1)],
@@ -179,33 +222,43 @@ pick_params_to_qs([{Key, Value}|Params], QsKits, Acc1, Acc2) ->
                                 end,
                     case lists:keytake(OpposeKey, 1, Params) of
                         false ->
-                            pick_params_to_qs(Params, QsKits, [params2qs(Key, Value, Type) | Acc1], Acc2);
+                            pick_params_to_qs(Params, QsKits, [qs(Key, Value, Type) | Acc1], Acc2);
                         {value, {K2, V2}, NParams} ->
-                            pick_params_to_qs(NParams, QsKits, [params2qs(Key, Value, K2, V2, Type) | Acc1], Acc2)
+                            pick_params_to_qs(NParams, QsKits, [qs(Key, Value, K2, V2, Type) | Acc1], Acc2)
                     end;
-                <<"_like", _/binary>> ->
-                    pick_params_to_qs(Params, QsKits, Acc1, [params2qs(Key, Value, Type) | Acc2]);
                 _ ->
-                    pick_params_to_qs(Params, QsKits, [params2qs(Key, Value, Type) | Acc1], Acc2)
+                    case is_fuzzy_key(Key) of
+                        true ->
+                            pick_params_to_qs(Params, QsKits, Acc1, [qs(Key, Value, Type) | Acc2]);
+                        _ ->
+                            pick_params_to_qs(Params, QsKits, [qs(Key, Value, Type) | Acc1], Acc2)
+
+                    end
             end
     end.
 
-params2qs(<<"_gte_", Key/binary>>, Value, Type) ->
+qs(<<"_gte_", Key/binary>>, Value, Type) ->
     {binary_to_existing_atom(Key, utf8), '>=', to_type(Value, Type)};
-params2qs(<<"_lte_", Key/binary>>, Value, Type) ->
+qs(<<"_lte_", Key/binary>>, Value, Type) ->
     {binary_to_existing_atom(Key, utf8), '=<', to_type(Value, Type)};
-params2qs(<<"_like_", Key/binary>>, Value, Type) ->
+qs(<<"_like_", Key/binary>>, Value, Type) ->
     {binary_to_existing_atom(Key, utf8), like, to_type(Value, Type)};
-params2qs(Key, Value, Type) ->
+qs(<<"_match_", Key/binary>>, Value, Type) ->
+    {binary_to_existing_atom(Key, utf8), match, to_type(Value, Type)};
+qs(Key, Value, Type) ->
     {binary_to_existing_atom(Key, utf8), '=:=', to_type(Value, Type)}.
 
-params2qs(K1, V1, K2, V2, Type) ->
-    {Key, Op1, NV1} = params2qs(K1, V1, Type),
-    {Key, Op2, NV2} = params2qs(K2, V2, Type),
+qs(K1, V1, K2, V2, Type) ->
+    {Key, Op1, NV1} = qs(K1, V1, Type),
+    {Key, Op2, NV2} = qs(K2, V2, Type),
     {Key, Op1, NV1, Op2, NV2}.
 
-is_empty_qs({_Tab, [{_, [], _}], []}) -> true;
-is_empty_qs(_) -> false.
+is_fuzzy_key(<<"_like_", _/binary>>) ->
+    true;
+is_fuzzy_key(<<"_match_", _/binary>>) ->
+    true;
+is_fuzzy_key(_) ->
+    false.
 
 %%--------------------------------------------------------------------
 %% Types
@@ -235,22 +288,39 @@ aton(B) when is_binary(B) ->
     list_to_tuple([binary_to_integer(T) || T <- re:split(B, "[.]")]).
 
 %%--------------------------------------------------------------------
-%% Match
+%% EUnits
+%%--------------------------------------------------------------------
 
-match_fun(Ms, Fuzzy) ->
-    REFuzzy = lists:map(fun({K, like, S}) ->
-                  {ok, RE} = re:compile(S),
-                  {K, like, RE}
-              end, Fuzzy),
-    fun(E) ->
-         case ets:test_ms(E, Ms) of
-             {error, _} -> false;
-             {ok, false}-> false;
-             {ok, _} -> run_fuzzy_match(E, REFuzzy)
-         end
-    end.
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
 
-run_fuzzy_match(_, []) ->
-    true;
-run_fuzzy_match(E = {_, #{clientinfo := ClientInfo}, _}, [{Key, _, RE}|Fuzzy]) ->
-    re:run(maps:get(Key, ClientInfo, ""), RE, [{capture, none}]) == match andalso run_fuzzy_match(E, Fuzzy).
+params2qs_test() ->
+    Schema = [{<<"str">>, binary},
+              {<<"int">>, integer},
+              {<<"atom">>, atom},
+              {<<"ts">>, timestamp},
+              {<<"_gte_range">>, integer},
+              {<<"_lte_range">>, integer},
+              {<<"_like_fuzzy">>, binary},
+              {<<"_match_topic">>, binary}],
+    Params = [{<<"str">>, <<"abc">>},
+              {<<"int">>, <<"123">>},
+              {<<"atom">>, <<"connected">>},
+              {<<"ts">>, <<"156000">>},
+              {<<"_gte_range">>, <<"1">>},
+              {<<"_lte_range">>, <<"5">>},
+              {<<"_like_fuzzy">>, <<"user">>},
+              {<<"_match_topic">>, <<"t/#">>}],
+    ExpectedQs = [{str, '=:=', <<"abc">>},
+                  {int, '=:=', 123},
+                  {atom, '=:=', connected},
+                  {ts, '=:=', 156000},
+                  {range, '>=', 1, '=<', 5}
+                 ],
+    FuzzyQs = [{fuzzy, like, <<"user">>},
+               {topic, match, <<"t/#">>}],
+    ?assertEqual({7, {ExpectedQs, FuzzyQs}}, params2qs(Params, Schema)),
+
+    {0, {[], []}} = params2qs([{not_a_predefined_params, val}], Schema).
+
+-endif.
