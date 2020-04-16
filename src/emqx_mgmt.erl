@@ -251,7 +251,10 @@ lookup_client({clientid, ClientId}, FormatFun) ->
     lists:append([lookup_client(Node, {clientid, ClientId}, FormatFun) || Node <- ekka_mnesia:running_nodes()]);
 
 lookup_client({username, Username}, FormatFun) ->
-    lists:append([lookup_client(Node, {username, Username}, FormatFun) || Node <- ekka_mnesia:running_nodes()]).
+    lists:append([lookup_client(Node, {username, Username}, FormatFun) || Node <- ekka_mnesia:running_nodes()]);
+
+lookup_client({topic, Topic}, FormatFun) ->
+    lists:append([lookup_client(Node, {topic, Topic}, FormatFun) || Node <- ekka_mnesia:running_nodes()]).
 
 lookup_client(Node, {clientid, ClientId}, FormatFun) when Node =:= node() ->
     FormatFun(ets:lookup(emqx_channel, ClientId));
@@ -264,7 +267,14 @@ lookup_client(Node, {username, Username}, FormatFun) when Node =:= node() ->
     FormatFun(ets:select(emqx_channel_info, MatchSpec));
 
 lookup_client(Node, {username, Username}, FormatFun) ->
-    rpc_call(Node, lookup_client, [Node, {username, Username}, FormatFun]).
+    rpc_call(Node, lookup_client, [Node, {username, Username}, FormatFun]);
+
+lookup_client(Node, {topic, Topic}, FormatFun) when Node =:= node() ->
+    MatchSpec = [{{{'_', '$1'}, #{subid => '$2'}}, [{'=:=','$1', Topic}], ['$2']}],
+    FormatFun(ets:select(emqx_suboption, MatchSpec));
+
+lookup_client(Node, {topic, Topic}, FormatFun) ->
+    rpc_call(Node, lookup_client, [Node, {topic, Topic}, FormatFun]).
 
 kickout_client(ClientId) ->
     Results = [kickout_client(Node, ClientId) || Node <- ekka_mnesia:running_nodes()],
