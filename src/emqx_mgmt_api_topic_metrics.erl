@@ -18,6 +18,12 @@
 
 -import(minirest, [return/1]).
 
+-rest_api(#{name   => list_all_topic_metrics,
+            method => 'GET',
+            path   => "/topic-metrics",
+            func   => list,
+            descr  => "A list of all topic metrics of all nodes in the cluster"}).
+
 -rest_api(#{name   => list_topic_metrics,
             method => 'GET',
             path   => "/topic-metrics/:bin:topic",
@@ -50,6 +56,11 @@
 list(#{topic := Topic0}, _Params) ->
     Topic = http_uri:decode(Topic0),
     case emqx_mgmt:get_topic_metrics(Topic) of
+        {error, Reason} -> return({error, Reason});
+        Metrics         -> return({ok, maps:from_list(Metrics)})
+    end;
+list(_Bindings, _Params) ->
+    case emqx_mgmt:get_all_topic_metrics() of
         {error, Reason} -> return({error, Reason});
         Metrics         -> return({ok, maps:from_list(Metrics)})
     end.

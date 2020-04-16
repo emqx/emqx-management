@@ -36,6 +36,7 @@
 %% Metrics and Stats
 -export([ get_metrics/0
         , get_metrics/1
+        , get_all_topic_metrics/0
         , get_topic_metrics/1
         , get_topic_metrics/2
         , register_topic_metrics/1
@@ -177,6 +178,16 @@ get_metrics(Node) when Node =:= node() ->
     emqx_metrics:all();
 get_metrics(Node) ->
     rpc_call(Node, get_metrics, [Node]).
+
+get_all_topic_metrics() ->
+    lists:foldl(fun(Topic, Acc) ->
+                    case get_topic_metrics(Topic) of
+                        {error, _Reason} ->
+                            Acc;
+                        Metrics ->
+                            [{Topic, Metrics} | Acc]
+                    end
+                end, [], emqx_mod_topic_metrics:all_registered_topics()).
 
 get_topic_metrics(Topic) ->
     lists:foldl(fun(Node, Acc) ->
