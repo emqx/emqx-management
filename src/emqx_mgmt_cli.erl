@@ -56,8 +56,6 @@
 
 -define(MAIN_APP, emqx).
 
--define(VERSION, 1).
-
 -spec(load() -> ok).
 load() ->
     Cmds = [Fun || {Fun, _} <- ?MODULE:module_info(exports), is_cmd(Fun)],
@@ -563,7 +561,7 @@ data(["export", Directory]) ->
                     {{Y, M, D}, _} = emqx_mgmt_util:datetime(Seconds),
                     Filename = io_lib:format("emqx-export-~p-~p-~p.json", [Y, M, D]),
                     NFilename = filename:join([Directory, Filename]),
-                    Data = [{version, ?VERSION},
+                    Data = [{version, erlang:list_to_binary(string:sub_string(emqx_sys:version(), 1, 3))},
                             {date, erlang:list_to_binary(emqx_mgmt_util:strftime(Seconds))},
                             {rules, Rules},
                             {resources, Resources},
@@ -590,8 +588,9 @@ data(["import", Filename]) ->
     case file:read_file(Filename) of
         {ok, Json} ->
             Data = emqx_json:decode(Json, [return_maps]),
+            CurVersion = erlang:list_to_binary(string:sub_string(emqx_sys:version(), 1, 3)),
             case maps:get(<<"version">>, Data) of
-                ?VERSION ->
+                CurVersion ->
                     try
                         import_resources(maps:get(<<"resources">>, Data)),
                         import_rules(maps:get(<<"rules">>, Data)),
