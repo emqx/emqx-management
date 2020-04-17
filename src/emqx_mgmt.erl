@@ -346,7 +346,7 @@ list_subscriptions_via_topic(Topic, FormatFun) ->
     lists:append([list_subscriptions_via_topic(Node, Topic, FormatFun) || Node <- ekka_mnesia:running_nodes()]).
 
 list_subscriptions_via_topic(Node, Topic, FormatFun) when Node =:= node() ->
-    MatchSpec = [{{{'_', '$1'}, #{subid => '$2'}}, [{'=:=','$1', Topic}], ['$_']}],
+    MatchSpec = [{{{'_', '$1'}, '_'}, [{'=:=','$1', Topic}], ['$_']}],
     FormatFun(ets:select(emqx_suboption, MatchSpec));
 
 list_subscriptions_via_topic(Node, {topic, Topic}, FormatFun) ->
