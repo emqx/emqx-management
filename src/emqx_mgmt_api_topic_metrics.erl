@@ -32,7 +32,7 @@
 
 -rest_api(#{name   => register_topic_metrics,
             method => 'POST',
-            path   => "/topic-metrics/:bin:topic",
+            path   => "/topic-metrics",
             func   => register,
             descr  => "Register topic metrics"}).
 
@@ -54,29 +54,56 @@
         ]).
 
 list(#{topic := Topic0}, _Params) ->
-    Topic = http_uri:decode(Topic0),
-    case emqx_mgmt:get_topic_metrics(Topic) of
-        {error, Reason} -> return({error, Reason});
-        Metrics         -> return({ok, maps:from_list(Metrics)})
-    end;
-list(_Bindings, _Params) ->
-    case emqx_mgmt:get_all_topic_metrics() of
-        {error, Reason} -> return({error, Reason});
-        Metrics         -> return({ok, maps:from_list(Metrics)})
-    end.
+    execute_when_enabled(fun() ->
+        Topic = http_uri:decode(Topic0),
+        case emqx_mgmt:get_topic_metrics(Topic) of
+            {error, Reason} -> return({error, Reason});
+            Metrics         -> return({ok, maps:from_list(Metrics)})
+        end
+    end);
 
-register(#{topic := Topic0}, _Params) ->
-    Topic = http_uri:decode(Topic0),
-    emqx_mgmt:register_topic_metrics(Topic),
-    return(ok).
+list(_Bindings, _Params) ->
+    execute_when_enabled(fun() ->
+        case emqx_mgmt:get_all_topic_metrics() of
+            {error, Reason} -> return({error, Reason});
+            Metrics         -> return({ok, maps:from_list(Metrics)})
+        end
+    end).
+    
+register(_Bindings, Params) ->
+    execute_when_enabled(fun() ->
+        case proplists:get_value(<<"topic">>, Params) of
+            undefined ->
+                return({error, missing_required_params});
+            Topic ->
+                emqx_mgmt:register_topic_metrics(Topic),
+                return(ok)
+        end
+    end).
 
 unregister(Bindings, _Params) when map_size(Bindings) =:= 0 ->
-    emqx_mgmt:unregister_all_topic_metrics(),
-    return(ok);
+    execute_when_enabled(fun() ->
+        emqx_mgmt:unregister_all_topic_metrics(),
+        return(ok)
+    end);
 
 unregister(#{topic := Topic0}, _Params) ->
-    Topic = http_uri:decode(Topic0),
-    emqx_mgmt:unregister_topic_metrics(Topic),
-    return(ok).
+    execute_when_enabled(fun() ->
+        Topic = http_uri:decode(Topic0),
+        emqx_mgmt:unregister_topic_metrics(Topic),
+        return(ok)
+    end).
+
+execute_when_enabled(Fun) ->
+    Enabled = case emqx_modules:find_module(emqx_mod_topic_metrics) of
+                  [{_, false}] -> false;
+                  [{_, true}] -> true
+              end,
+    case Enabled of
+        true ->
+            Fun();
+        false ->
+            return({error, plugin_not_loaded})
+    end.
 
 
