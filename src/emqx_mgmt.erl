@@ -61,6 +61,8 @@
 
 %% Subscriptions
 -export([ list_subscriptions/1
+        , list_subscriptions_via_topic/2
+        , list_subscriptions_via_topic/3
         , lookup_subscriptions/1
         , lookup_subscriptions/2
         ]).
@@ -350,6 +352,16 @@ list_subscriptions(Node) when Node =:= node() ->
 
 list_subscriptions(Node) ->
     rpc_call(Node, list_subscriptions, [Node]).
+
+list_subscriptions_via_topic(Topic, FormatFun) ->
+    lists:append([list_subscriptions_via_topic(Node, Topic, FormatFun) || Node <- ekka_mnesia:running_nodes()]).
+
+list_subscriptions_via_topic(Node, Topic, FormatFun) when Node =:= node() ->
+    MatchSpec = [{{{'_', '$1'}, '_'}, [{'=:=','$1', Topic}], ['$_']}],
+    FormatFun(ets:select(emqx_suboption, MatchSpec));
+
+list_subscriptions_via_topic(Node, {topic, Topic}, FormatFun) ->
+    rpc_call(Node, list_subscriptions_via_topic, [Node, {topic, Topic}, FormatFun]).
 
 lookup_subscriptions(Key) ->
     lists:append([lookup_subscriptions(Node, Key) || Node <- ekka_mnesia:running_nodes()]).
