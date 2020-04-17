@@ -79,20 +79,6 @@
             descr  => "Lookup a client via username on the node "
            }).
 
--rest_api(#{name   => lookup_client_via_topic,
-            method => 'GET',
-            path   => "/clients/topic/:bin:topic",
-            func   => lookup,
-            descr  => "Lookup a client via topic in the cluster"
-           }).
-
--rest_api(#{name   => lookup_node_client_via_topic,
-            method => 'GET',
-            path   => "/nodes/:atom:node/clients/topic/:bin:topic",
-            func   => lookup,
-            descr  => "Lookup a client via topic on the node "
-           }).
-
 -rest_api(#{name   => kickout_client,
             method => 'DELETE',
             path   => "/clients/:bin:clientid",
@@ -144,13 +130,7 @@ lookup(#{node := Node, username := Username}, _Params) ->
     return({ok, emqx_mgmt:lookup_client(Node, {username, http_uri:decode(Username)}, fun format/1)});
 
 lookup(#{username := Username}, _Params) ->
-    return({ok, emqx_mgmt:lookup_client({username, http_uri:decode(Username)}, fun format/1)});
-
-lookup(#{node := Node, topic := Topic}, _Params) ->
-    return({ok, emqx_mgmt:lookup_client(Node, {topic, http_uri:decode(Topic)}, fun(Clients) -> Clients end)});
-
-lookup(#{topic := Topic}, _Params) ->
-    return({ok, emqx_mgmt:lookup_client({topic, http_uri:decode(Topic)}, fun(Clients) -> Clients end)}).
+    return({ok, emqx_mgmt:lookup_client({username, http_uri:decode(Username)}, fun format/1)}).
 
 kickout(#{clientid := ClientId}, _Params) ->
     case emqx_mgmt:kickout_client(http_uri:decode(ClientId)) of

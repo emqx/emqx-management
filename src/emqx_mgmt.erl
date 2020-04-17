@@ -60,6 +60,8 @@
 
 %% Subscriptions
 -export([ list_subscriptions/1
+        , list_subscriptions_via_topic/2
+        , list_subscriptions_via_topic/3
         , lookup_subscriptions/1
         , lookup_subscriptions/2
         ]).
@@ -251,10 +253,7 @@ lookup_client({clientid, ClientId}, FormatFun) ->
     lists:append([lookup_client(Node, {clientid, ClientId}, FormatFun) || Node <- ekka_mnesia:running_nodes()]);
 
 lookup_client({username, Username}, FormatFun) ->
-    lists:append([lookup_client(Node, {username, Username}, FormatFun) || Node <- ekka_mnesia:running_nodes()]);
-
-lookup_client({topic, Topic}, FormatFun) ->
-    lists:append([lookup_client(Node, {topic, Topic}, FormatFun) || Node <- ekka_mnesia:running_nodes()]).
+    lists:append([lookup_client(Node, {username, Username}, FormatFun) || Node <- ekka_mnesia:running_nodes()]).
 
 lookup_client(Node, {clientid, ClientId}, FormatFun) when Node =:= node() ->
     FormatFun(ets:lookup(emqx_channel, ClientId));
@@ -267,14 +266,7 @@ lookup_client(Node, {username, Username}, FormatFun) when Node =:= node() ->
     FormatFun(ets:select(emqx_channel_info, MatchSpec));
 
 lookup_client(Node, {username, Username}, FormatFun) ->
-    rpc_call(Node, lookup_client, [Node, {username, Username}, FormatFun]);
-
-lookup_client(Node, {topic, Topic}, FormatFun) when Node =:= node() ->
-    MatchSpec = [{{{'_', '$1'}, #{subid => '$2'}}, [{'=:=','$1', Topic}], ['$2']}],
-    FormatFun(ets:select(emqx_suboption, MatchSpec));
-
-lookup_client(Node, {topic, Topic}, FormatFun) ->
-    rpc_call(Node, lookup_client, [Node, {topic, Topic}, FormatFun]).
+    rpc_call(Node, lookup_client, [Node, {username, Username}, FormatFun]).
 
 kickout_client(ClientId) ->
     Results = [kickout_client(Node, ClientId) || Node <- ekka_mnesia:running_nodes()],
@@ -349,6 +341,16 @@ list_subscriptions(Node) when Node =:= node() ->
 
 list_subscriptions(Node) ->
     rpc_call(Node, list_subscriptions, [Node]).
+
+list_subscriptions_via_topic(Topic, FormatFun) ->
+    lists:append([list_subscriptions_via_topic(Node, Topic, FormatFun) || Node <- ekka_mnesia:running_nodes()]).
+
+list_subscriptions_via_topic(Node, Topic, FormatFun) when Node =:= node() ->
+    MatchSpec = [{{{'_', '$1'}, #{subid => '$2'}}, [{'=:=','$1', Topic}], ['$_']}],
+    FormatFun(ets:select(emqx_suboption, MatchSpec));
+
+list_subscriptions_via_topic(Node, {topic, Topic}, FormatFun) ->
+    rpc_call(Node, list_subscriptions_via_topic, [Node, {topic, Topic}, FormatFun]).
 
 lookup_subscriptions(Key) ->
     lists:append([lookup_subscriptions(Node, Key) || Node <- ekka_mnesia:running_nodes()]).
