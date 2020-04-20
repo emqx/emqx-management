@@ -56,7 +56,7 @@
 
 -define(MAIN_APP, emqx).
 
--define(VERSION, 1).
+-define(VERSIONS, ["1", "3.2", "3.4", "4.0"]).
 
 -spec(load() -> ok).
 load() ->
@@ -549,7 +549,8 @@ data(["export", Directory]) ->
                     {{Y, M, D}, _} = emqx_mgmt_util:datetime(Seconds),
                     Filename = io_lib:format("emqx-export-~p-~p-~p.json", [Y, M, D]),
                     NFilename = filename:join([Directory, Filename]),
-                    Data = [{version, ?VERSION},
+                    Version = string:sub_string(emqx_sys:version(), 1, 3),
+                    Data = [{version, erlang:list_to_binary(Version)},
                             {date, erlang:list_to_binary(emqx_mgmt_util:strftime(Seconds))},
                             {rules, Rules},
                             {resources, Resources},
@@ -576,8 +577,9 @@ data(["import", Filename]) ->
     case file:read_file(Filename) of
         {ok, Json} ->
             Data = emqx_json:decode(Json, [return_maps]),
-            case maps:get(<<"version">>, Data) of
-                ?VERSION ->
+            Version = to_version(maps:get(<<"version">>, Data)),
+            case lists:member(binary_to_list(Version), ?VERSIONS) of
+                true  ->
                     try
                         import_resources(maps:get(<<"resources">>, Data)),
                         import_rules(maps:get(<<"rules">>, Data)),
@@ -589,7 +591,7 @@ data(["import", Filename]) ->
                     catch _Class:Reason ->
                         emqx_ctl:print("The emqx data import failed due to ~p.~n", [Reason])
                     end;
-                Version ->
+                false ->
                     emqx_ctl:print("Unsupported version: ~p~n", [Version])
             end;
         {error, Reason} ->
@@ -819,3 +821,10 @@ bin(S) -> iolist_to_binary(S).
 any_to_atom(L) when is_list(L) -> list_to_atom(L);
 any_to_atom(B) when is_binary(B) -> binary_to_atom(B, utf8);
 any_to_atom(A) when is_atom(A) -> A.
+
+to_version(Version) when is_integer(Version) ->
+    integer_to_list(Version);
+to_version(Version) when is_binary(Version) ->
+    binary_to_list(Version);
+to_version(Version) when is_list(Version) ->
+    Version.
