@@ -103,7 +103,7 @@ execute_when_enabled(Fun) ->
         true ->
             Fun();
         false ->
-            return({error, plugin_not_loaded})
+            return({error, module_not_loaded})
     end.
 
 
