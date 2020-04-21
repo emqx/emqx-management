@@ -557,6 +557,9 @@ data(["export", Directory]) ->
                     Blacklist = export_blacklist(),
                     Apps = export_applications(),
                     Users = export_users(),
+                    AuthMnesia = export_auth_mnesia(),
+                    AclMnesia = export_acl_mnesia(),
+                    Schemas = export_schemas(),
                     Seconds = erlang:system_time(second),
                     {{Y, M, D}, _} = emqx_mgmt_util:datetime(Seconds),
                     Filename = io_lib:format("emqx-export-~p-~p-~p.json", [Y, M, D]),
@@ -567,13 +570,11 @@ data(["export", Directory]) ->
                             {resources, Resources},
                             {blacklist, Blacklist},
                             {apps, Apps},
-                            {users, Users}],
-                    Data2 = case ets:info(emqx_schema) of
-                        undefined -> Data;
-                        _ ->
-                            Data ++ [{schemas, export_schemas()}]
-                    end,
-                    case file:write_file(NFilename, emqx_json:encode(Data2)) of
+                            {users, Users},
+                            {auth_mnesia, AuthMnesia},
+                            {acl_mnesia, AclMnesia},
+                            {schemas, Schemas}],
+                    case file:write_file(NFilename, emqx_json:encode(Data)) of
                         ok ->
                             emqx_ctl:print("The emqx data has been successfully exported to ~s.~n", [NFilename]);
                         {error, Reason} ->
@@ -597,10 +598,12 @@ data(["import", Filename]) ->
                         import_blacklist(maps:get(<<"blacklist">>, Data)),
                         import_applications(maps:get(<<"apps">>, Data)),
                         import_users(maps:get(<<"users">>, Data)),
-                        import_schemas(maps:get(<<"schemas">>, Data, undefined)),
+                        import_auth_mnesia(maps:get(<<"auth_mnesia">>, Data)),
+                        import_acl_mnesia(maps:get(<<"acl_mnesia">>, Data)),
+                        import_schemas(maps:get(<<"schemas">>, Data)),
                         emqx_ctl:print("The emqx data has been imported successfully.~n")
-                    catch _Class:Reason ->
-                        emqx_ctl:print("The emqx data import failed due to ~p.~n", [Reason])
+                    catch _Class:_Reason:Stack ->
+                        emqx_ctl:print("The emqx data import failed due to ~p.~n", [Stack])
                     end;
                 Version ->
                     emqx_ctl:print("Unsupported version: ~p~n", [Version])
@@ -657,8 +660,30 @@ export_users() ->
                     [[{username, Username}, {password, base64:encode(Password)}, {tags, Tags}] | Acc]
                 end, [], ets:tab2list(mqtt_admin)).
 
+export_auth_mnesia() ->
+    case ets:info(emqx_user) of
+        undefined -> [];
+        _ -> 
+            lists:foldl(fun({_, Login, Password, IsSuperuser}, Acc) ->
+                            [[{login, Login}, {password, Password}, {is_superuser, IsSuperuser}] | Acc]
+                        end, [], ets:tab2list(emqx_user))
+    end.
+
+export_acl_mnesia() ->
+    case ets:info(emqx_user) of
+        undefined -> [];
+        _ ->
+            lists:foldl(fun({_, Login, Topic, Action, Allow}, Acc) ->
+                            [[{login, Login}, {topic, Topic}, {action, Action}, {allow, Allow}] | Acc]
+                        end, [], ets:tab2list(emqx_acl))
+    end.
+
 export_schemas() ->
-    [emqx_schema_api:format_schema(Schema) || Schema <- emqx_schema_registry:get_all_schemas()].
+    case ets:info(emqx_schema) of
+        undefined -> [];
+        _ ->
+            [emqx_schema_api:format_schema(Schema) || Schema <- emqx_schema_registry:get_all_schemas()]
+    end.
 
 import_rules(Rules) ->
     lists:foreach(fun(#{<<"id">> := RuleId,
@@ -739,9 +764,30 @@ import_users(Users) ->
                       emqx_dashboard_admin:force_add_user(Username, NPassword, Tags)
                   end, Users).
 
-import_schemas(undefined) -> ok;
-import_schemas(Schemas) ->
-    [emqx_schema_registry:add_schema(emqx_schema_api:make_schema_params(Schema)) || Schema <- Schemas].
+import_auth_mnesia(Auths) ->
+    case ets:info(emqx_acl) of
+        undefined -> ok;
+        _ -> 
+            [ mnesia:dirty_write({emqx_user, Login, Password, IsSuperuser}) || #{<<"login">> := Login,
+                                                                                 <<"password">> := Password,
+                                                                                 <<"is_superuser">> := IsSuperuser} <- Auths ]
+    end.
+
+import_acl_mnesia(Acls) ->
+    case ets:info(emqx_acl) of
+        undefined -> ok;
+        _ -> 
+            [ mnesia:dirty_write({emqx_acl ,Login, Topic, Action, Allow}) || #{<<"login">> := Login, 
+                                                                               <<"topic">> := Topic,
+                                                                               <<"action">> := Action,
+                                                                               <<"allow">> := Allow} <- Acls ]
+    end.
+
+import_schemas(Schemas) -> 
+    case ets:info(emqx_schema) of
+        undefined -> ok;
+        _ -> [emqx_schema_registry:add_schema(emqx_schema_api:make_schema_params(Schema)) || Schema <- Schemas]
+    end.
 
 
 %%--------------------------------------------------------------------
