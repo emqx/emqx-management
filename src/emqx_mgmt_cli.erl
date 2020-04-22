@@ -578,7 +578,7 @@ data(["import", Filename]) ->
         {ok, Json} ->
             Data = emqx_json:decode(Json, [return_maps]),
             Version = to_version(maps:get(<<"version">>, Data)),
-            case lists:member(binary_to_list(Version), ?VERSIONS) of
+            case lists:member(Version, ?VERSIONS) of
                 true  ->
                     try
                         import_resources(maps:get(<<"resources">>, Data)),
@@ -656,25 +656,13 @@ import_rules(Rules) ->
                         <<"enabled">> := Enabled,
                         <<"description">> := Desc}) ->
                       NActions = lists:foldl(fun(#{<<"id">> := ActionInstId, <<"name">> := Name, <<"args">> := Args}, Acc) ->
-                                                 [#action_instance{id = ActionInstId, name = any_to_atom(Name), args = Args} | Acc]
+                                                 [{ActionInstId, any_to_atom(Name), Args} | Acc]
                                              end, [], Actions),
-                      case emqx_rule_sqlparser:parse_select(RawSQL) of
-                          {ok, Select} ->
-                              Rule = #rule{id = RuleId,
-                                           rawsql = RawSQL,
-                                           for = emqx_rule_sqlparser:select_from(Select),
-                                           is_foreach = emqx_rule_sqlparser:select_is_foreach(Select),
-                                           fields = emqx_rule_sqlparser:select_fields(Select),
-                                           doeach = emqx_rule_sqlparser:select_doeach(Select),
-                                           incase = emqx_rule_sqlparser:select_incase(Select),
-                                           conditions = emqx_rule_sqlparser:select_where(Select),
-                                           actions = NActions,
-                                           enabled = Enabled,
-                                           description = Desc},
-                              ok = emqx_rule_registry:add_rule(Rule);
-                          Error ->
-                              error(Error)
-                      end
+                      {ok, _Rule} = emqx_rule_engine:create_rule(#{id => RuleId,
+                                                                   rawsql => RawSQL,
+                                                                   actions => NActions,
+                                                                   enabled => Enabled,
+                                                                   description => Desc})
                   end, Rules). 
 
 import_resources(Reources) ->
@@ -687,7 +675,11 @@ import_resources(Reources) ->
                                        null -> undefined;
                                        _ -> CreatedAt
                                    end,
-                      emqx_rule_registry:add_resource(#resource{id = Id, type = any_to_atom(Type), config = Config, created_at = NCreatedAt, description = Desc})
+                      emqx_rule_engine:create_resource(#{id => Id,
+                                                         type => any_to_atom(Type),
+                                                         config => Config,
+                                                         created_at => NCreatedAt,
+                                                         description => Desc})
                   end, Reources).
 
 import_blacklist(Blacklist) ->
