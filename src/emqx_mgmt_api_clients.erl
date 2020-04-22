@@ -168,11 +168,11 @@ format(Data) when is_map(Data)->
     maps:merge(Data1#{node         => node(),
                       ip_address   => iolist_to_binary(ntoa(IpAddr)),
                       port         => Port,
-                      connected_at => iolist_to_binary(strftime(ConnectedAt)),
-                      created_at   => iolist_to_binary(strftime(CreatedAt))},
+                      connected_at => iolist_to_binary(strftime(ConnectedAt div 1000)),
+                      created_at   => iolist_to_binary(strftime(CreatedAt div 1000))},
                case maps:get(disconnected_at, Data, undefined) of
                    undefined -> #{};
-                   DisconnectedAt -> #{disconnected_at => iolist_to_binary(strftime(DisconnectedAt))}
+                   DisconnectedAt -> #{disconnected_at => iolist_to_binary(strftime(DisconnectedAt div 1000))}
                end).
 
 format_acl_cache({{PubSub, Topic}, {AclResult, Timestamp}}) ->
