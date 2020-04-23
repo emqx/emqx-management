@@ -344,7 +344,7 @@ modules(["unload", Name]) ->
     end;
 
 modules(["reload", "emqx_mod_acl_internal" = Name]) ->
-    case emqx_modules:unload(list_to_atom(Name)) of
+    case emqx_modules:reload(list_to_atom(Name)) of
         ok ->
             emqx_ctl:print("Module ~s reloaded successfully.~n", [Name]);
         {error, Reason} ->
@@ -582,7 +582,7 @@ data(["export", Directory]) ->
                     end;
                 _ ->
                     emqx_ctl:print("Please enter a directory using an absolute path.~n")
-            end            
+            end
     end;
 
 data(["import", Filename]) ->
@@ -663,7 +663,7 @@ export_users() ->
 export_auth_mnesia() ->
     case ets:info(emqx_user) of
         undefined -> [];
-        _ -> 
+        _ ->
             lists:foldl(fun({_, Login, Password, IsSuperuser}, Acc) ->
                             [[{login, Login}, {password, Password}, {is_superuser, IsSuperuser}] | Acc]
                         end, [], ets:tab2list(emqx_user))
@@ -711,7 +711,7 @@ import_rules(Rules) ->
                           Error ->
                               error(Error)
                       end
-                  end, Rules). 
+                  end, Rules).
 
 import_resources(Reources) ->
     lists:foreach(fun(#{<<"id">> := Id,
@@ -767,7 +767,7 @@ import_users(Users) ->
 import_auth_mnesia(Auths) ->
     case ets:info(emqx_acl) of
         undefined -> ok;
-        _ -> 
+        _ ->
             [ mnesia:dirty_write({emqx_user, Login, Password, IsSuperuser}) || #{<<"login">> := Login,
                                                                                  <<"password">> := Password,
                                                                                  <<"is_superuser">> := IsSuperuser} <- Auths ]
@@ -776,14 +776,14 @@ import_auth_mnesia(Auths) ->
 import_acl_mnesia(Acls) ->
     case ets:info(emqx_acl) of
         undefined -> ok;
-        _ -> 
-            [ mnesia:dirty_write({emqx_acl ,Login, Topic, Action, Allow}) || #{<<"login">> := Login, 
+        _ ->
+            [ mnesia:dirty_write({emqx_acl ,Login, Topic, Action, Allow}) || #{<<"login">> := Login,
                                                                                <<"topic">> := Topic,
                                                                                <<"action">> := Action,
                                                                                <<"allow">> := Allow} <- Acls ]
     end.
 
-import_schemas(Schemas) -> 
+import_schemas(Schemas) ->
     case ets:info(emqx_schema) of
         undefined -> ok;
         _ -> [emqx_schema_registry:add_schema(emqx_schema_api:make_schema_params(Schema)) || Schema <- Schemas]
