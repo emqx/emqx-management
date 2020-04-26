@@ -22,8 +22,6 @@
 -include_lib("emqx/include/emqx.hrl").
 -include_lib("emqx/include/emqx_mqtt.hrl").
 
--include_lib("emqx_rule_engine/include/rule_engine.hrl").
-
 -import(proplists, [get_value/2]).
 
 %% Nodes and Brokers API
@@ -138,7 +136,7 @@
 
 -define(MAX_ROW_LIMIT, 10000).
 
--define(MAIN_APP, emqx_management).
+-define(APP, emqx_management).
 
 %%--------------------------------------------------------------------
 %% Node Info
@@ -541,7 +539,7 @@ export_rules() ->
     lists:foldl(fun({_, RuleId, _, RawSQL, _, _, _, _, _, Actions, Enabled, Desc}, Acc) ->
                     NActions = [[{id, ActionInstId},
                                  {name, Name},
-                                 {args, Args}] || #action_instance{id = ActionInstId, name = Name, args = Args} <- Actions],
+                                 {args, Args}] || {action_instance, ActionInstId, Name, Args} <- Actions],
                     [[{id, RuleId},
                       {rawsql, RawSQL},
                       {actions, NActions},
@@ -788,6 +786,6 @@ check_row_limit([Tab|Tables], Limit) ->
     end.
 
 max_row_limit() ->
-    application:get_env(?MAIN_APP, max_row_limit, ?MAX_ROW_LIMIT).
+    application:get_env(?APP, max_row_limit, ?MAX_ROW_LIMIT).
 
 table_size(Tab) -> ets:info(Tab, size).
