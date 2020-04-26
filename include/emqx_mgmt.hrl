@@ -31,3 +31,5 @@
 -define(ERROR13, 113). %% User already exist
 -define(ERROR14, 114). %% OldPassword error
 -define(ERROR15, 115). %% bad topic
+
+-define(VERSIONS, ["1", "3.2", "3.4", "4.0", "4.1"]).
