@@ -22,6 +22,8 @@
 -include_lib("emqx/include/emqx.hrl").
 -include_lib("emqx/include/emqx_mqtt.hrl").
 
+-include_lib("emqx_rule_engine/include/rule_engine.hrl").
+
 -import(proplists, [get_value/2]).
 
 %% Nodes and Brokers API
@@ -90,6 +92,30 @@
         , delete_banned/1
         ]).
 
+%% Export/Import
+-export([ export_rules/0
+        , export_resources/0
+        , export_blacklist/0
+        , export_applications/0
+        , export_users/0
+        , export_auth_clientid/0
+        , export_auth_username/0
+        , export_auth_mnesia/0
+        , export_acl_mnesia/0
+        , export_schemas/0
+        , import_rules/1
+        , import_resources/1
+        , import_blacklist/1
+        , import_applications/1
+        , import_users/1
+        , import_auth_clientid/1
+        , import_auth_username/1
+        , import_auth_mnesia/1
+        , import_acl_mnesia/1
+        , import_schemas/1
+        , to_version/1
+        ]).
+
 %% Common Table API
 -export([ item/2
         , max_row_limit/0
@@ -97,7 +123,7 @@
 
 -define(MAX_ROW_LIMIT, 10000).
 
--define(APP, emqx_management).
+-define(MAIN_APP, emqx_management).
 
 %%--------------------------------------------------------------------
 %% Node Info
@@ -417,6 +443,216 @@ create_banned(Banned) ->
 delete_banned(Who) ->
     emqx_banned:delete(Who).
 
+export_rules() ->
+    lists:foldl(fun({_, RuleId, _, RawSQL, _, _, _, _, _, Actions, Enabled, Desc}, Acc) ->
+                    NActions = [[{id, ActionInstId},
+                                 {name, Name},
+                                 {args, Args}] || #action_instance{id = ActionInstId, name = Name, args = Args} <- Actions],
+                    [[{id, RuleId},
+                      {rawsql, RawSQL},
+                      {actions, NActions},
+                      {enabled, Enabled},
+                      {description, Desc}] | Acc]
+               end, [], emqx_rule_registry:get_rules()).
+
+export_resources() ->
+    lists:foldl(fun({_, Id, Type, Config, CreatedAt, Desc}, Acc) ->
+                    NCreatedAt = case CreatedAt of
+                                     undefined -> null;
+                                     _ -> CreatedAt
+                                 end,
+                    [[{id, Id},
+                      {type, Type},
+                      {config, maps:to_list(Config)},
+                      {created_at, NCreatedAt},
+                      {description, Desc}] | Acc]
+               end, [], emqx_rule_registry:get_resources()).
+
+export_blacklist() ->
+    lists:foldl(fun(#banned{who = Who, by = By, reason = Reason, at = At, until = Until}, Acc) ->
+                    NWho = case Who of
+                               {peerhost, Peerhost} -> {peerhost, inet:ntoa(Peerhost)};
+                               _ -> Who
+                           end,
+                    [[{who, [NWho]}, {by, By}, {reason, Reason}, {at, At}, {until, Until}] | Acc]
+                end, [], ets:tab2list(emqx_banned)).
+
+export_applications() ->
+    lists:foldl(fun({_, AppID, AppSecret, Name, Desc, Status, Expired}, Acc) ->
+                    [[{id, AppID}, {secret, AppSecret}, {name, Name}, {desc, Desc}, {status, Status}, {expired, Expired}] | Acc]
+                end, [], ets:tab2list(mqtt_app)).
+
+export_users() ->
+    lists:foldl(fun({_, Username, Password, Tags}, Acc) ->
+                    [[{username, Username}, {password, base64:encode(Password)}, {tags, Tags}] | Acc]
+                end, [], ets:tab2list(mqtt_admin)).
+
+export_auth_clientid() ->
+    case ets:info(emqx_auth_clientid) of
+        undefined -> [];
+        _ ->
+            lists:foldl(fun({_, ClientId, Password}, Acc) ->
+                            [[{clientid, ClientId}, {password, Password}] | Acc]
+                        end, [], ets:tab2list(emqx_auth_clientid))
+    end.
+
+export_auth_username() ->
+    case ets:info(emqx_auth_username) of
+        undefined -> [];
+        _ ->
+            lists:foldl(fun({_, Username, Password}, Acc) ->
+                            [[{username, Username}, {password, Password}] | Acc]
+                        end, [], ets:tab2list(emqx_auth_username))
+    end.
+
+export_auth_mnesia() ->
+    case ets:info(emqx_user) of
+        undefined -> [];
+        _ -> 
+            lists:foldl(fun({_, Login, Password, IsSuperuser}, Acc) ->
+                            [[{login, Login}, {password, Password}, {is_superuser, IsSuperuser}] | Acc]
+                        end, [], ets:tab2list(emqx_user))
+    end.
+
+export_acl_mnesia() ->
+    case ets:info(emqx_user) of
+        undefined -> [];
+        _ ->
+            lists:foldl(fun({_, Login, Topic, Action, Allow}, Acc) ->
+                            [[{login, Login}, {topic, Topic}, {action, Action}, {allow, Allow}] | Acc]
+                        end, [], ets:tab2list(emqx_acl))
+    end.
+
+export_schemas() ->
+    case ets:info(emqx_schema) of
+        undefined -> [];
+        _ ->
+            [emqx_schema_api:format_schema(Schema) || Schema <- emqx_schema_registry:get_all_schemas()]
+    end.
+
+import_rules(Rules) ->
+    lists:foreach(fun(#{<<"id">> := RuleId,
+                        <<"rawsql">> := RawSQL,
+                        <<"actions">> := Actions,
+                        <<"enabled">> := Enabled,
+                        <<"description">> := Desc}) ->
+                      NActions = lists:foldl(fun(#{<<"id">> := ActionInstId, <<"name">> := Name, <<"args">> := Args}, Acc) ->
+                                                 [#{id => ActionInstId, name => any_to_atom(Name), args => Args} | Acc]
+                                             end, [], Actions),
+                      {ok, _Rule} = emqx_rule_engine:create_rule(#{id => RuleId,
+                                                                   rawsql => RawSQL,
+                                                                   actions => NActions,
+                                                                   enabled => Enabled,
+                                                                   description => Desc})
+                  end, Rules). 
+
+import_resources(Reources) ->
+    lists:foreach(fun(#{<<"id">> := Id,
+                        <<"type">> := Type,
+                        <<"config">> := Config,
+                        <<"created_at">> := CreatedAt,
+                        <<"description">> := Desc}) ->
+                      NCreatedAt = case CreatedAt of
+                                       null -> undefined;
+                                       _ -> CreatedAt
+                                   end,
+                      emqx_rule_engine:create_resource(#{id => Id,
+                                                         type => any_to_atom(Type),
+                                                         config => Config,
+                                                         created_at => NCreatedAt,
+                                                         description => Desc})
+                  end, Reources).
+
+import_blacklist(Blacklist) ->
+    lists:foreach(fun(#{<<"who">> := Who,
+                        <<"by">> := By,
+                        <<"reason">> := Reason,
+                        <<"at">> := At,
+                        <<"until">> := Until}) ->
+                      NWho = case Who of
+                                 #{<<"peerhost">> := Peerhost} ->
+                                     {ok, NPeerhost} = inet:parse_address(Peerhost),
+                                     {peerhost, NPeerhost};
+                                 #{<<"clientid">> := ClientId} -> {clientid, ClientId};
+                                 #{<<"username">> := Username} -> {username, Username}
+                             end,
+                     emqx_banned:create(#banned{who = NWho, by = By, reason = Reason, at = At, until = Until})
+                  end, Blacklist).
+
+import_applications(Apps) ->
+    lists:foreach(fun(#{<<"id">> := AppID,
+                        <<"secret">> := AppSecret,
+                        <<"name">> := Name,
+                        <<"desc">> := Desc,
+                        <<"status">> := Status,
+                        <<"expired">> := Expired}) ->
+                      NExpired = case is_integer(Expired) of
+                                     true -> Expired;
+                                     false -> undefined
+                                 end,
+                      emqx_mgmt_auth:force_add_app(AppID, Name, AppSecret, Desc, Status, NExpired)
+                  end, Apps).
+
+import_users(Users) ->
+    lists:foreach(fun(#{<<"username">> := Username,
+                        <<"password">> := Password,
+                        <<"tags">> := Tags}) ->
+                      NPassword = base64:decode(Password),
+                      emqx_dashboard_admin:force_add_user(Username, NPassword, Tags)
+                  end, Users).
+
+import_auth_clientid(Lists) ->
+    case ets:info(emqx_auth_clientid) of
+        undefined -> ok;
+        _ ->
+            [ mnesia:dirty_write({emqx_auth_clientid, ClientId, Password}) || #{<<"clientid">> := ClientId, 
+                                                                               <<"password">> := Password} <- Lists ]
+    end.
+
+import_auth_username(Lists) ->
+    case ets:info(emqx_auth_username) of
+        undefined -> ok;
+        _ ->
+            [ mnesia:dirty_write({emqx_auth_username, Username, Password}) || #{<<"username">> := Username, 
+                                                                               <<"password">> := Password} <- Lists ]
+    end.
+
+import_auth_mnesia(Auths) ->
+    case ets:info(emqx_acl) of
+        undefined -> ok;
+        _ -> 
+            [ mnesia:dirty_write({emqx_user, Login, Password, IsSuperuser}) || #{<<"login">> := Login,
+                                                                                 <<"password">> := Password,
+                                                                                 <<"is_superuser">> := IsSuperuser} <- Auths ]
+    end.
+
+import_acl_mnesia(Acls) ->
+    case ets:info(emqx_acl) of
+        undefined -> ok;
+        _ -> 
+            [ mnesia:dirty_write({emqx_acl ,Login, Topic, Action, Allow}) || #{<<"login">> := Login, 
+                                                                               <<"topic">> := Topic,
+                                                                               <<"action">> := Action,
+                                                                               <<"allow">> := Allow} <- Acls ]
+    end.
+
+import_schemas(Schemas) -> 
+    case ets:info(emqx_schema) of
+        undefined -> ok;
+        _ -> [emqx_schema_registry:add_schema(emqx_schema_api:make_schema_params(Schema)) || Schema <- Schemas]
+    end.
+
+any_to_atom(L) when is_list(L) -> list_to_atom(L);
+any_to_atom(B) when is_binary(B) -> binary_to_atom(B, utf8);
+any_to_atom(A) when is_atom(A) -> A.
+
+to_version(Version) when is_integer(Version) ->
+    integer_to_list(Version);
+to_version(Version) when is_binary(Version) ->
+    binary_to_list(Version);
+to_version(Version) when is_list(Version) ->
+    Version.
+
 %%--------------------------------------------------------------------
 %% Common Table API
 %%--------------------------------------------------------------------
@@ -490,6 +726,6 @@ check_row_limit([Tab|Tables], Limit) ->
     end.
 
 max_row_limit() ->
-    application:get_env(?APP, max_row_limit, ?MAX_ROW_LIMIT).
+    application:get_env(?MAIN_APP, max_row_limit, ?MAX_ROW_LIMIT).
 
 table_size(Tab) -> ets:info(Tab, size).
