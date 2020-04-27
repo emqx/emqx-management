@@ -545,6 +545,8 @@ data(["export", Directory]) ->
                     Blacklist = export_blacklist(),
                     Apps = export_applications(),
                     Users = export_users(),
+                    AuthClientID = export_auth_clientid(),
+                    AuthUsername = export_auth_username(),
                     AuthMnesia = export_auth_mnesia(),
                     AclMnesia = export_acl_mnesia(),
                     Schemas = export_schemas(),
@@ -560,6 +562,8 @@ data(["export", Directory]) ->
                             {blacklist, Blacklist},
                             {apps, Apps},
                             {users, Users},
+                            {auth_clientid, AuthClientID},
+                            {auth_username, AuthUsername},
                             {auth_mnesia, AuthMnesia},
                             {acl_mnesia, AclMnesia},
                             {schemas, Schemas}],
@@ -587,6 +591,8 @@ data(["import", Filename]) ->
                         import_blacklist(maps:get(<<"blacklist">>, Data)),
                         import_applications(maps:get(<<"apps">>, Data)),
                         import_users(maps:get(<<"users">>, Data)),
+                        import_auth_clientid(maps:get(<<"auth_clientid">>, Data)),
+                        import_auth_username(maps:get(<<"auth_username">>, Data)),
                         import_auth_mnesia(maps:get(<<"auth_mnesia">>, Data)),
                         import_acl_mnesia(maps:get(<<"acl_mnesia">>, Data)),
                         import_schemas(maps:get(<<"schemas">>, Data)),
@@ -648,6 +654,24 @@ export_users() ->
     lists:foldl(fun({_, Username, Password, Tags}, Acc) ->
                     [[{username, Username}, {password, base64:encode(Password)}, {tags, Tags}] | Acc]
                 end, [], ets:tab2list(mqtt_admin)).
+
+export_auth_clientid() ->
+    case ets:info(emqx_auth_clientid) of
+        undefined -> [];
+        _ ->
+            lists:foldl(fun({_, ClientId, Password}, Acc) ->
+                            [[{clientid, ClientId}, {password, Password}] | Acc]
+                        end, [], ets:tab2list(emqx_auth_clientid))
+    end.
+
+export_auth_username() ->
+    case ets:info(emqx_auth_username) of
+        undefined -> [];
+        _ ->
+            lists:foldl(fun({_, Username, Password}, Acc) ->
+                            [[{username, Username}, {password, Password}] | Acc]
+                        end, [], ets:tab2list(emqx_auth_username))
+    end.
 
 export_auth_mnesia() ->
     case ets:info(emqx_user) of
@@ -744,6 +768,22 @@ import_users(Users) ->
                       NPassword = base64:decode(Password),
                       emqx_dashboard_admin:force_add_user(Username, NPassword, Tags)
                   end, Users).
+
+import_auth_clientid(Lists) ->
+    case ets:info(emqx_auth_clientid) of
+        undefined -> ok;
+        _ ->
+            [ mnesia:dirty_write({emqx_auth_clientid, ClientId, Password}) || #{<<"clientid">> := ClientId, 
+                                                                               <<"password">> := Password} <- Lists ]
+    end.
+
+import_auth_username(Lists) ->
+    case ets:info(emqx_auth_username) of
+        undefined -> ok;
+        _ ->
+            [ mnesia:dirty_write({emqx_auth_username, Username, Password}) || #{<<"username">> := Username, 
+                                                                               <<"password">> := Password} <- Lists ]
+    end.
 
 import_auth_mnesia(Auths) ->
     case ets:info(emqx_acl) of
