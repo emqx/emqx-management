@@ -444,7 +444,7 @@ delete_banned(Who) ->
     emqx_banned:delete(Who).
 
 export_rules() ->
-    lists:foldl(fun({_, RuleId, _, RawSQL, _, _, _, _, _, Actions, Enabled, Desc}, Acc) ->
+    lists:foldl(fun({_, RuleId, _, RawSQL, _, _, _, _, _, _, Actions, Enabled, Desc}, Acc) ->
                     NActions = [[{id, ActionInstId},
                                  {name, Name},
                                  {args, Args}] || #action_instance{id = ActionInstId, name = Name, args = Args} <- Actions],
