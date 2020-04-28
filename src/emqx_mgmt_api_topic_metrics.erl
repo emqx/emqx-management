@@ -56,9 +56,14 @@
 list(#{topic := Topic0}, _Params) ->
     execute_when_enabled(fun() ->
         Topic = http_uri:decode(Topic0),
-        case emqx_mgmt:get_topic_metrics(Topic) of
-            {error, Reason} -> return({error, Reason});
-            Metrics         -> return({ok, maps:from_list(Metrics)})
+        case safe_validate(Topic) of
+            true -> 
+                case emqx_mgmt:get_topic_metrics(Topic) of
+                    {error, Reason} -> return({error, Reason});
+                    Metrics         -> return({ok, maps:from_list(Metrics)})
+                end;
+            false ->
+                return({error, invalid_topic_name})
         end
     end);
 
@@ -76,8 +81,13 @@ register(_Bindings, Params) ->
             undefined ->
                 return({error, missing_required_params});
             Topic ->
-                emqx_mgmt:register_topic_metrics(Topic),
-                return(ok)
+                case safe_validate(Topic) of
+                    true -> 
+                        emqx_mgmt:register_topic_metrics(Topic),
+                        return(ok);
+                    false ->
+                        return({error, invalid_topic_name})
+                end
         end
     end).
 
@@ -90,8 +100,13 @@ unregister(Bindings, _Params) when map_size(Bindings) =:= 0 ->
 unregister(#{topic := Topic0}, _Params) ->
     execute_when_enabled(fun() ->
         Topic = http_uri:decode(Topic0),
-        emqx_mgmt:unregister_topic_metrics(Topic),
-        return(ok)
+        case safe_validate(Topic) of
+            true -> 
+                emqx_mgmt:unregister_topic_metrics(Topic),
+                return(ok);
+            false ->
+                return({error, invalid_topic_name})
+        end
     end).
 
 execute_when_enabled(Fun) ->
@@ -106,4 +121,10 @@ execute_when_enabled(Fun) ->
             return({error, module_not_loaded})
     end.
 
-
+safe_validate(Topic) ->
+    try emqx_topic:validate(name, Topic) of
+        true -> true
+    catch
+        error:_Error ->
+            false
+    end.
