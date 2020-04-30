@@ -149,7 +149,7 @@ import(_Bindings, Params) ->
                     case lists:member(Version, ?VERSIONS) of
                         true  ->
                             try
-                                emqx_mgmt:import_resources(maps:get(<<"resources">>, Data, []),
+                                emqx_mgmt:import_resources(maps:get(<<"resources">>, Data, [])),
                                 emqx_mgmt:import_rules(maps:get(<<"rules">>, Data, [])),
                                 emqx_mgmt:import_blacklist(maps:get(<<"blacklist">>, Data, [])),
                                 emqx_mgmt:import_applications(maps:get(<<"apps">>, Data, [])),
