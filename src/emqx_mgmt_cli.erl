@@ -584,16 +584,16 @@ data(["import", Filename]) ->
             case lists:member(Version, ?VERSIONS) of
                 true  ->
                     try
-                        emqx_mgmt:import_resources(maps:get(<<"resources">>, Data)),
-                        emqx_mgmt:import_rules(maps:get(<<"rules">>, Data)),
-                        emqx_mgmt:import_blacklist(maps:get(<<"blacklist">>, Data)),
-                        emqx_mgmt:import_applications(maps:get(<<"apps">>, Data)),
-                        emqx_mgmt:import_users(maps:get(<<"users">>, Data)),
-                        emqx_mgmt:import_auth_clientid(maps:get(<<"auth_clientid">>, Data)),
-                        emqx_mgmt:import_auth_username(maps:get(<<"auth_username">>, Data)),
-                        emqx_mgmt:import_auth_mnesia(maps:get(<<"auth_mnesia">>, Data)),
-                        emqx_mgmt:import_acl_mnesia(maps:get(<<"acl_mnesia">>, Data)),
-                        emqx_mgmt:import_schemas(maps:get(<<"schemas">>, Data)),
+                        emqx_mgmt:import_resources(maps:get(<<"resources">>, Data, [])),
+                        emqx_mgmt:import_rules(maps:get(<<"rules">>, Data, [])),
+                        emqx_mgmt:import_blacklist(maps:get(<<"blacklist">>, Data, [])),
+                        emqx_mgmt:import_applications(maps:get(<<"apps">>, Data, [])),
+                        emqx_mgmt:import_users(maps:get(<<"users">>, Data, [])),
+                        emqx_mgmt:import_auth_clientid(maps:get(<<"auth_clientid">>, Data, [])),
+                        emqx_mgmt:import_auth_username(maps:get(<<"auth_username">>, Data, [])),
+                        emqx_mgmt:import_auth_mnesia(maps:get(<<"auth_mnesia">>, Data, [])),
+                        emqx_mgmt:import_acl_mnesia(maps:get(<<"acl_mnesia">>, Data, [])),
+                        emqx_mgmt:import_schemas(maps:get(<<"schemas">>, Data, [])),
                         emqx_ctl:print("The emqx data has been imported successfully.~n")
                     catch _Class:_Reason:Stack ->
                         emqx_ctl:print("The emqx data import failed due to ~p.~n", [Stack])
