@@ -116,8 +116,8 @@ list_exported(_Bindings, _Params) ->
     Dir = filename:join([Dir0, "data"]),
     {ok, Files} = file:list_dir_all(Dir),
     Data = lists:foldl(fun(File, Acc) ->
-                           case re:run(File, "emqx-export-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+.json") of
-                               {match, _} ->
+                           case filename:extension(File) =:= ".json" of
+                               true ->
                                    FullFile = filename:join([Dir, File]),
                                    case file:read_file_info(FullFile) of
                                        {ok, #file_info{size = Size, ctime = {{Y, M, D}, {H, MM, S}}}} ->
@@ -129,7 +129,7 @@ list_exported(_Bindings, _Params) ->
                                            logger:error("Read file info of ~s failed with: ~p", [File, Reason]),
                                            Acc
                                    end;
-                               nomatch ->
+                               false ->
                                    Acc
                            end
                        end, [], Files),
@@ -149,14 +149,14 @@ import(_Bindings, Params) ->
                     case lists:member(Version, ?VERSIONS) of
                         true  ->
                             try
-                                emqx_mgmt:import_resources(maps:get(<<"resources">>, Data)),
-                                emqx_mgmt:import_rules(maps:get(<<"rules">>, Data)),
-                                emqx_mgmt:import_blacklist(maps:get(<<"blacklist">>, Data)),
-                                emqx_mgmt:import_applications(maps:get(<<"apps">>, Data)),
-                                emqx_mgmt:import_users(maps:get(<<"users">>, Data)),
-                                emqx_mgmt:import_auth_mnesia(maps:get(<<"auth_mnesia">>, Data)),
-                                emqx_mgmt:import_acl_mnesia(maps:get(<<"acl_mnesia">>, Data)),
-                                emqx_mgmt:import_schemas(maps:get(<<"schemas">>, Data)),
+                                emqx_mgmt:import_resources(maps:get(<<"resources">>, Data, [])),
+                                emqx_mgmt:import_rules(maps:get(<<"rules">>, Data, [])),
+                                emqx_mgmt:import_blacklist(maps:get(<<"blacklist">>, Data, [])),
+                                emqx_mgmt:import_applications(maps:get(<<"apps">>, Data, [])),
+                                emqx_mgmt:import_users(maps:get(<<"users">>, Data, [])),
+                                emqx_mgmt:import_auth_mnesia(maps:get(<<"auth_mnesia">>, Data, [])),
+                                emqx_mgmt:import_acl_mnesia(maps:get(<<"acl_mnesia">>, Data, [])),
+                                emqx_mgmt:import_schemas(maps:get(<<"schemas">>, Data, [])),
                                 logger:debug("The emqx data has been imported successfully"),
                                 return()
                             catch _Class:_Reason:Stack ->

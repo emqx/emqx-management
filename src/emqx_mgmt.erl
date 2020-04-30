@@ -115,6 +115,8 @@
         , export_blacklist/0
         , export_applications/0
         , export_users/0
+        , export_auth_clientid/0
+        , export_auth_username/0
         , export_auth_mnesia/0
         , export_acl_mnesia/0
         , export_schemas/0
@@ -123,6 +125,8 @@
         , import_blacklist/1
         , import_applications/1
         , import_users/1
+        , import_auth_clientid/1
+        , import_auth_username/1
         , import_auth_mnesia/1
         , import_acl_mnesia/1
         , import_schemas/1
@@ -579,6 +583,24 @@ export_users() ->
                     [[{username, Username}, {password, base64:encode(Password)}, {tags, Tags}] | Acc]
                 end, [], ets:tab2list(mqtt_admin)).
 
+export_auth_clientid() ->
+    case ets:info(emqx_auth_clientid) of
+        undefined -> [];
+        _ ->
+            lists:foldl(fun({_, ClientId, Password}, Acc) ->
+                            [[{clientid, ClientId}, {password, Password}] | Acc]
+                        end, [], ets:tab2list(emqx_auth_clientid))
+    end.
+
+export_auth_username() ->
+    case ets:info(emqx_auth_username) of
+        undefined -> [];
+        _ ->
+            lists:foldl(fun({_, Username, Password}, Acc) ->
+                            [[{username, Username}, {password, Password}] | Acc]
+                        end, [], ets:tab2list(emqx_auth_username))
+    end.
+
 export_auth_mnesia() ->
     case ets:info(emqx_user) of
         undefined -> [];
@@ -674,6 +696,22 @@ import_users(Users) ->
                       NPassword = base64:decode(Password),
                       emqx_dashboard_admin:force_add_user(Username, NPassword, Tags)
                   end, Users).
+
+import_auth_clientid(Lists) ->
+    case ets:info(emqx_auth_clientid) of
+        undefined -> ok;
+        _ ->
+            [ mnesia:dirty_write({emqx_auth_clientid, ClientId, Password}) || #{<<"clientid">> := ClientId, 
+                                                                               <<"password">> := Password} <- Lists ]
+    end.
+
+import_auth_username(Lists) ->
+    case ets:info(emqx_auth_username) of
+        undefined -> ok;
+        _ ->
+            [ mnesia:dirty_write({emqx_auth_username, Username, Password}) || #{<<"username">> := Username, 
+                                                                               <<"password">> := Password} <- Lists ]
+    end.
 
 import_auth_mnesia(Auths) ->
     case ets:info(emqx_acl) of
