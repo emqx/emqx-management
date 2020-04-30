@@ -116,8 +116,8 @@ list_exported(_Bindings, _Params) ->
     Dir = filename:join([Dir0, "data"]),
     {ok, Files} = file:list_dir_all(Dir),
     Data = lists:foldl(fun(File, Acc) ->
-                           case re:run(File, "emqx-export-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+.json") of
-                               {match, _} ->
+                           case filename:extension(File) =:= ".json" of
+                               true ->
                                    FullFile = filename:join([Dir, File]),
                                    case file:read_file_info(FullFile) of
                                        {ok, #file_info{size = Size, ctime = {{Y, M, D}, {H, MM, S}}}} ->
@@ -129,7 +129,7 @@ list_exported(_Bindings, _Params) ->
                                            logger:error("Read file info of ~s failed with: ~p", [File, Reason]),
                                            Acc
                                    end;
-                               nomatch ->
+                               false ->
                                    Acc
                            end
                        end, [], Files),
