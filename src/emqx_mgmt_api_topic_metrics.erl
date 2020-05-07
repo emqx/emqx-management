@@ -71,7 +71,7 @@ list(_Bindings, _Params) ->
     execute_when_enabled(fun() ->
         case emqx_mgmt:get_all_topic_metrics() of
             {error, Reason} -> return({error, Reason});
-            Metrics         -> return({ok, maps:from_list(Metrics)})
+            Metrics         -> return({ok, Metrics})
         end
     end).
     
