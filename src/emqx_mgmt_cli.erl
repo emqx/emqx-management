@@ -620,8 +620,8 @@ data(["import", Filename]) ->
     end;
 
 data(_) ->
-    emqx_ctl:usage([{"import <File>",   "Import data from the specified file"},
-                    {"export [<Path>]", "Export data to the specified path"}]).
+    emqx_ctl:usage([{"data import <File>",   "Import data from the specified file"},
+                    {"data export [<Path>]", "Export data to the specified path"}]).
 
 %%--------------------------------------------------------------------
 %% Dump ETS
