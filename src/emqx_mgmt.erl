@@ -211,7 +211,7 @@ get_all_topic_metrics() ->
                         {error, _Reason} ->
                             Acc;
                         Metrics ->
-                            [{Topic, Metrics} | Acc]
+                            [#{topic => Topic, metrics => Metrics} | Acc]
                     end
                 end, [], emqx_mod_topic_metrics:all_registered_topics()).
 
