@@ -77,6 +77,8 @@ format({AlarmId, #alarm{severity  = Severity,
                 summary   => iolist_to_binary(Summary)},
       create_at => iolist_to_binary(emqx_mgmt_util:strftime(Ts))};
 format({AlarmId, {AlarmDesc, Ts}}) ->
+    format({AlarmId, AlarmDesc, Ts});
+format({AlarmId, AlarmDesc, Ts}) ->
     #{id        => maybe_to_binary(AlarmId),
       desc      => maybe_to_binary(AlarmDesc),
       create_at => iolist_to_binary(emqx_mgmt_util:strftime(Ts))};
@@ -91,6 +93,8 @@ format({AlarmId, #alarm{severity  = Severity,
       create_at => iolist_to_binary(emqx_mgmt_util:strftime(Ts)),
       clear_at  => iolist_to_binary(emqx_mgmt_util:strftime(ClearAt))};
 format({AlarmId, {AlarmDesc, Ts}, ClearAt}) ->
+    format({AlarmId, AlarmDesc, Ts, ClearAt});
+format({AlarmId, AlarmDesc, Ts, ClearAt}) ->
     #{id        => maybe_to_binary(AlarmId),
       desc      => maybe_to_binary(AlarmDesc),
       create_at => iolist_to_binary(emqx_mgmt_util:strftime(Ts)),
