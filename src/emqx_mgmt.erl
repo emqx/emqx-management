@@ -22,8 +22,6 @@
 -include_lib("emqx/include/emqx.hrl").
 -include_lib("emqx/include/emqx_mqtt.hrl").
 
--include_lib("emqx_rule_engine/include/rule_engine.hrl").
-
 -import(proplists, [get_value/2]).
 
 %% Nodes and Brokers API
