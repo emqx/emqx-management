@@ -442,16 +442,13 @@ delete_banned(Who) ->
     emqx_banned:delete(Who).
 
 export_rules() ->
-    lists:foldl(fun({_, RuleId, _, RawSQL, _, _, _, _, _, _, Actions, Enabled, Desc}, Acc) ->
-                    NActions = [[{id, ActionInstId},
-                                 {name, Name},
-                                 {args, Args}] || #action_instance{id = ActionInstId, name = Name, args = Args} <- Actions],
-                    [[{id, RuleId},
+    lists:map(fun({_, RuleId, _, RawSQL, _, _, _, _, _, _, Actions, Enabled, Desc}) ->
+                    [{id, RuleId},
                       {rawsql, RawSQL},
-                      {actions, NActions},
+                      {actions, actions_to_prop_list(Actions)},
                       {enabled, Enabled},
-                      {description, Desc}] | Acc]
-               end, [], emqx_rule_registry:get_rules()).
+                      {description, Desc}]
+               end, emqx_rule_registry:get_rules()).
 
 export_resources() ->
     lists:foldl(fun({_, Id, Type, Config, CreatedAt, Desc}, Acc) ->
@@ -534,15 +531,18 @@ import_rules(Rules) ->
                         <<"actions">> := Actions,
                         <<"enabled">> := Enabled,
                         <<"description">> := Desc}) ->
-                      NActions = lists:foldl(fun(#{<<"id">> := ActionInstId, <<"name">> := Name, <<"args">> := Args}, Acc) ->
-                                                 [#{id => ActionInstId, name => any_to_atom(Name), args => Args} | Acc]
-                                             end, [], Actions),
-                      {ok, _Rule} = emqx_rule_engine:create_rule(#{id => RuleId,
-                                                                   rawsql => RawSQL,
-                                                                   actions => NActions,
-                                                                   enabled => Enabled,
-                                                                   description => Desc})
-                  end, Rules). 
+                      Rule = #{
+                        id => RuleId,
+                        rawsql => RawSQL,
+                        actions => map_to_actions(Actions),
+                        enabled => Enabled,
+                        description => Desc
+                      },
+                      try emqx_rule_engine:create_rule(Rule)
+                      catch throw:{resource_not_initialized, _ResId} ->
+                          emqx_rule_engine:create_rule(Rule#{enabled => false})
+                      end
+                  end, Rules).
 
 import_resources(Reources) ->
     lists:foreach(fun(#{<<"id">> := Id,
@@ -727,3 +727,18 @@ max_row_limit() ->
     application:get_env(?MAIN_APP, max_row_limit, ?MAX_ROW_LIMIT).
 
 table_size(Tab) -> ets:info(Tab, size).
+
+map_to_actions(Maps) ->
+    [map_to_action(M) || M <- Maps].
+
+map_to_action(#{<<"id">> := ActionInstId, <<"name">> := Name, <<"args">> := Args, <<"fallbacks">> := FallbackActions}) ->
+    #{id => ActionInstId, name => any_to_atom(Name), args => Args, fallbacks => map_to_actions(FallbackActions)}.
+
+actions_to_prop_list(Actions) ->
+    [action_to_prop_list(Act) || Act <- Actions].
+
+action_to_prop_list({action_instance, ActionInstId, Name, FallbackActions, Args}) ->
+    [{id, ActionInstId},
+     {name, Name},
+     {fallbacks, actions_to_prop_list(FallbackActions)},
+     {args, Args}].
