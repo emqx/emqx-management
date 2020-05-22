@@ -81,7 +81,8 @@ format({AlarmId, {AlarmDesc, Ts}}) ->
 format({AlarmId, AlarmDesc, Ts}) ->
     #{id        => maybe_to_binary(AlarmId),
       desc      => maybe_to_binary(AlarmDesc),
-      create_at => iolist_to_binary(emqx_mgmt_util:strftime(Ts))};
+      create_at => iolist_to_binary(emqx_mgmt_util:strftime(Ts)),
+      clear_at => iolist_to_binary(emqx_mgmt_util:strftime(Ts))};
 format({AlarmId, #alarm{severity  = Severity, 
                         title     = Title,
                         summary   = Summary, 
