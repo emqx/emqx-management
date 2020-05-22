@@ -74,25 +74,27 @@ format({AlarmId, #alarm{severity  = Severity,
     #{id   => maybe_to_binary(AlarmId),
       desc => #{severity  => Severity,
                 title     => iolist_to_binary(Title),
-                summary   => iolist_to_binary(Summary),
-                timestamp => iolist_to_binary(emqx_mgmt_util:strftime(Ts))}};
-format({AlarmId, AlarmDesc}) ->
-    #{id   => maybe_to_binary(AlarmId),
-      desc => maybe_to_binary(AlarmDesc)};
+                summary   => iolist_to_binary(Summary)},
+      create_at => iolist_to_binary(emqx_mgmt_util:strftime(Ts))};
+format({AlarmId, {AlarmDesc, Ts}}) ->
+    #{id        => maybe_to_binary(AlarmId),
+      desc      => maybe_to_binary(AlarmDesc),
+      create_at => iolist_to_binary(emqx_mgmt_util:strftime(Ts))};
 format({AlarmId, #alarm{severity  = Severity, 
                         title     = Title,
                         summary   = Summary, 
                         timestamp = Ts}, ClearAt}) ->
-    #{id       => maybe_to_binary(AlarmId),
-      desc     => #{severity  => Severity,
+    #{id        => maybe_to_binary(AlarmId),
+      desc      => #{severity  => Severity,
                     title     => iolist_to_binary(Title),
-                    summary   => iolist_to_binary(Summary),
-                    timestamp => iolist_to_binary(emqx_mgmt_util:strftime(Ts))},
-      clear_at => iolist_to_binary(emqx_mgmt_util:strftime(ClearAt))};
-format({AlarmId, AlarmDesc, ClearAt}) ->
-    #{id       => maybe_to_binary(AlarmId),
-      desc     => maybe_to_binary(AlarmDesc),
-      clear_at => iolist_to_binary(emqx_mgmt_util:strftime(ClearAt))}.
+                    summary   => iolist_to_binary(Summary)},
+      create_at => iolist_to_binary(emqx_mgmt_util:strftime(Ts)),
+      clear_at  => iolist_to_binary(emqx_mgmt_util:strftime(ClearAt))};
+format({AlarmId, {AlarmDesc, Ts}, ClearAt}) ->
+    #{id        => maybe_to_binary(AlarmId),
+      desc      => maybe_to_binary(AlarmDesc),
+      create_at => iolist_to_binary(emqx_mgmt_util:strftime(Ts)),
+      clear_at  => iolist_to_binary(emqx_mgmt_util:strftime(ClearAt))}.
 
 maybe_to_binary(Data) when is_binary(Data) ->
     Data;
