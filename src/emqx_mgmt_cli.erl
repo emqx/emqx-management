@@ -711,7 +711,3 @@ format(_, Val) ->
     Val.
 
 bin(S) -> iolist_to_binary(S).
-
-any_to_atom(L) when is_list(L) -> list_to_atom(L);
-any_to_atom(B) when is_binary(B) -> binary_to_atom(B, utf8);
-any_to_atom(A) when is_atom(A) -> A.
