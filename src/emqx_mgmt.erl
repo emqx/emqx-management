@@ -731,8 +731,11 @@ table_size(Tab) -> ets:info(Tab, size).
 map_to_actions(Maps) ->
     [map_to_action(M) || M <- Maps].
 
-map_to_action(#{<<"id">> := ActionInstId, <<"name">> := Name, <<"args">> := Args, <<"fallbacks">> := FallbackActions}) ->
-    #{id => ActionInstId, name => any_to_atom(Name), args => Args, fallbacks => map_to_actions(FallbackActions)}.
+map_to_action(Map = #{<<"id">> := ActionInstId, <<"name">> := Name, <<"args">> := Args}) ->
+    #{id => ActionInstId,
+      name => any_to_atom(Name),
+      args => Args,
+      fallbacks => map_to_actions(maps:get(<<"fallbacks">>, Map, []))}.
 
 actions_to_prop_list(Actions) ->
     [action_to_prop_list(Act) || Act <- Actions].

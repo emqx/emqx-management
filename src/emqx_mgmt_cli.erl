@@ -595,14 +595,14 @@ data(["import", Filename]) ->
                         emqx_mgmt:import_acl_mnesia(maps:get(<<"acl_mnesia">>, Data, [])),
                         emqx_mgmt:import_schemas(maps:get(<<"schemas">>, Data, [])),
                         emqx_ctl:print("The emqx data has been imported successfully.~n")
-                    catch _Class:_Reason:Stack ->
-                        emqx_ctl:print("The emqx data import failed due to ~p.~n", [Stack])
+                    catch Class:Reason:Stack ->
+                        emqx_ctl:print("The emqx data import failed due: ~0p~n", [{Class,Reason,Stack}])
                     end;
                 false ->
                     emqx_ctl:print("Unsupported version: ~p~n", [Version])
             end;
         {error, Reason} ->
-            emqx_ctl:print("The emqx data import failed due to ~p while reading ~s.~n", [Reason, Filename])
+            emqx_ctl:print("The emqx data import failed: ~0p while reading ~s.~n", [Reason, Filename])
     end;
 
 data(_) ->

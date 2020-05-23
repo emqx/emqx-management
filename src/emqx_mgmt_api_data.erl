@@ -165,8 +165,8 @@ import(_Bindings, Params) ->
                                 emqx_mgmt:import_schemas(maps:get(<<"schemas">>, Data, [])),
                                 logger:debug("The emqx data has been imported successfully"),
                                 return()
-                            catch _Class:_Reason:Stack ->
-                                logger:error("The emqx data import failed due to ~p", [Stack]),
+                            catch Class:Reason:Stack ->
+                                logger:error("The emqx data import failed: ~0p", [{Class,Reason,Stack}]),
                                 return({error, import_failed})
                             end;
                         false ->
