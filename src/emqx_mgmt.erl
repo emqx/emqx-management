@@ -291,11 +291,15 @@ list_subscriptions(Node) when Node =:= node() ->
 list_subscriptions(Node) ->
     rpc_call(Node, list_subscriptions, [Node]).
 
-lookup_subscriptions(Key) ->
-    lists:append([lookup_subscriptions(Node, Key) || Node <- ekka_mnesia:running_nodes()]).
+lookup_subscriptions(ClientId) ->
+    lists:append([lookup_subscriptions(Node, ClientId) || Node <- ekka_mnesia:running_nodes()]).
 
-lookup_subscriptions(Node, Key) when Node =:= node() ->
-    ets:match_object(emqx_suboption, {{Key, '_'}, '_'});
+lookup_subscriptions(Node, ClientId) when Node =:= node() ->
+    case ets:lookup(emqx_subid, ClientId) of
+        [] -> [];
+        [{_, Pid}] ->
+            ets:match_object(emqx_suboption, {{Pid, '_'}, '_'})
+    end;
 
 lookup_subscriptions(Node, Key) ->
     rpc_call(Node, lookup_subscriptions, [Node, Key]).
