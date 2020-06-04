@@ -387,14 +387,18 @@ list_subscriptions_via_topic(Node, Topic, FormatFun) when Node =:= node() ->
 list_subscriptions_via_topic(Node, {topic, Topic}, FormatFun) ->
     rpc_call(Node, list_subscriptions_via_topic, [Node, {topic, Topic}, FormatFun]).
 
-lookup_subscriptions(Key) ->
-    lists:append([lookup_subscriptions(Node, Key) || Node <- ekka_mnesia:running_nodes()]).
+lookup_subscriptions(ClientId) ->
+    lists:append([lookup_subscriptions(Node, ClientId) || Node <- ekka_mnesia:running_nodes()]).
 
-lookup_subscriptions(Node, Key) when Node =:= node() ->
-    ets:match_object(emqx_suboption, {{Key, '_'}, '_'});
+lookup_subscriptions(Node, ClientId) when Node =:= node() ->
+    case ets:lookup(emqx_subid, ClientId) of
+        [] -> [];
+        [{_, Pid}] ->
+            ets:match_object(emqx_suboption, {{Pid, '_'}, '_'})
+    end;
 
-lookup_subscriptions(Node, Key) ->
-    rpc_call(Node, lookup_subscriptions, [Node, Key]).
+lookup_subscriptions(Node, ClientId) ->
+    rpc_call(Node, lookup_subscriptions, [Node, ClientId]).
 
 %%--------------------------------------------------------------------
 %% Routes
@@ -417,7 +421,7 @@ subscribe(ClientId, TopicTables) ->
     case ets:lookup(emqx_channel, ClientId) of
         [] -> {error, channel_not_found};
         [{_, Pid}] ->
-            Pid ! {subscribe, TopicTables}
+            Pid ! {force_subscribe, TopicTables}
     end.
 
 %%TODO: ???
@@ -427,7 +431,7 @@ unsubscribe(ClientId, Topic) ->
     case ets:lookup(emqx_channel, ClientId) of
         [] -> {error, channel_not_found};
         [{_, Pid}] ->
-            Pid ! {unsubscribe, [Topic]}
+            Pid ! {force_unsubscribe, [Topic]}
     end.
 
 %%--------------------------------------------------------------------
