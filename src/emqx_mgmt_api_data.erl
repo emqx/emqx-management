@@ -158,7 +158,7 @@ import(_Bindings, Params) ->
                                 emqx_mgmt:import_blacklist(maps:get(<<"blacklist">>, Data, [])),
                                 emqx_mgmt:import_applications(maps:get(<<"apps">>, Data, [])),
                                 emqx_mgmt:import_users(maps:get(<<"users">>, Data, [])),
-                                emqx_mgmt:import_auth_cleintid(maps:get(<<"auth_clientid">>, Data, [])),
+                                emqx_mgmt:import_auth_clientid(maps:get(<<"auth_clientid">>, Data, [])),
                                 emqx_mgmt:import_auth_username(maps:get(<<"auth_username">>, Data, [])),
                                 emqx_mgmt:import_auth_mnesia(maps:get(<<"auth_mnesia">>, Data, [])),
                                 emqx_mgmt:import_acl_mnesia(maps:get(<<"acl_mnesia">>, Data, [])),
