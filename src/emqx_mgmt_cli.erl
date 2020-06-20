@@ -493,11 +493,11 @@ trace_off(Who, Name) ->
 %% @doc Listeners Command
 
 listeners([]) ->
-    foreach(fun({{Protocol, ListenOn}, Pid}) ->
-                Info = [{acceptors,      esockd:get_acceptors(Pid)},
-                        {max_conns,      esockd:get_max_connections(Pid)},
-                        {current_conn,   esockd:get_current_connections(Pid)},
-                        {shutdown_count, esockd:get_shutdown_count(Pid)}],
+    foreach(fun({{Protocol, ListenOn}, _Pid}) ->
+                Info = [{acceptors,      esockd:get_acceptors({Protocol, ListenOn})},
+                        {max_conns,      esockd:get_max_connections({Protocol, ListenOn})},
+                        {current_conn,   esockd:get_current_connections({Protocol, ListenOn})},
+                        {shutdown_count, esockd:get_shutdown_count({Protocol, ListenOn})}],
                     emqx_ctl:print("listener on ~s:~s~n", [Protocol, esockd:to_string(ListenOn)]),
                 foreach(fun({Key, Val}) ->
                             emqx_ctl:print("  ~-16s: ~w~n", [Key, Val])
