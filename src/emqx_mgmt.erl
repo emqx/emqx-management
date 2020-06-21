@@ -496,13 +496,13 @@ list_listeners() ->
     [{Node, list_listeners(Node)} || Node <- ekka_mnesia:running_nodes()].
 
 list_listeners(Node) when Node =:= node() ->
-    Tcp = lists:map(fun({{Protocol, ListenOn}, Pid}) ->
+    Tcp = lists:map(fun({{Protocol, ListenOn}, _Pid}) ->
         #{protocol        => Protocol,
           listen_on       => ListenOn,
-          acceptors       => esockd:get_acceptors(Pid),
-          max_conns       => esockd:get_max_connections(Pid),
-          current_conns   => esockd:get_current_connections(Pid),
-          shutdown_count  => esockd:get_shutdown_count(Pid)}
+          acceptors       => esockd:get_acceptors({Protocol, ListenOn}),
+          max_conns       => esockd:get_max_connections({Protocol, ListenOn}),
+          current_conns   => esockd:get_current_connections({Protocol, ListenOn}),
+          shutdown_count  => esockd:get_shutdown_count({Protocol, ListenOn})}
     end, esockd:listeners()),
     Http = lists:map(fun({Protocol, Opts}) ->
         #{protocol        => Protocol,
