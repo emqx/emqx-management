@@ -421,7 +421,7 @@ subscribe(ClientId, TopicTables) ->
     case ets:lookup(emqx_channel, ClientId) of
         [] -> {error, channel_not_found};
         [{_, Pid}] ->
-            Pid ! {force_subscribe, TopicTables}
+            Pid ! {subscribe, TopicTables}
     end.
 
 %%TODO: ???
@@ -431,7 +431,7 @@ unsubscribe(ClientId, Topic) ->
     case ets:lookup(emqx_channel, ClientId) of
         [] -> {error, channel_not_found};
         [{_, Pid}] ->
-            Pid ! {force_unsubscribe, [Topic]}
+            Pid ! {unsubscribe, [Topic]}
     end.
 
 %%--------------------------------------------------------------------
