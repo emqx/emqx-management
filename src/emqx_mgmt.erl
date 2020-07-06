@@ -431,7 +431,7 @@ unsubscribe(ClientId, Topic) ->
     case ets:lookup(emqx_channel, ClientId) of
         [] -> {error, channel_not_found};
         [{_, Pid}] ->
-            Pid ! {unsubscribe, [Topic]}
+            Pid ! {unsubscribe, [emqx_topic:parse(Topic)]}
     end.
 
 %%--------------------------------------------------------------------
