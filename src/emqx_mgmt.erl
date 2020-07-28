@@ -102,6 +102,9 @@
 %% Alarms
 -export([ get_alarms/1
         , get_alarms/2
+        , deactivate/2
+        , delete_all_deactivated_alarms/0
+        , delete_all_deactivated_alarms/1
         ]).
 
 %% Banned
@@ -525,9 +528,22 @@ get_alarms(Type) ->
     [{Node, get_alarms(Node, Type)} || Node <- ekka_mnesia:running_nodes()].
 
 get_alarms(Node, Type) when Node =:= node() ->
-    emqx_alarm_handler:get_alarms(Type);
+    emqx_alarm:get_alarms(Type);
 get_alarms(Node, Type) ->
     rpc_call(Node, get_alarms, [Node, Type]).
+
+deactivate(Node, Name) when Node =:= node() ->
+    emqx_alarm:deactivate(Name);
+deactivate(Node, Name) ->
+    rpc_call(Node, deactivate, [Node, Name]).
+
+delete_all_deactivated_alarms() ->
+    [delete_all_deactivated_alarms(Node) || Node <- ekka_mnesia:running_nodes()].
+
+delete_all_deactivated_alarms(Node) when Node =:= node() ->
+    emqx_alarm:delete_all_deactivated_alarms();
+delete_all_deactivated_alarms(Node) -> 
+    rpc_call(Node, delete_deactivated_alarms, [Node]).
 
 %%--------------------------------------------------------------------
 %% Banned API
