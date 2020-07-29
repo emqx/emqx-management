@@ -68,51 +68,52 @@ end_per_suite(_Config) ->
 get(Key, ResponseBody) ->
    maps:get(Key, jiffy:decode(list_to_binary(ResponseBody), [return_maps])).
 
-lookup_alarm(AlarmId, Alarms) ->
-    lists:foldl(fun(Alarm, Acc) ->
-                    case maps:get(<<"id">>, Alarm, undefined) =:= AlarmId of
-                        true -> true;
-                        false -> Acc
-                    end
-                end, false, Alarms).
+lookup_alarm(Name, [#{<<"name">> := Name} | _More]) ->
+    true;
+lookup_alarm(Name, [_Alarm | More]) ->  
+    lookup_alarm(Name, More);
+lookup_alarm(_Name, []) ->
+    false.
+
+is_existing(Name, [#{name := Name} | _More]) ->
+    true;
+is_existing(Name, [_Alarm | More]) ->
+    is_existing(Name, More);
+is_existing(_Name, []) ->
+    false.
 
 alarms(_) ->
-    alarm_handler:set_alarm({<<"t1">>, #alarm{id = <<"t1">>,
-                                              severity = error,
-                                              title = "alarm title",
-                                              summary = "alarm summary"}}),
-    alarm_handler:set_alarm({<<"t2">>, <<"alarm desc">>}),                                          
-    timer:sleep(100),
-    ?assertEqual(true, proplists:is_defined(<<"t1">>, emqx_alarm_handler:get_alarms())),
-    ?assertEqual(true, proplists:is_defined(<<"t2">>, emqx_alarm_handler:get_alarms())),
+    emqx_alarm:activate(alarm1),
+    emqx_alarm:activate(alarm2),
 
-    {ok, Return} = request_api(get, api_path(["alarms/present"]), auth_header_()),
-    [Misc] = get(<<"data">>, Return),
-    ?assertEqual(erlang:atom_to_binary(node(), utf8), maps:get(<<"node">>, Misc, undefined)),
-    ?assertEqual(true, lookup_alarm(<<"t1">>, maps:get(<<"alarms">>, Misc, undefined))),
-    ?assertEqual(true, lookup_alarm(<<"t2">>, maps:get(<<"alarms">>, Misc, undefined))),
-
-    {ok, Return1} = request_api(get, api_path(["alarms/present", atom_to_list(node())]), auth_header_()),
-    ?assertEqual(true, lookup_alarm(<<"t1">>, get(<<"data">>, Return1))),
-    ?assertEqual(true, lookup_alarm(<<"t2">>, get(<<"data">>, Return1))),
-    {ok, Return2} = request_api(get, api_path(["alarms/history", atom_to_list(node())]), auth_header_()),
-    ?assertEqual(false, lookup_alarm(<<"t1">>, get(<<"data">>, Return2))),
-    ?assertEqual(false, lookup_alarm(<<"t2">>, get(<<"data">>, Return2))),
+    ?assert(is_existing(alarm1, emqx_alarm:get_alarms(activated))),
+    ?assert(is_existing(alarm2, emqx_alarm:get_alarms(activated))),
     
-    alarm_handler:clear_alarm(<<"t1">>),
-    alarm_handler:clear_alarm(<<"t2">>),
-    {ok, Return3} = request_api(get, api_path(["alarms/history"]), auth_header_()),
-    [Misc3] = get(<<"data">>, Return3),
-    ?assertEqual(erlang:atom_to_binary(node(), utf8), maps:get(<<"node">>, Misc3, undefined)),
-    ?assertEqual(true, lookup_alarm(<<"t1">>, maps:get(<<"alarms">>, Misc3, undefined))),
-    ?assertEqual(true, lookup_alarm(<<"t2">>, maps:get(<<"alarms">>, Misc3, undefined))),
+    {ok, Return1} = request_api(get, api_path(["alarms/activated"]), auth_header_()),
+    ?assert(lookup_alarm(<<"alarm1">>, maps:get(<<"alarms">>, lists:nth(1, get(<<"data">>, Return1))))),
+    ?assert(lookup_alarm(<<"alarm2">>, maps:get(<<"alarms">>, lists:nth(1, get(<<"data">>, Return1))))),
 
-    {ok, Return4} = request_api(get, api_path(["alarms/history", atom_to_list(node())]), auth_header_()),
-    ?assertEqual(true, lookup_alarm(<<"t1">>, get(<<"data">>, Return4))),
-    ?assertEqual(true, lookup_alarm(<<"t2">>, get(<<"data">>, Return4))),
-    {ok, Return5} = request_api(get, api_path(["alarms/present", atom_to_list(node())]), auth_header_()),
-    ?assertEqual(false, lookup_alarm(<<"t1">>, get(<<"data">>, Return5))),
-    ?assertEqual(false, lookup_alarm(<<"t2">>, get(<<"data">>, Return5))).
+    emqx_alarm:deactivate(alarm1),
+
+    {ok, Return2} = request_api(get, api_path(["alarms"]), auth_header_()),
+    ?assert(lookup_alarm(<<"alarm1">>, maps:get(<<"alarms">>, lists:nth(1, get(<<"data">>, Return2))))),
+    ?assert(lookup_alarm(<<"alarm2">>, maps:get(<<"alarms">>, lists:nth(1, get(<<"data">>, Return2))))),
+
+    {ok, Return3} = request_api(get, api_path(["alarms/deactivated"]), auth_header_()),
+    ?assert(lookup_alarm(<<"alarm1">>, maps:get(<<"alarms">>, lists:nth(1, get(<<"data">>, Return3))))),
+    ?assertNot(lookup_alarm(<<"alarm2">>, maps:get(<<"alarms">>, lists:nth(1, get(<<"data">>, Return3))))),
+
+    emqx_alarm:deactivate(alarm2),
+
+    {ok, Return4} = request_api(get, api_path(["alarms/deactivated"]), auth_header_()),
+    ?assert(lookup_alarm(<<"alarm1">>, maps:get(<<"alarms">>, lists:nth(1, get(<<"data">>, Return4))))),
+    ?assert(lookup_alarm(<<"alarm2">>, maps:get(<<"alarms">>, lists:nth(1, get(<<"data">>, Return4))))),
+
+    {ok, _} = request_api(delete, api_path(["alarms/deactivated"]), auth_header_()),
+
+    {ok, Return5} = request_api(get, api_path(["alarms/deactivated"]), auth_header_()),
+    ?assertNot(lookup_alarm(<<"alarm1">>, maps:get(<<"alarms">>, lists:nth(1, get(<<"data">>, Return5))))),
+    ?assertNot(lookup_alarm(<<"alarm2">>, maps:get(<<"alarms">>, lists:nth(1, get(<<"data">>, Return5))))).
 
 apps(_) ->
     AppId = <<"123456">>,
