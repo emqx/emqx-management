@@ -152,12 +152,14 @@ do_subscribe(ClientId, Topics, QoS) ->
 
 do_publish(_ClientId, [], _Qos, _Retain, _Payload) ->
     {ok, ?ERROR15, bad_topic};
-do_publish(ClientId, Topics, Qos, Retain, Payload) ->
+do_publish(ClientId, Topics, Qos, Retain, Payload) when is_binary(Payload) ->
     lists:foreach(fun(Topic) ->
         Msg = emqx_message:make(ClientId, Qos, Topic, Payload),
         emqx_mgmt:publish(Msg#message{flags = #{retain => Retain}})
     end, Topics),
-    ok.
+    ok;
+do_publish(_ClientId, _Topic, _Qos, _Retain, _Payload) ->
+    {ok, ?ERROR9, <<"Request parameter is not a json">>}.
 
 do_unsubscribe(ClientId, Topic) ->
     case validate_by_filter(Topic) of

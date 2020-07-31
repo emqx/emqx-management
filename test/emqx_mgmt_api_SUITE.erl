@@ -489,6 +489,14 @@ pubsub(_) ->
             after 100 ->
                     false
             end),
+    %% json payload
+    {ok, BadParameter} = request_api(post, api_path(["mqtt/publish"]), [], auth_header_(),
+                             #{<<"clientid">> => ClientId,
+                               <<"topic">> => <<"mytopic">>,
+                               <<"qos">> => 1,
+                               <<"payload">> => #{body => "hello world"}}),
+    ?assertEqual(?ERROR9, get(<<"code">>, BadParameter)),
+
     {ok, Code} = request_api(post, api_path(["mqtt/unsubscribe"]), [], auth_header_(),
                              #{<<"clientid">> => ClientId,
                               <<"topic">> => Topic}),
