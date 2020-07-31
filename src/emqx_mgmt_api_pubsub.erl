@@ -235,6 +235,6 @@ maybe_maps_to_binary(Payload) ->
   try
       emqx_json:encode(Payload)
   catch
-      C : E ->
-          erlang:error("Payload parsing failed: ~p ~p .~n", [C, E])
+      C : E : S ->
+         error({encode_payload_fail, S})
   end.
