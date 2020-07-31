@@ -489,6 +489,20 @@ pubsub(_) ->
             after 100 ->
                     false
             end),
+    %% json payload
+    {ok, Code} = request_api(post, api_path(["mqtt/publish"]), [], auth_header_(),
+                             #{<<"clientid">> => ClientId,
+                               <<"topic">> => <<"mytopic">>,
+                               <<"qos">> => 1,
+                               <<"payload">> => #{body => "hello world"}}),
+    Payload = emqx_json:encode(#{body => "hello world"}),
+    ?assert(receive
+                {publish, #{payload := Payload}} ->
+                    true
+            after 100 ->
+                    false
+            end),
+
     {ok, Code} = request_api(post, api_path(["mqtt/unsubscribe"]), [], auth_header_(),
                              #{<<"clientid">> => ClientId,
                               <<"topic">> => Topic}),
@@ -502,7 +516,7 @@ pubsub(_) ->
     loop(maps:get(<<"data">>, jiffy:decode(list_to_binary(Data1), [return_maps]))),
 
     %% tests publish_batch
-    Body2 = [ #{<<"clientid">> => ClientId, <<"topic">> => Topics, <<"qos">> => 2, <<"retain">> => <<"false">>, <<"payload">> => <<"publish_batch">>} || Topics <- Topic_list ],
+    Body2 = [ #{<<"clientid">> => ClientId, <<"topic">> => Topics, <<"qos">> => 2, <<"retain">> => <<"false">>, <<"payload">> => #{body => "hello world"}} || Topics <- Topic_list ],
     {ok, Data2} = request_api(post, api_path(["mqtt/publish_batch"]), [], auth_header_(), Body2),
     loop(maps:get(<<"data">>, jiffy:decode(list_to_binary(Data2), [return_maps]))),
     [ ?assert(receive
