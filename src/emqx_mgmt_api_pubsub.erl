@@ -183,7 +183,8 @@ parse_publish_params(Params) ->
                               get_value(<<"encoding">>, Params, <<"plain">>)),
     Qos      = get_value(<<"qos">>, Params, 0),
     Retain   = get_value(<<"retain">>, Params, false),
-    {ClientId, Topics, Qos, Retain, Payload}.
+    Payload1 = maybe_maps_to_binary(Payload),
+    {ClientId, Topics, Qos, Retain, Payload1}.
 
 parse_unsubscribe_params(Params) ->
     ClientId = get_value(<<"clientid">>, Params),
@@ -228,3 +229,12 @@ resp_topic(Topic, _) -> Topic.
 
 decode_payload(Payload, <<"base64">>) -> base64:decode(Payload);
 decode_payload(Payload, _) -> Payload.
+
+maybe_maps_to_binary(Payload) when is_binary(Payload) -> Payload;
+maybe_maps_to_binary(Payload) ->
+  try
+      emqx_json:encode(Payload)
+  catch
+      C : E ->
+          erlang:error("Payload parsing failed: ~p ~p .~n", [C, E])
+  end.
