@@ -159,7 +159,7 @@ do_publish(ClientId, Topics, Qos, Retain, Payload) when is_binary(Payload) ->
     end, Topics),
     ok;
 do_publish(_ClientId, _Topic, _Qos, _Retain, _Payload) ->
-    {ok, ?ERROR9, <<"Request parameter is not a json">>}.
+    {ok, ?ERROR8, <<"Request parameter type error">>}.
 
 do_unsubscribe(ClientId, Topic) ->
     case validate_by_filter(Topic) of

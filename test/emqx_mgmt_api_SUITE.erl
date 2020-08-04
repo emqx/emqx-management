@@ -495,7 +495,7 @@ pubsub(_) ->
                                <<"topic">> => <<"mytopic">>,
                                <<"qos">> => 1,
                                <<"payload">> => #{body => "hello world"}}),
-    ?assertEqual(?ERROR9, get(<<"code">>, BadParameter)),
+    ?assertEqual(?ERROR8, get(<<"code">>, BadParameter)),
 
     {ok, Code} = request_api(post, api_path(["mqtt/unsubscribe"]), [], auth_header_(),
                              #{<<"clientid">> => ClientId,
