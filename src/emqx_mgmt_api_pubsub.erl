@@ -235,6 +235,6 @@ maybe_maps_to_binary(Payload) ->
   try
       emqx_json:encode(Payload)
   catch
-      C : E : S ->
+      _C : _E : S ->
          error({encode_payload_fail, S})
   end.
