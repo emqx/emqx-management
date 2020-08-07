@@ -136,6 +136,11 @@
         , to_version/1
         ]).
 
+-export([ enable_telemetry/0
+        , disable_telemetry/0
+        , get_telemetry/0
+        ]).
+
 %% Common Table API
 -export([ item/2
         , max_row_limit/0
@@ -769,7 +774,28 @@ to_version(Version) when is_binary(Version) ->
 to_version(Version) when is_list(Version) ->
     Version.
 
+%%--------------------------------------------------------------------
+%% Telemtry API
+%%--------------------------------------------------------------------
 
+enable_telemetry() ->
+    [enable_telemetry(Node) || Node <- ekka_mnesia:running_nodes()], ok.
+
+enable_telemetry(Node) when Node =:= node() ->
+    emqx_telemetry:enable();
+enable_telemetry(Node) ->
+    rpc_call(Node, enable_telemetry, [Node]).
+
+disable_telemetry() ->
+    [disable_telemetry(Node) || Node <- ekka_mnesia:running_nodes()], ok.
+
+disable_telemetry(Node) when Node =:= node() ->
+    emqx_telemetry:disable();
+disable_telemetry(Node) ->
+    rpc_call(Node, disable_telemetry, [Node]).
+
+get_telemetry() ->
+    emqx_telemetry:get_telemetry().
 
 %%--------------------------------------------------------------------
 %% Common Table API
