@@ -121,33 +121,33 @@ list(Bindings = #{node := Node}, Params) ->
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    return({ok, emqx_mgmt:lookup_client(Node, {clientid, http_uri:decode(ClientId)}, fun format/1)});
+    return({ok, emqx_mgmt:lookup_client(Node, {clientid, emqx_mgmt_util:urldecode(ClientId)}, fun format/1)});
 
 lookup(#{clientid := ClientId}, _Params) ->
-    return({ok, emqx_mgmt:lookup_client({clientid, http_uri:decode(ClientId)}, fun format/1)});
+    return({ok, emqx_mgmt:lookup_client({clientid, emqx_mgmt_util:urldecode(ClientId)}, fun format/1)});
 
 lookup(#{node := Node, username := Username}, _Params) ->
-    return({ok, emqx_mgmt:lookup_client(Node, {username, http_uri:decode(Username)}, fun format/1)});
+    return({ok, emqx_mgmt:lookup_client(Node, {username, emqx_mgmt_util:urldecode(Username)}, fun format/1)});
 
 lookup(#{username := Username}, _Params) ->
-    return({ok, emqx_mgmt:lookup_client({username, http_uri:decode(Username)}, fun format/1)}).
+    return({ok, emqx_mgmt:lookup_client({username, emqx_mgmt_util:urldecode(Username)}, fun format/1)}).
 
 kickout(#{clientid := ClientId}, _Params) ->
-    case emqx_mgmt:kickout_client(http_uri:decode(ClientId)) of
+    case emqx_mgmt:kickout_client(emqx_mgmt_util:urldecode(ClientId)) of
         ok -> return();
         {error, not_found} -> return({error, ?ERROR12, not_found});
         {error, Reason} -> return({error, ?ERROR1, Reason})
     end.
 
 clean_acl_cache(#{clientid := ClientId}, _Params) ->
-    case emqx_mgmt:clean_acl_cache(http_uri:decode(ClientId)) of
+    case emqx_mgmt:clean_acl_cache(emqx_mgmt_util:urldecode(ClientId)) of
         ok -> return();
         {error, not_found} -> return({error, ?ERROR12, not_found});
         {error, Reason} -> return({error, ?ERROR1, Reason})
     end.
 
 list_acl_cache(#{clientid := ClientId}, _Params) ->
-    case emqx_mgmt:list_acl_cache(http_uri:decode(ClientId)) of
+    case emqx_mgmt:list_acl_cache(emqx_mgmt_util:urldecode(ClientId)) of
         {error, not_found} -> return({error, ?ERROR12, not_found});
         {error, Reason} -> return({error, ?ERROR1, Reason});
         Caches -> return({ok, [format_acl_cache(Cache) || Cache <- Caches]})

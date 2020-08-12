@@ -60,7 +60,7 @@ list(Bindings, Params) when map_size(Bindings) == 0 ->
         undefined ->
             return({ok, emqx_mgmt_api:cluster_query(Params, ?SUBS_QS_SCHEMA, fun query/3)});
         Topic ->
-            return({ok, emqx_mgmt:list_subscriptions_via_topic(http_uri:decode(Topic), fun format/1)})
+            return({ok, emqx_mgmt:list_subscriptions_via_topic(emqx_mgmt_util:urldecode(Topic), fun format/1)})
     end;
 
 list(#{node := Node} = Bindings, Params) ->
@@ -76,14 +76,14 @@ list(#{node := Node} = Bindings, Params) ->
                     end
             end;
         Topic ->
-            return({ok, emqx_mgmt:list_subscriptions_via_topic(Node, http_uri:decode(Topic), fun format/1)})
+            return({ok, emqx_mgmt:list_subscriptions_via_topic(Node, emqx_mgmt_util:urldecode(Topic), fun format/1)})
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    return({ok, format(emqx_mgmt:lookup_subscriptions(Node, http_uri:decode(ClientId)))});
+    return({ok, format(emqx_mgmt:lookup_subscriptions(Node, emqx_mgmt_util:urldecode(ClientId)))});
 
 lookup(#{clientid := ClientId}, _Params) ->
-    return({ok, format(emqx_mgmt:lookup_subscriptions(http_uri:decode(ClientId)))}).
+    return({ok, format(emqx_mgmt:lookup_subscriptions(emqx_mgmt_util:urldecode(ClientId)))}).
 
 format(Items) when is_list(Items) ->
     [format(Item) || Item <- Items];

@@ -23,6 +23,8 @@
         , merge_maps/2
         ]).
 
+-export([urldecode/1]).
+
 -define(KB, 1024).
 -define(MB, (1024*1024)).
 -define(GB, (1024*1024*1024)).
@@ -71,3 +73,12 @@ merge_maps(Default, New) ->
             _ -> Acc#{K => V}
         end
     end, Default, New).
+
+-if(?OTP_RELEASE >= 23).
+urldecode(S) ->
+    [{R, _}] = uri_string:dissect_query(S), R.
+-else.
+urldecode(S) ->
+    http_uri:decode(S).
+-endif.
+
