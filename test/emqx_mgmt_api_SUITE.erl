@@ -595,9 +595,9 @@ stats(_) ->
 
 telemetry(_) ->
     emqx_telemetry:enable(),
-    {ok, _} = request_api(put, api_path(["telemetry"]), [], auth_header_(), [{enabled, true}]),
-    {ok, _} = request_api(put, api_path(["telemetry"]), [], auth_header_(), [{enabled, false}]),
-    {ok, Result} = request_api(get, api_path(["telemetry"]), [], auth_header_()),
+    {ok, _} = request_api(put, api_path(["telemetry/status"]), [], auth_header_(), [{enabled, true}]),
+    {ok, _} = request_api(put, api_path(["telemetry/status"]), [], auth_header_(), [{enabled, false}]),
+    {ok, Result} = request_api(get, api_path(["telemetry/data"]), [], auth_header_()),
     {ok, UUID} = emqx_telemetry:get_uuid(),
     ?assertEqual(UUID, maps:get(<<"uuid">>, get(<<"data">>, Result))).
 
