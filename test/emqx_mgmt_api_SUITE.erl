@@ -53,7 +53,8 @@ groups() ->
        acl_cache,
        pubsub,
        routes_and_subscriptions,
-       stats]}].
+       stats,
+       telemetry]}].
 
 init_per_suite(Config) ->
     emqx_ct_helpers:start_apps([emqx, emqx_management, emqx_reloader]),
@@ -592,19 +593,31 @@ stats(_) ->
     ?assertEqual(<<"undefined">>, get(<<"message">>, Return)),
     meck:unload(emqx_mgmt).
 
+telemetry(_) ->
+    emqx_telemetry:enable(),
+    {ok, _} = request_api(put, api_path(["telemetry"]), [], auth_header_(), [{enabled, true}]),
+    {ok, _} = request_api(put, api_path(["telemetry"]), [], auth_header_(), [{enabled, false}]),
+    {ok, Result} = request_api(get, api_path(["telemetry"]), [], auth_header_()),
+    {ok, UUID} = emqx_telemetry:get_uuid(),
+    ?assertEqual(UUID, maps:get(<<"uuid">>, get(<<"data">>, Result))).
+
 request_api(Method, Url, Auth) ->
     request_api(Method, Url, [], Auth, []).
 
 request_api(Method, Url, QueryParams, Auth) ->
     request_api(Method, Url, QueryParams, Auth, []).
 
-request_api(Method, Url, [], Auth, []) ->
-    do_request_api(Method, {Url, [Auth]});
 request_api(Method, Url, QueryParams, Auth, []) ->
-    NewUrl = Url ++ "?" ++ QueryParams,
+    NewUrl = case QueryParams of
+                 "" -> Url;
+                 _ -> Url ++ "?" ++ QueryParams
+             end,
     do_request_api(Method, {NewUrl, [Auth]});
 request_api(Method, Url, QueryParams, Auth, Body) ->
-    NewUrl = Url ++ "?" ++ QueryParams,
+    NewUrl = case QueryParams of
+                 "" -> Url;
+                 _ -> Url ++ "?" ++ QueryParams
+             end,
     do_request_api(Method, {NewUrl, [Auth], "application/json", emqx_json:encode(Body)}).
 
 do_request_api(Method, Request)->
