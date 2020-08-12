@@ -64,8 +64,8 @@ create(_Bindings, Params) ->
     end.
 
 delete(#{as := As, who := Who}, _) ->
-    Params = [{<<"who">>, bin(http_uri:decode(Who))},
-              {<<"as">>, bin(http_uri:decode(As))}],
+    Params = [{<<"who">>, bin(emqx_mgmt_util:urldecode(Who))},
+              {<<"as">>, bin(emqx_mgmt_util:urldecode(As))}],
     case pipeline([fun ensure_required/1,
                    fun validate_params/1], Params) of
         {ok, NParams} ->

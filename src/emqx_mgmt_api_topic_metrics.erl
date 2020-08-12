@@ -55,7 +55,7 @@
 
 list(#{topic := Topic0}, _Params) ->
     execute_when_enabled(fun() ->
-        Topic = http_uri:decode(Topic0),
+        Topic = emqx_mgmt_util:urldecode(Topic0),
         case safe_validate(Topic) of
             true -> 
                 case emqx_mgmt:get_topic_metrics(Topic) of
@@ -99,7 +99,7 @@ unregister(Bindings, _Params) when map_size(Bindings) =:= 0 ->
 
 unregister(#{topic := Topic0}, _Params) ->
     execute_when_enabled(fun() ->
-        Topic = http_uri:decode(Topic0),
+        Topic = emqx_mgmt_util:urldecode(Topic0),
         case safe_validate(Topic) of
             true -> 
                 emqx_mgmt:unregister_topic_metrics(Topic),
