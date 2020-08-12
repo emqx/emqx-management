@@ -49,7 +49,8 @@ groups() ->
         t_broker_cmd,
         t_router_cmd,
         t_subscriptions_cmd,
-        t_listeners_cmd
+        t_listeners_cmd,
+        t_telemetry_cmd
        ]}].
 
 apps() ->
@@ -279,6 +280,11 @@ t_cli(_) ->
     [?assertMatch({match, _}, re:run(Value, "mnesia")) || Value <- emqx_mgmt_cli:mnesia([""])],
     [?assertMatch({match, _}, re:run(Value, "trace")) || Value <- emqx_mgmt_cli:trace([""])],
     [?assertMatch({match, _}, re:run(Value, "mgmt")) || Value <- emqx_mgmt_cli:mgmt([""])].
+
+t_telemetry_cmd(_) ->
+    print_mock(),
+    ?assertEqual(emqx_mgmt_cli:telemetry(["enable"]),"Enable telemetry successfully~n"),
+    ?assertEqual(emqx_mgmt_cli:telemetry(["disable"]),"Disable telemetry successfully~n").
 
 print_mock() ->
     meck:new(emqx_ctl, [non_strict, passthrough]),
