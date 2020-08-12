@@ -634,8 +634,16 @@ telemetry(["disable"]) ->
     emqx_mgmt:disable_telemetry(),
     emqx_ctl:print("Disable telemetry successfully~n");
 
+telemetry(["get", "status"]) ->
+    case emqx_mgmt:get_telemetry_status() of
+        [{enabled, true}] ->
+            emqx_ctl:print("Telemetry is enabled~n");
+        [{enabled, false}] ->
+            emqx_ctl:print("Telemetry is disabled~n")
+    end;
+
 telemetry(["get", "data"]) ->
-    {ok, TelemetryData} = emqx_mgmt:get_telemetry(),
+    {ok, TelemetryData} = emqx_mgmt:get_telemetry_data(),
     case emqx_json:safe_encode(TelemetryData, [pretty]) of
         {ok, Bin} ->
             emqx_ctl:print("~s~n", [Bin]);

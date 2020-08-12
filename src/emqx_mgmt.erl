@@ -138,7 +138,8 @@
 
 -export([ enable_telemetry/0
         , disable_telemetry/0
-        , get_telemetry/0
+        , get_telemetry_status/0
+        , get_telemetry_data/0
         ]).
 
 %% Common Table API
@@ -794,7 +795,10 @@ disable_telemetry(Node) when Node =:= node() ->
 disable_telemetry(Node) ->
     rpc_call(Node, disable_telemetry, [Node]).
 
-get_telemetry() ->
+get_telemetry_status() ->
+    [{enabled, emqx_telemetry:is_enabled()}].
+
+get_telemetry_data() ->
     emqx_telemetry:get_telemetry().
 
 %%--------------------------------------------------------------------
