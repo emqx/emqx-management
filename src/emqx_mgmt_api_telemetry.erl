@@ -18,18 +18,25 @@
 
 -rest_api(#{name   => enable_telemetry,
             method => 'PUT',
-            path   => "/telemetry",
+            path   => "/telemetry/status",
             func   => enable,
-            descr  => "Enable telemetry"}).
+            descr  => "Enable or disbale telemetry"}).
 
--rest_api(#{name   => get_telemetry,
+-rest_api(#{name   => get_telemetry_status,
             method => 'GET',
-            path   => "/telemetry",
-            func   => get_telemetry,
+            path   => "/telemetry/status",
+            func   => get_status,
+            descr  => "Get telemetry status"}).
+
+-rest_api(#{name   => get_telemetry_data,
+            method => 'GET',
+            path   => "/telemetry/data",
+            func   => get_data,
             descr  => "Get reported telemetry data"}).
 
 -export([ enable/2
-        , get_telemetry/2
+        , get_status/2
+        , get_data/2
         ]).
 
 -import(minirest, [return/1]).
@@ -46,5 +53,8 @@ enable(_Bindings, Params) ->
             return({error, missing_required_params})
     end.
 
-get_telemetry(_Bindings, _Params) ->
-    return(emqx_mgmt:get_telemetry()).
+get_status(_Bindings, _Params) ->
+    return({ok, emqx_mgmt:get_telemetry_status()}).
+
+get_data(_Bindings, _Params) ->
+    return(emqx_mgmt:get_telemetry_data()).
