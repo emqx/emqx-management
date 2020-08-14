@@ -40,7 +40,7 @@ list(Bindings, Params) when map_size(Bindings) == 0 ->
     return({ok, emqx_mgmt_api:paginate(emqx_route, Params, fun format/1)}).
 
 lookup(#{topic := Topic}, _Params) ->
-    [{Topic1, _}] = uri_string:dissect_query(Topic),
+    Topic1 = emqx_mgmt_util:urldecode(Topic),
     return({ok, [format(R) || R <- emqx_mgmt:lookup_routes(Topic1)]}).
 format(#route{topic = Topic, dest = {_, Node}}) ->
     #{topic => Topic, node => Node};
