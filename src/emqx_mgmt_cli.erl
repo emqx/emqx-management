@@ -42,7 +42,6 @@
         , mgmt/1
         , data/1
         , modules/1
-        , telemetry/1
         ]).
 
 -define(PROC_INFOKEYS, [status,
@@ -623,39 +622,6 @@ data(["import", Filename]) ->
 data(_) ->
     emqx_ctl:usage([{"data import <File>",   "Import data from the specified file"},
                     {"data export [<Path>]", "Export data to the specified path"}]).
-
-%%--------------------------------------------------------------------
-%% @doc Telemetry Command
-telemetry(["enable"]) ->
-    emqx_mgmt:enable_telemetry(),
-    emqx_ctl:print("Enable telemetry successfully~n");
-
-telemetry(["disable"]) ->
-    emqx_mgmt:disable_telemetry(),
-    emqx_ctl:print("Disable telemetry successfully~n");
-
-telemetry(["get", "status"]) ->
-    case emqx_mgmt:get_telemetry_status() of
-        [{enabled, true}] ->
-            emqx_ctl:print("Telemetry is enabled~n");
-        [{enabled, false}] ->
-            emqx_ctl:print("Telemetry is disabled~n")
-    end;
-
-telemetry(["get", "data"]) ->
-    {ok, TelemetryData} = emqx_mgmt:get_telemetry_data(),
-    case emqx_json:safe_encode(TelemetryData, [pretty]) of
-        {ok, Bin} ->
-            emqx_ctl:print("~s~n", [Bin]);
-        {error, _Reason} ->
-            emqx_ctl:print("Failed to get telemetry data")
-    end;
-
-telemetry(_) ->
-    emqx_ctl:usage([{"telemetry enable",   "Enable telemetry"},
-                    {"telemetry disable",  "Disable telemetry"},
-                    {"telemetry get data", "Get reported telemetry data"}]).
-
 
 %%--------------------------------------------------------------------
 %% Dump ETS
