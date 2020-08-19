@@ -53,8 +53,7 @@ groups() ->
        acl_cache,
        pubsub,
        routes_and_subscriptions,
-       stats,
-       telemetry]}].
+       stats]}].
 
 init_per_suite(Config) ->
     emqx_ct_helpers:start_apps([emqx, emqx_management, emqx_reloader]),
@@ -592,14 +591,6 @@ stats(_) ->
     {ok, Return} = request_api(get, api_path(["nodes", atom_to_list(node()), "stats"]), auth_header_()),
     ?assertEqual(<<"undefined">>, get(<<"message">>, Return)),
     meck:unload(emqx_mgmt).
-
-telemetry(_) ->
-    emqx_telemetry:enable(),
-    {ok, _} = request_api(put, api_path(["telemetry/status"]), [], auth_header_(), [{enabled, true}]),
-    {ok, _} = request_api(put, api_path(["telemetry/status"]), [], auth_header_(), [{enabled, false}]),
-    {ok, Result} = request_api(get, api_path(["telemetry/data"]), [], auth_header_()),
-    {ok, UUID} = emqx_telemetry:get_uuid(),
-    ?assertEqual(UUID, maps:get(<<"uuid">>, get(<<"data">>, Result))).
 
 request_api(Method, Url, Auth) ->
     request_api(Method, Url, [], Auth, []).
