@@ -83,9 +83,8 @@ export(_Bindings, _Params) ->
     Schemas = emqx_mgmt:export_schemas(),
     Seconds = erlang:system_time(second),
     {{Y, M, D}, {H, MM, S}} = emqx_mgmt_util:datetime(Seconds),
-    {ok, Dir} = file:get_cwd(),
     Filename = io_lib:format("emqx-export-~p-~p-~p-~p-~p-~p.json", [Y, M, D, H, MM, S]),
-    NFilename = filename:join([Dir, "data", Filename]),
+    NFilename = filename:join([emqx:get_env(data_dir), Filename]),
     Version = string:sub_string(emqx_sys:version(), 1, 3),
     Data = [{version, erlang:list_to_binary(Version)},
             {date, erlang:list_to_binary(emqx_mgmt_util:strftime(Seconds))},
@@ -116,8 +115,7 @@ export(_Bindings, _Params) ->
     end.
 
 list_exported(_Bindings, _Params) ->
-    {ok, Dir0} = file:get_cwd(),
-    Dir = filename:join([Dir0, "data"]),
+    Dir = emqx:get_env(data_dir),
     {ok, Files} = file:list_dir_all(Dir),
     Data = lists:foldl(fun(File, Acc) ->
                            case filename:extension(File) =:= ".json" of
@@ -144,8 +142,7 @@ import(_Bindings, Params) ->
         undefined ->
             return({error, missing_required_params});
         Filename ->
-            {ok, Dir} = file:get_cwd(),
-            FullFilename = filename:join([Dir, "data", Filename]),
+            FullFilename = filename:join([emqx:get_env(data_dir), Filename]),
             case file:read_file(FullFilename) of
                 {ok, Json} ->
                     Data = emqx_json:decode(Json, [return_maps]),
@@ -179,8 +176,7 @@ import(_Bindings, Params) ->
     end.
 
 download(#{filename := Filename}, _Params) ->
-    {ok, Dir} = file:get_cwd(),
-    FullFilename = filename:join([Dir, "data", Filename]),
+    FullFilename = filename:join([emqx:get_env(data_dir), Filename]),
     case file:read_file(FullFilename) of
         {ok, Bin} ->
             {ok, #{filename => list_to_binary(FullFilename),
@@ -194,8 +190,7 @@ upload(Bindings, Params) ->
 
 do_upload(_Bindings, #{<<"filename">> := Filename,
                        <<"file">> := Bin}) ->
-    {ok, Dir} = file:get_cwd(),
-    FullFilename = filename:join([Dir, "data", Filename]),
+    FullFilename = filename:join([emqx:get_env(data_dir), Filename]),
     case file:write_file(FullFilename, Bin) of
         ok ->
             return();
@@ -211,8 +206,7 @@ do_upload(_Bindings, _Params) ->
     return({error, missing_required_params}).
 
 delete(#{filename := Filename}, _Params) ->
-    {ok, Dir} = file:get_cwd(),
-    FullFilename = filename:join([Dir, "data", Filename]),
+    FullFilename = filename:join([emqx:get_env(data_dir), Filename]),
     case file:delete(FullFilename) of
         ok ->
             return();
