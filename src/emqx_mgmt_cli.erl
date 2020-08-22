@@ -420,14 +420,28 @@ log(["primary-level", Level]) ->
     emqx_ctl:print("~s~n", [emqx_logger:get_primary_log_level()]);
 
 log(["handlers", "list"]) ->
-    [emqx_ctl:print("LogHandler(id=~s, level=~s, destination=~s)~n", [Id, Level, Dst])
-        || {Id, Level, Dst} <- emqx_logger:get_log_handlers()],
+    [emqx_ctl:print("LogHandler(id=~s, level=~s, destination=~s, status=~s)~n", [Id, Level, Dst, Status])
+        || #{id := Id, level := Level, dst := Dst, status := Status} <- emqx_logger:get_log_handlers()],
     ok;
+
+log(["handlers", "start", HandlerId]) ->
+    case emqx_logger:start_log_handler(list_to_atom(HandlerId)) of
+        ok -> emqx_ctl:print("log handler ~s started~n", [HandlerId]);
+        {error, Reason} ->
+            emqx_ctl:print("[error] failed to start log handler ~s: ~p~n", [HandlerId, Reason])
+    end;
+
+log(["handlers", "stop", HandlerId]) ->
+    case emqx_logger:stop_log_handler(list_to_atom(HandlerId)) of
+        ok -> emqx_ctl:print("log handler ~s stopped~n", [HandlerId]);
+        {error, Reason} ->
+            emqx_ctl:print("[error] failed to stop log handler ~s: ~p~n", [HandlerId, Reason])
+    end;
 
 log(["handlers", "set-level", HandlerId, Level]) ->
     case emqx_logger:set_log_handler_level(list_to_atom(HandlerId), list_to_atom(Level)) of
         ok ->
-            {_Id, NewLevel, _Dst} = emqx_logger:get_log_handler(list_to_atom(HandlerId)),
+            #{level := NewLevel} = emqx_logger:get_log_handler(list_to_atom(HandlerId)),
             emqx_ctl:print("~s~n", [NewLevel]);
         {error, Error} ->
             emqx_ctl:print("[error] ~p~n", [Error])
@@ -438,6 +452,8 @@ log(_) ->
                     {"log primary-level", "Show the primary log level now"},
                     {"log primary-level <Level>","Set the primary log level"},
                     {"log handlers list", "Show log handlers"},
+                    {"log handlers start <HandlerId>", "Start a log handler"},
+                    {"log handlers stop  <HandlerId>", "Stop a log handler"},
                     {"log handlers set-level <HandlerId> <Level>", "Set log level of a log handler"}]).
 
 %%--------------------------------------------------------------------
