@@ -106,7 +106,7 @@ t_log_cmd(_) ->
                          ?assertEqual(Level++"\n", emqx_mgmt_cli:log(["handlers", "set-level",
                                                                       atom_to_list(Id), Level]))
                       end, ?LOG_LEVELS)
-        || {Id, _Level, _Dst} <- emqx_logger:get_log_handlers()].
+        || #{id := Id} <- emqx_logger:get_log_handlers()].
 
 t_mgmt_cmd(_) ->
     ct:pal("start testing the mgmt command"),
