@@ -91,8 +91,8 @@ node_query(Node, Params, {Tab, QsSchema}, QueryFun) ->
     #{meta => NMeta, data => lists:sublist(Rows, Limit)}.
 
 %% @private
-do_query(Node, Qs, QueryFun, Start, Limit) when Node =:= node() ->
-    QueryFun(Qs, Start, Limit);
+do_query(Node, Qs, {M,F}, Start, Limit) when Node =:= node() ->
+    M:F(Qs, Start, Limit);
 do_query(Node, Qs, QueryFun, Start, Limit) ->
     rpc_call(Node, ?MODULE, do_query, [Node, Qs, QueryFun, Start, Limit], 50000).
 

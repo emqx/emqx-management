@@ -55,12 +55,19 @@
         , lookup/2
         ]).
 
+-export([ query/3
+        , format/1
+        ]).
+
+-define(query_fun, {?MODULE, query}).
+-define(format_fun, {?MODULE, format}).
+
 list(Bindings, Params) when map_size(Bindings) == 0 ->
     case proplists:get_value(<<"topic">>, Params) of
         undefined ->
-            return({ok, emqx_mgmt_api:cluster_query(Params, ?SUBS_QS_SCHEMA, fun query/3)});
+            return({ok, emqx_mgmt_api:cluster_query(Params, ?SUBS_QS_SCHEMA, ?query_fun)});
         Topic ->
-            return({ok, emqx_mgmt:list_subscriptions_via_topic(emqx_mgmt_util:urldecode(Topic), fun format/1)})
+            return({ok, emqx_mgmt:list_subscriptions_via_topic(emqx_mgmt_util:urldecode(Topic), ?format_fun)})
     end;
 
 list(#{node := Node} = Bindings, Params) ->
@@ -68,7 +75,7 @@ list(#{node := Node} = Bindings, Params) ->
         undefined ->
             case Node =:= node() of
                 true ->
-                    return({ok, emqx_mgmt_api:node_query(Node, Params, ?SUBS_QS_SCHEMA, fun query/3)});
+                    return({ok, emqx_mgmt_api:node_query(Node, Params, ?SUBS_QS_SCHEMA, ?query_fun)});
                 false ->
                     case rpc:call(Node, ?MODULE, list, [Bindings, Params]) of
                         {badrpc, Reason} -> return({error, Reason});
@@ -76,7 +83,7 @@ list(#{node := Node} = Bindings, Params) ->
                     end
             end;
         Topic ->
-            return({ok, emqx_mgmt:list_subscriptions_via_topic(Node, emqx_mgmt_util:urldecode(Topic), fun format/1)})
+            return({ok, emqx_mgmt:list_subscriptions_via_topic(Node, emqx_mgmt_util:urldecode(Topic), ?format_fun)})
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
