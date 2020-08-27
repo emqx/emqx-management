@@ -117,16 +117,17 @@ export(_Bindings, _Params) ->
 list_exported(_Bindings, _Params) ->
     Dir = emqx:get_env(data_dir),
     {ok, Files} = file:list_dir_all(Dir),
-    Data = lists:foldl(fun(File, Acc) ->
+    List = lists:foldl(fun(File, Acc) ->
                            case filename:extension(File) =:= ".json" of
                                true ->
                                    FullFile = filename:join([Dir, File]),
                                    case file:read_file_info(FullFile) of
-                                       {ok, #file_info{size = Size, ctime = {{Y, M, D}, {H, MM, S}}}} ->
+                                       {ok, #file_info{size = Size, ctime = CTime = {{Y, M, D}, {H, MM, S}}}} ->
                                            CreatedAt = io_lib:format("~p-~p-~p ~p:~p:~p", [Y, M, D, H, MM, S]),
-                                           [[{filename, list_to_binary(File)},
-                                             {size, Size},
-                                             {created_at, list_to_binary(CreatedAt)}] | Acc];
+                                           Seconds = calendar:datetime_to_gregorian_seconds(CTime),
+                                           [{Seconds, [{filename, list_to_binary(File)},
+                                                       {size, Size},
+                                                       {created_at, list_to_binary(CreatedAt)}]} | Acc];
                                        {error, Reason} ->
                                            logger:error("Read file info of ~s failed with: ~p", [File, Reason]),
                                            Acc
@@ -135,7 +136,8 @@ list_exported(_Bindings, _Params) ->
                                    Acc
                            end
                        end, [], Files),
-    return({ok, Data}).
+    NList = lists:map(fun({_, FileInfo}) -> FileInfo end, lists:keysort(1, List)),
+    return({ok, NList}).
 
 import(_Bindings, Params) ->
     case proplists:get_value(<<"filename">>, Params) of
