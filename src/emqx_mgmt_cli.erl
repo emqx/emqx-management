@@ -542,52 +542,38 @@ listeners(_) ->
 %% @doc data Command
 
 data(["export"]) ->
-    {ok, Dir} = file:get_cwd(),
-    data(["export", filename:join([Dir, "data"])]);
-
-data(["export", Directory]) ->
-    case filelib:is_dir(Directory) of
-        false ->
-            emqx_ctl:print("Please enter an existing directory.~n");
-        true ->
-            case list_to_binary(Directory) of
-                <<"/", _/binary>> ->
-                    Rules = emqx_mgmt:export_rules(),
-                    Resources = emqx_mgmt:export_resources(),
-                    Blacklist = emqx_mgmt:export_blacklist(),
-                    Apps = emqx_mgmt:export_applications(),
-                    Users = emqx_mgmt:export_users(),
-                    AuthClientID = emqx_mgmt:export_auth_clientid(),
-                    AuthUsername = emqx_mgmt:export_auth_username(),
-                    AuthMnesia = emqx_mgmt:export_auth_mnesia(),
-                    AclMnesia = emqx_mgmt:export_acl_mnesia(),
-                    Schemas = emqx_mgmt:export_schemas(),
-                    Seconds = erlang:system_time(second),
-                    {{Y, M, D}, {H, MM, S}} = emqx_mgmt_util:datetime(Seconds),
-                    Filename = io_lib:format("emqx-export-~p-~p-~p-~p-~p-~p.json", [Y, M, D, H, MM, S]),
-                    NFilename = filename:join([Directory, Filename]),
-                    Version = string:sub_string(emqx_sys:version(), 1, 3),
-                    Data = [{version, erlang:list_to_binary(Version)},
-                            {date, erlang:list_to_binary(emqx_mgmt_util:strftime(Seconds))},
-                            {rules, Rules},
-                            {resources, Resources},
-                            {blacklist, Blacklist},
-                            {apps, Apps},
-                            {users, Users},
-                            {auth_clientid, AuthClientID},
-                            {auth_username, AuthUsername},
-                            {auth_mnesia, AuthMnesia},
-                            {acl_mnesia, AclMnesia},
-                            {schemas, Schemas}],
-                    case file:write_file(NFilename, emqx_json:encode(Data)) of
-                        ok ->
-                            emqx_ctl:print("The emqx data has been successfully exported to ~s.~n", [NFilename]);
-                        {error, Reason} ->
-                            emqx_ctl:print("The emqx data export failed due to ~p.~n", [Reason])
-                    end;
-                _ ->
-                    emqx_ctl:print("Please enter a directory using an absolute path.~n")
-            end            
+    Rules = emqx_mgmt:export_rules(),
+    Resources = emqx_mgmt:export_resources(),
+    Blacklist = emqx_mgmt:export_blacklist(),
+    Apps = emqx_mgmt:export_applications(),
+    Users = emqx_mgmt:export_users(),
+    AuthClientID = emqx_mgmt:export_auth_clientid(),
+    AuthUsername = emqx_mgmt:export_auth_username(),
+    AuthMnesia = emqx_mgmt:export_auth_mnesia(),
+    AclMnesia = emqx_mgmt:export_acl_mnesia(),
+    Schemas = emqx_mgmt:export_schemas(),
+    Seconds = erlang:system_time(second),
+    {{Y, M, D}, {H, MM, S}} = emqx_mgmt_util:datetime(Seconds),
+    Filename = io_lib:format("emqx-export-~p-~p-~p-~p-~p-~p.json", [Y, M, D, H, MM, S]),
+    NFilename = filename:join([emqx:get_env(data_dir), Filename]),
+    Version = string:sub_string(emqx_sys:version(), 1, 3),
+    Data = [{version, erlang:list_to_binary(Version)},
+            {date, erlang:list_to_binary(emqx_mgmt_util:strftime(Seconds))},
+            {rules, Rules},
+            {resources, Resources},
+            {blacklist, Blacklist},
+            {apps, Apps},
+            {users, Users},
+            {auth_clientid, AuthClientID},
+            {auth_username, AuthUsername},
+            {auth_mnesia, AuthMnesia},
+            {acl_mnesia, AclMnesia},
+            {schemas, Schemas}],
+    case file:write_file(NFilename, emqx_json:encode(Data)) of
+        ok ->
+            emqx_ctl:print("The emqx data has been successfully exported to ~s.~n", [NFilename]);
+        {error, Reason} ->
+            emqx_ctl:print("The emqx data export failed due to ~p.~n", [Reason])
     end;
 
 data(["import", Filename]) ->
@@ -621,7 +607,7 @@ data(["import", Filename]) ->
 
 data(_) ->
     emqx_ctl:usage([{"data import <File>",   "Import data from the specified file"},
-                    {"data export [<Path>]", "Export data to the specified path"}]).
+                    {"data export",          "Export data"}]).
 
 %%--------------------------------------------------------------------
 %% Dump ETS
