@@ -612,7 +612,7 @@ export_auth_mnesia() ->
     end.
 
 export_acl_mnesia() ->
-    case ets:info(emqx_user) of
+    case ets:info(emqx_acl) of
         undefined -> [];
         _ ->
             lists:foldl(fun({_, Login, Topic, Action, Allow}, Acc) ->
@@ -718,7 +718,7 @@ import_auth_username(Lists) ->
     end.
 
 import_auth_mnesia(Auths) ->
-    case ets:info(emqx_acl) of
+    case ets:info(emqx_user) of
         undefined -> ok;
         _ -> 
             [ mnesia:dirty_write({emqx_user, Login, base64:decode(Password), IsSuperuser}) || #{<<"login">> := Login,
