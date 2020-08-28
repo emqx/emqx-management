@@ -429,7 +429,7 @@ acl_cache(_) ->
     {ok, Result3} = request_api(get, api_path(["clients", binary_to_list(ClientId), "acl_cache"]), [], auth_header_()),
     #{<<"code">> := 0, <<"data">> := Caches3} = jiffy:decode(list_to_binary(Result3), [return_maps]),
     ?assertEqual(0, length(Caches3)),
-    ok.
+    ok = emqtt:disconnect(C1).
 
 pubsub(_) ->
     ClientId = <<"client1">>,
@@ -530,7 +530,9 @@ pubsub(_) ->
     %% tests unsubscribe_batch
     Body3 = [#{<<"clientid">> => ClientId, <<"topic">> => Topics} || Topics <- Topic_list],
     {ok, Data3} = request_api(post, api_path(["mqtt/unsubscribe_batch"]), [], auth_header_(), Body3),
-    loop(maps:get(<<"data">>, jiffy:decode(list_to_binary(Data3), [return_maps]))).
+    loop(maps:get(<<"data">>, jiffy:decode(list_to_binary(Data3), [return_maps]))),
+
+    ok = emqtt:disconnect(C1).
 
 loop([]) -> [];
 
@@ -581,7 +583,9 @@ routes_and_subscriptions(_) ->
     {ok, Result4} = request_api(get, api_path(["subscriptions", binary_to_list(ClientId)]), auth_header_()),
     [Subscription] = get(<<"data">>, Result4),
     {ok, Result4} = request_api(get, api_path(["nodes", atom_to_list(node()), "subscriptions", binary_to_list(ClientId)])
-                               , auth_header_()).
+                               , auth_header_()),
+
+    ok = emqtt:disconnect(C1).
 
 stats(_) ->
     {ok, _} = request_api(get, api_path(["stats"]), auth_header_()),
