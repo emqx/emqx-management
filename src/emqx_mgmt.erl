@@ -54,10 +54,14 @@
         , lookup_client/3
         , kickout_client/1
         , list_acl_cache/1
-        , list_acl_cache/2
         , clean_acl_cache/1
         , clean_acl_cache/2
+        , set_ratelimit_policy/2
+        , set_quota_policy/2
         ]).
+
+%% Internal funcs
+-export([call_client/3]).
 
 %% Subscriptions
 -export([ list_subscriptions/1
@@ -328,34 +332,7 @@ kickout_client(Node, ClientId) ->
     rpc_call(Node, kickout_client, [Node, ClientId]).
 
 list_acl_cache(ClientId) ->
-    Results = lists:append([list_acl_cache(Node, ClientId) || Node <- ekka_mnesia:running_nodes()]),
-    Expected = lists:filter(fun({error, _}) -> false;
-                               (_) -> true
-                            end, Results),
-    case Expected of
-        [] -> case Results of
-                  [] -> [];
-                  _ -> lists:last(Results)
-              end;
-        _ -> Expected
-    end.
-
-list_acl_cache(Node, ClientId) when Node =:= node() ->
-    case emqx_cm:lookup_channels(ClientId) of
-        [] ->
-            [{error, not_found}];
-        Pids when is_list(Pids) ->
-            Pid = lists:last(Pids),
-            case emqx_cm:get_chan_info(ClientId, Pid) of
-                #{conninfo := #{conn_mod := emqx_connection}} ->
-                    gen_server:call(Pid, list_acl_cache);
-                #{conninfo := #{conn_mod := emqx_ws_connection}} ->
-                    emqx_ws_connection:call(Pid, list_acl_cache);
-                undefined -> [{error, not_found}]
-            end
-    end;
-list_acl_cache(Node, ClientId) ->
-    rpc_call(Node, list_acl_cache, [Node, ClientId]).
+    call_client(ClientId, list_acl_cache).
 
 clean_acl_cache(ClientId) ->
     Results = [clean_acl_cache(Node, ClientId) || Node <- ekka_mnesia:running_nodes()],
@@ -374,6 +351,38 @@ clean_acl_cache(Node, ClientId) when Node =:= node() ->
     end;
 clean_acl_cache(Node, ClientId) ->
     rpc_call(Node, clean_acl_cache, [Node, ClientId]).
+
+set_ratelimit_policy(ClientId, Policy) ->
+    call_client(ClientId, {ratelimit, Policy}).
+
+set_quota_policy(ClientId, Policy) ->
+    call_client(ClientId, {quota, Policy}).
+
+%% @private
+call_client(ClientId, Req) ->
+    Results = [call_client(Node, ClientId, Req) || Node <- ekka_mnesia:running_nodes()],
+    Expected = lists:filter(fun({error, _}) -> false;
+                               (_) -> true
+                            end, Results),
+    case Expected of
+        [] -> {error, not_found};
+        [Result|_] -> Result
+    end.
+
+%% @private
+call_client(Node, ClientId, Req) when Node =:= node() ->
+    case emqx_cm:lookup_channels(ClientId) of
+        [] -> {error, not_found};
+        Pids when is_list(Pids) ->
+            Pid = lists:last(Pids),
+            case emqx_cm:get_chan_info(ClientId, Pid) of
+                #{conninfo := #{conn_mod := ConnMod}} ->
+                    ConnMod:call(Pid, Req);
+                undefined -> {error, not_found}
+            end
+    end;
+call_client(Node, ClientId, Req) ->
+    rpc_call(Node, call_client, [Node, ClientId, Req]).
 
 %%--------------------------------------------------------------------
 %% Subscriptions
