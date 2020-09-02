@@ -25,6 +25,8 @@
                   , return/1
                   ]).
 
+-import(proplists, [get_value/2]).
+
 -define(CLIENT_QS_SCHEMA, {emqx_channel_info,
         [{<<"clientid">>, binary},
          {<<"username">>, binary},
@@ -97,6 +99,30 @@
             func   => list_acl_cache,
             descr  => "List the ACL cache of a specified client in the cluster"}).
 
+-rest_api(#{name   => set_ratelimit_policy,
+            method => 'POST',
+            path   => "/clients/:bin:clientid/ratelimit",
+            func   => set_ratelimit_policy,
+            descr  => "Set the client ratelimit policy"}).
+
+-rest_api(#{name   => clean_ratelimit,
+            method => 'DELETE',
+            path   => "/clients/:bin:clientid/ratelimit",
+            func   => clean_ratelimit,
+            descr  => "Clear the ratelimit policy"}).
+
+-rest_api(#{name   => set_quota_policy,
+            method => 'POST',
+            path   => "/clients/:bin:clientid/quota",
+            func   => set_quota_policy,
+            descr  => "Set the client quota policy"}).
+
+-rest_api(#{name   => clean_quota,
+            method => 'DELETE',
+            path   => "/clients/:bin:clientid/quota",
+            func   => clean_quota,
+            descr  => "Clear the quota policy"}).
+
 -import(emqx_mgmt_util, [ ntoa/1
                         , strftime/1
                         ]).
@@ -106,6 +132,10 @@
         , kickout/2
         , clean_acl_cache/2
         , list_acl_cache/2
+        , set_ratelimit_policy/2
+        , set_quota_policy/2
+        , clean_ratelimit/2
+        , clean_quota/2
         ]).
 
 -export([ query/3
@@ -159,6 +189,57 @@ list_acl_cache(#{clientid := ClientId}, _Params) ->
         {error, Reason} -> return({error, ?ERROR1, Reason});
         Caches -> return({ok, [format_acl_cache(Cache) || Cache <- Caches]})
     end.
+
+set_ratelimit_policy(#{clientid := ClientId}, Params) ->
+    P = [{conn_bytes_in, get_value(<<"conn_bytes_in">>, Params)},
+         {conn_messages_in, get_value(<<"conn_messages_in">>, Params)}],
+    Policy = [{K, parse_ratelimit_str(V)} || {K, V} <- P, V =/= undefined],
+    case emqx_mgmt:set_ratelimit_policy(emqx_mgmt_util:urldecode(ClientId), Policy) of
+        ok -> return();
+        {error, not_found} -> return({error, ?ERROR12, not_found});
+        {error, Reason} -> return({error, ?ERROR1, Reason})
+    end.
+
+clean_ratelimit(#{clientid := ClientId}, _Params) ->
+    case emqx_mgmt:set_ratelimit_policy(emqx_mgmt_util:urldecode(ClientId), []) of
+        ok -> return();
+        {error, not_found} -> return({error, ?ERROR12, not_found});
+        {error, Reason} -> return({error, ?ERROR1, Reason})
+    end.
+
+set_quota_policy(#{clientid := ClientId}, Params) ->
+    P = [{conn_messages_routing, get_value(<<"conn_messages_routing">>, Params)},
+         {overall_messages_routing, get_value(<<"overall_messages_routing">>, Params)}],
+    Policy = [{K, parse_ratelimit_str(V)} || {K, V} <- P, V =/= undefined],
+    case emqx_mgmt:set_quota_policy(emqx_mgmt_util:urldecode(ClientId), Policy) of
+        ok -> return();
+        {error, not_found} -> return({error, ?ERROR12, not_found});
+        {error, Reason} -> return({error, ?ERROR1, Reason})
+    end.
+
+clean_quota(#{clientid := ClientId}, _Params) ->
+    case emqx_mgmt:set_quota_policy(emqx_mgmt_util:urldecode(ClientId), []) of
+        ok -> return();
+        {error, not_found} -> return({error, ?ERROR12, not_found});
+        {error, Reason} -> return({error, ?ERROR1, Reason})
+    end.
+
+%% @private
+%% S = 100,1s
+%%   | 100KB, 1m
+parse_ratelimit_str(S) when is_binary(S) ->
+    parse_ratelimit_str(binary_to_list(S));
+parse_ratelimit_str(S) ->
+    [L, D] = string:tokens(S, ", "),
+    Limit = case cuttlefish_bytesize:parse(L) of
+                Sz when is_integer(Sz) -> Sz;
+                {error, Reason1} -> error(Reason1)
+            end,
+    Duration = case cuttlefish_duration:parse(D, s) of
+                   Secs when is_integer(Secs) -> Secs;
+                   {error, Reason} -> error(Reason)
+               end,
+    {Limit, Duration}.
 
 %%--------------------------------------------------------------------
 %% Format
