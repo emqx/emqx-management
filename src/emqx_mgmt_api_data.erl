@@ -181,7 +181,7 @@ download(#{filename := Filename}, _Params) ->
     FullFilename = filename:join([emqx:get_env(data_dir), Filename]),
     case file:read_file(FullFilename) of
         {ok, Bin} ->
-            {ok, #{filename => list_to_binary(FullFilename),
+            {ok, #{filename => list_to_binary(Filename),
                    file => Bin}};
         {error, Reason} ->
             return({error, Reason})
