@@ -78,8 +78,10 @@
 
 %% PubSub
 -export([ subscribe/2
+        , do_subscribe/2
         , publish/1
         , unsubscribe/2
+        , do_unsubscribe/2
         ]).
 
 %% Plugins
@@ -436,6 +438,18 @@ lookup_routes(Topic) ->
 %%--------------------------------------------------------------------
 
 subscribe(ClientId, TopicTables) ->
+    subscribe(ekka_mnesia:running_nodes(), ClientId, TopicTables).
+
+subscribe([Node | Nodes], ClientId, TopicTables) ->
+    case rpc_call(Node, do_subscribe, [ClientId, TopicTables]) of
+        {error, _} -> subscribe(Nodes, ClientId, TopicTables);
+        Re -> Re
+    end;
+
+subscribe([], _ClientId, _TopicTables) ->
+    {error, channel_not_found}.
+
+do_subscribe(ClientId, TopicTables) ->
     case ets:lookup(emqx_channel, ClientId) of
         [] -> {error, channel_not_found};
         [{_, Pid}] ->
@@ -446,6 +460,18 @@ subscribe(ClientId, TopicTables) ->
 publish(Msg) -> emqx:publish(Msg).
 
 unsubscribe(ClientId, Topic) ->
+    unsubscribe(ekka_mnesia:running_nodes(), ClientId, Topic).
+
+unsubscribe([Node | Nodes], ClientId, Topic) ->
+    case rpc_call(Node, do_unsubscribe, [ClientId, Topic]) of
+        {error, _} -> unsubscribe(Nodes, ClientId, Topic);
+        Re -> Re
+    end;
+
+unsubscribe([], _ClientId, _Topic) ->
+    {error, channel_not_found}.
+
+do_unsubscribe(ClientId, Topic) ->
     case ets:lookup(emqx_channel, ClientId) of
         [] -> {error, channel_not_found};
         [{_, Pid}] ->
