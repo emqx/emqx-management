@@ -845,7 +845,7 @@ item(client, {ClientId, ChanPid}) ->
                              max_mqueue, heap_size, reductions, mailbox_len,
                              recv_cnt, recv_msg, recv_oct, recv_pkt, send_cnt,
                              send_msg, send_oct, send_pkt], NStats),
-                 maps:with([clientid, username, is_bridge, zone], ClientInfo),
+                 maps:with([clientid, username, mountpoint, is_bridge, zone], ClientInfo),
                  maps:with([clean_start, keepalive, expiry_interval, proto_name,
                             proto_ver, peername, connected_at, disconnected_at], ConnInfo),
                  maps:with([created_at], Session)]);
