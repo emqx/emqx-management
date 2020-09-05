@@ -193,11 +193,14 @@ list_acl_cache(#{clientid := ClientId}, _Params) ->
 set_ratelimit_policy(#{clientid := ClientId}, Params) ->
     P = [{conn_bytes_in, get_value(<<"conn_bytes_in">>, Params)},
          {conn_messages_in, get_value(<<"conn_messages_in">>, Params)}],
-    Policy = [{K, parse_ratelimit_str(V)} || {K, V} <- P, V =/= undefined],
-    case emqx_mgmt:set_ratelimit_policy(emqx_mgmt_util:urldecode(ClientId), Policy) of
-        ok -> return();
-        {error, not_found} -> return({error, ?ERROR12, not_found});
-        {error, Reason} -> return({error, ?ERROR1, Reason})
+    case [{K, parse_ratelimit_str(V)} || {K, V} <- P, V =/= undefined] of
+        [] -> return();
+        Policy ->
+            case emqx_mgmt:set_ratelimit_policy(emqx_mgmt_util:urldecode(ClientId), Policy) of
+                ok -> return();
+                {error, not_found} -> return({error, ?ERROR12, not_found});
+                {error, Reason} -> return({error, ?ERROR1, Reason})
+            end
     end.
 
 clean_ratelimit(#{clientid := ClientId}, _Params) ->
@@ -208,13 +211,15 @@ clean_ratelimit(#{clientid := ClientId}, _Params) ->
     end.
 
 set_quota_policy(#{clientid := ClientId}, Params) ->
-    P = [{conn_messages_routing, get_value(<<"conn_messages_routing">>, Params)},
-         {overall_messages_routing, get_value(<<"overall_messages_routing">>, Params)}],
-    Policy = [{K, parse_ratelimit_str(V)} || {K, V} <- P, V =/= undefined],
-    case emqx_mgmt:set_quota_policy(emqx_mgmt_util:urldecode(ClientId), Policy) of
-        ok -> return();
-        {error, not_found} -> return({error, ?ERROR12, not_found});
-        {error, Reason} -> return({error, ?ERROR1, Reason})
+    P = [{conn_messages_routing, get_value(<<"conn_messages_routing">>, Params)}],
+    case [{K, parse_ratelimit_str(V)} || {K, V} <- P, V =/= undefined] of
+        [] -> return();
+        Policy ->
+            case emqx_mgmt:set_quota_policy(emqx_mgmt_util:urldecode(ClientId), Policy) of
+                ok -> return();
+                {error, not_found} -> return({error, ?ERROR12, not_found});
+                {error, Reason} -> return({error, ?ERROR1, Reason})
+            end
     end.
 
 clean_quota(#{clientid := ClientId}, _Params) ->
