@@ -601,18 +601,18 @@ delete_banned(Who) ->
 %%--------------------------------------------------------------------
 
 export_modules() ->
-    case ets:info(emqx_module) of
+    case ets:info(emqx_modules) of
         undefined -> [];
         _ ->
-           lists:fold(fun({_, Id, Type, Config, Enabled, CreatedAt, Description}, Acc) ->
-                          [[ {id, Id},
-                             {type, Type},
-                             {config, Config},
-                             {enabled, Enabled},
-                             {created_at, CreatedAt},
-                             {description, Description}
-                           ] | Acc]
-                      end, [], ets:tab2list(emqx_module))
+           lists:map(fun({_, Id, Type, Config, Enabled, CreatedAt, Description}) ->
+                          [ {id, Id},
+                            {type, Type},
+                            {config, Config},
+                            {enabled, Enabled},
+                            {created_at, CreatedAt},
+                            {description, Description}
+                          ]
+                      end, ets:tab2list(emqx_modules))
     end.
 
 export_rules() ->
@@ -625,53 +625,53 @@ export_rules() ->
                end, emqx_rule_registry:get_rules()).
 
 export_resources() ->
-    lists:foldl(fun({_, Id, Type, Config, CreatedAt, Desc}, Acc) ->
+    lists:map(fun({_, Id, Type, Config, CreatedAt, Desc}) ->
                     NCreatedAt = case CreatedAt of
                                      undefined -> null;
                                      _ -> CreatedAt
                                  end,
-                    [[{id, Id},
-                      {type, Type},
-                      {config, maps:to_list(Config)},
-                      {created_at, NCreatedAt},
-                      {description, Desc}] | Acc]
-               end, [], emqx_rule_registry:get_resources()).
+                    [{id, Id},
+                     {type, Type},
+                     {config, maps:to_list(Config)},
+                     {created_at, NCreatedAt},
+                     {description, Desc}]
+               end, emqx_rule_registry:get_resources()).
 
 export_blacklist() ->
-    lists:foldl(fun(#banned{who = Who, by = By, reason = Reason, at = At, until = Until}, Acc) ->
+    lists:map(fun(#banned{who = Who, by = By, reason = Reason, at = At, until = Until}) ->
                     NWho = case Who of
                                {peerhost, Peerhost} -> {peerhost, inet:ntoa(Peerhost)};
                                _ -> Who
                            end,
-                    [[{who, [NWho]}, {by, By}, {reason, Reason}, {at, At}, {until, Until}] | Acc]
-                end, [], ets:tab2list(emqx_banned)).
+                    [{who, [NWho]}, {by, By}, {reason, Reason}, {at, At}, {until, Until}]
+                end, ets:tab2list(emqx_banned)).
 
 export_applications() ->
-    lists:foldl(fun({_, AppID, AppSecret, Name, Desc, Status, Expired}, Acc) ->
-                    [[{id, AppID}, {secret, AppSecret}, {name, Name}, {desc, Desc}, {status, Status}, {expired, Expired}] | Acc]
-                end, [], ets:tab2list(mqtt_app)).
+    lists:map(fun({_, AppID, AppSecret, Name, Desc, Status, Expired}) ->
+                    [{id, AppID}, {secret, AppSecret}, {name, Name}, {desc, Desc}, {status, Status}, {expired, Expired}]
+                end, ets:tab2list(mqtt_app)).
 
 export_users() ->
-    lists:foldl(fun({_, Username, Password, Tags}, Acc) ->
-                    [[{username, Username}, {password, base64:encode(Password)}, {tags, Tags}] | Acc]
-                end, [], ets:tab2list(mqtt_admin)).
+    lists:map(fun({_, Username, Password, Tags}) ->
+                    [{username, Username}, {password, base64:encode(Password)}, {tags, Tags}]
+                end, ets:tab2list(mqtt_admin)).
 
 export_auth_mnesia() ->
     case ets:info(emqx_user) of
         undefined -> [];
         _ -> 
-            lists:foldl(fun({_, Login, Password, CreatedAt}, Acc) ->
-                            [[{login, Login}, {password, Password}, {created_at, CreatedAt}] | Acc]
-                        end, [], ets:tab2list(emqx_user))
+            lists:map(fun({_, Login, Password, CreatedAt}) ->
+                            [{login, Login}, {password, Password}, {created_at, CreatedAt}]
+                        end, ets:tab2list(emqx_user))
     end.
 
 export_acl_mnesia() ->
     case ets:info(emqx_acl) of
         undefined -> [];
         _ ->
-            lists:foldl(fun({_, Filter, Action, Access, CreatedAt}, Acc) ->
-                            [[{filter, Filter}, {action, Action}, {access, Access}, {created_at, CreatedAt}] | Acc]
-                        end, [], ets:tab2list(emqx_acl))
+            lists:map(fun({_, Filter, Action, Access, CreatedAt}) ->
+                            [{filter, Filter}, {action, Action}, {access, Access}, {created_at, CreatedAt}]
+                        end, ets:tab2list(emqx_acl))
     end.
 
 export_schemas() ->
@@ -682,7 +682,7 @@ export_schemas() ->
     end.
 
 import_modules(Modules) ->
-    case ets:info(emqx_module) of
+    case ets:info(emqx_modules) of
         undefined -> [];
         _ ->
            lists:foreach(fun(#{<<"id">> := Id,
@@ -691,7 +691,7 @@ import_modules(Modules) ->
                                <<"enabled">> := Enabled,
                                <<"created_at">> := CreatedAt,
                                <<"description">> := Description}) ->
-                            mnesia:dirty_write({emqx_module, Id, Type, Config, Enabled, CreatedAt, Description })
+                            mnesia:dirty_write(emqx_modules, {module, Id, Type, Config, Enabled, CreatedAt, Description})
                          end, Modules)
     end.
 
@@ -786,7 +786,8 @@ import_auth_username(Lists) ->
               || #{<<"username">> := Username, <<"password">> := Password} <- Lists ]
     end.
 
-import_auth_mnesia(_Auths, "4.1") ->
+import_auth_mnesia(_Auths, FromVersion) when FromVersion =:= "4.0" orelse
+                                             FromVersion =:= "4.1" ->
     case ets:info(emqx_user) of
         undefined -> ok;
         _ -> []
@@ -802,7 +803,8 @@ import_auth_mnesia(Auths, _) ->
                    <<"created_at">> := CreatedAt } <- Auths ]
     end.
 
-import_acl_mnesia(_Acls, "4.1") ->
+import_acl_mnesia(_Acls, FromVersion) when FromVersion =:= "4.0" orelse
+                                           FromVersion =:= "4.1" ->
     case ets:info(emqx_acl) of
         undefined -> ok;
         _ -> []
