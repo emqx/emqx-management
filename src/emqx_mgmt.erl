@@ -692,7 +692,8 @@ import_modules(Modules) ->
                                <<"created_at">> := CreatedAt,
                                <<"description">> := Description}) ->
                             mnesia:dirty_write(emqx_modules, {module, Id, Type, Config, Enabled, CreatedAt, Description})
-                         end, Modules)
+                         end, Modules),
+           emqx_module_mgmt:refresh_modules()
     end.
 
 
