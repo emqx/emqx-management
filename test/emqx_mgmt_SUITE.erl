@@ -44,7 +44,6 @@ groups() ->
         t_clients_cmd,
         t_vm_cmd,
         t_plugins_cmd,
-        t_modules_cmd,
         t_trace_cmd,
         t_broker_cmd,
         t_router_cmd,
@@ -254,16 +253,6 @@ t_plugins_cmd(_) ->
     ?assertEqual(emqx_mgmt_cli:plugins(["unload", "emqx_reloader"]), "Plugin emqx_reloader unloaded successfully.\n"),
     ?assertEqual(emqx_mgmt_cli:plugins(["load", "emqx_reloader"]),"Plugin emqx_reloader loaded successfully.\n"),
     ?assertEqual(emqx_mgmt_cli:plugins(["unload", "emqx_management"]), "Plugin emqx_management can not be unloaded.~n").
-
-t_modules_cmd(_) ->
-    print_mock(),
-    meck:new(emqx_modules, [non_strict, passthrough]),
-    meck:expect(emqx_modules, load, fun(_) -> ok end),
-    meck:expect(emqx_modules, unload, fun(_) -> ok end),
-    meck:expect(emqx_modules, reload, fun(_) -> ok end),
-    ?assertEqual(emqx_mgmt_cli:modules(["list"]), ok),
-    ?assertEqual(emqx_mgmt_cli:modules(["load", "emqx_mod_presence"]),"Module emqx_mod_presence loaded successfully.\n"),
-    ?assertEqual(emqx_mgmt_cli:modules(["unload", "emqx_mod_presence"]), "Module emqx_mod_presence unloaded successfully.\n").
 
 t_cli(_) ->
     print_mock(),
