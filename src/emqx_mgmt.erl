@@ -36,15 +36,6 @@
 %% Metrics and Stats
 -export([ get_metrics/0
         , get_metrics/1
-        , get_all_topic_metrics/0
-        , get_topic_metrics/1
-        , get_topic_metrics/2
-        , register_topic_metrics/1
-        , register_topic_metrics/2
-        , unregister_topic_metrics/1
-        , unregister_topic_metrics/2
-        , unregister_all_topic_metrics/0
-        , unregister_all_topic_metrics/1
         , get_stats/0
         , get_stats/1
         ]).
@@ -219,73 +210,6 @@ get_metrics(Node) when Node =:= node() ->
     emqx_metrics:all();
 get_metrics(Node) ->
     rpc_call(Node, get_metrics, [Node]).
-
-get_all_topic_metrics() ->
-    lists:foldl(fun(Topic, Acc) ->
-                    case get_topic_metrics(Topic) of
-                        {error, _Reason} ->
-                            Acc;
-                        Metrics ->
-                            [#{topic => Topic, metrics => Metrics} | Acc]
-                    end
-                end, [], emqx_mod_topic_metrics:all_registered_topics()).
-
-get_topic_metrics(Topic) ->
-    lists:foldl(fun(Node, Acc) ->
-                    case get_topic_metrics(Node, Topic) of
-                        {error, _Reason} ->
-                            Acc;
-                        Metrics ->
-                            case Acc of
-                                [] -> Metrics;
-                                _ ->
-                                    lists:foldl(fun({K, V}, Acc0) ->
-                                                    [{K, V + proplists:get_value(K, Metrics, 0)} | Acc0]
-                                                end, [], Acc)
-                            end
-                    end
-                end, [], ekka_mnesia:running_nodes()).
-
-get_topic_metrics(Node, Topic) when Node =:= node() ->
-    emqx_mod_topic_metrics:metrics(Topic);
-get_topic_metrics(Node, Topic) ->
-    rpc_call(Node, get_topic_metrics, [Node, Topic]).
-
-register_topic_metrics(Topic) ->
-    Results = [register_topic_metrics(Node, Topic) || Node <- ekka_mnesia:running_nodes()],
-    case lists:any(fun(Item) -> Item =:= ok end, Results) of
-        true  -> ok;
-        false -> lists:last(Results)
-    end.
-
-register_topic_metrics(Node, Topic) when Node =:= node() ->
-    emqx_mod_topic_metrics:register(Topic);
-register_topic_metrics(Node, Topic) ->
-    rpc_call(Node, register_topic_metrics, [Node, Topic]).
-
-unregister_topic_metrics(Topic) ->
-    Results = [unregister_topic_metrics(Node, Topic) || Node <- ekka_mnesia:running_nodes()],
-    case lists:any(fun(Item) -> Item =:= ok end, Results) of
-        true  -> ok;
-        false -> lists:last(Results)
-    end.
-
-unregister_topic_metrics(Node, Topic) when Node =:= node() ->
-    emqx_mod_topic_metrics:unregister(Topic);
-unregister_topic_metrics(Node, Topic) ->
-    rpc_call(Node, unregister_topic_metrics, [Node, Topic]).
-
-unregister_all_topic_metrics() ->
-    Results = [unregister_all_topic_metrics(Node) || Node <- ekka_mnesia:running_nodes()],
-    case lists:any(fun(Item) -> Item =:= ok end, Results) of
-        true  -> ok;
-        false -> lists:last(Results)
-    end.
-
-unregister_all_topic_metrics(Node) when Node =:= node() ->
-    emqx_mod_topic_metrics:unregister_all();
-unregister_all_topic_metrics(Node) ->
-    rpc_call(Node, unregister_topic_metrics, [Node]).
 
 get_stats() ->
     [{Node, get_stats(Node)} || Node <- ekka_mnesia:running_nodes()].
