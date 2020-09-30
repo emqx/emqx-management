@@ -83,14 +83,6 @@
         , reload_plugin/2
         ]).
 
-%% Modules
--export([ list_modules/0
-        , list_modules/1
-        , load_module/2
-        , unload_module/2
-        , reload_module/2
-        ]).
-
 %% Listeners
 -export([ list_listeners/0
         , list_listeners/1
@@ -429,33 +421,6 @@ reload_plugin(Node, Plugin) when Node =:= node() ->
 reload_plugin(Node, Plugin) ->
     rpc_call(Node, reload_plugin, [Node, Plugin]).
 
-
-%%--------------------------------------------------------------------
-%% Modules
-%%--------------------------------------------------------------------
-
-list_modules() ->
-    [{Node, list_modules(Node)} || Node <- ekka_mnesia:running_nodes()].
-
-list_modules(Node) when Node =:= node() ->
-    emqx_modules:list();
-list_modules(Node) ->
-    rpc_call(Node, list_modules, [Node]).
-
-load_module(Node, Module) when Node =:= node() ->
-    emqx_modules:load(Module);
-load_module(Node, Module) ->
-    rpc_call(Node, load_module, [Node, Module]).
-
-unload_module(Node, Module) when Node =:= node() ->
-    emqx_modules:unload(Module);
-unload_module(Node, Module) ->
-    rpc_call(Node, unload_module, [Node, Module]).
-
-reload_module(Node, Module) when Node =:= node() ->
-    emqx_modules:reload(Module);
-reload_module(Node, Module) ->
-    rpc_call(Node, reload_module, [Node, Module]).
 %%--------------------------------------------------------------------
 %% Listeners
 %%--------------------------------------------------------------------
@@ -584,8 +549,8 @@ export_auth_mnesia() ->
     case ets:info(emqx_user) of
         undefined -> [];
         _ -> 
-            lists:map(fun({_, Login, Password, CreatedAt}) ->
-                            [{login, Login}, {password, Password}, {created_at, CreatedAt}]
+            lists:map(fun({_, {Type, Login}, Password, CreatedAt}) ->
+                            [{login, Login}, {type, Type}, {password, Password}, {created_at, CreatedAt}]
                         end, ets:tab2list(emqx_user))
     end.
 
@@ -594,7 +559,13 @@ export_acl_mnesia() ->
         undefined -> [];
         _ ->
             lists:map(fun({_, Filter, Action, Access, CreatedAt}) ->
-                            [{filter, Filter}, {action, Action}, {access, Access}, {created_at, CreatedAt}]
+                            Filter1 = case Filter of
+                                {{Type, TypeValue}, Topic} ->
+                                    [{type, Type}, {type_value, TypeValue}, {topic, Topic}];
+                                {Type, Topic} ->
+                                    [{type, Type}, {topic, Topic}]
+                            end,
+                            Filter1 ++ [{action, Action}, {access, Access}, {created_at, CreatedAt}]
                         end, ets:tab2list(emqx_acl))
     end.
 
@@ -615,9 +586,9 @@ import_modules(Modules) ->
                                <<"enabled">> := Enabled,
                                <<"created_at">> := CreatedAt,
                                <<"description">> := Description}) ->
-                            mnesia:dirty_write(emqx_modules, {module, Id, Type, Config, Enabled, CreatedAt, Description})
+                            emqx_modules:import_module({Id, any_to_atom(Type), Config, Enabled, CreatedAt, Description})
                          end, Modules),
-           emqx_module_mgmt:refresh_modules()
+           emqx_modules:refresh_modules()
     end.
 
 
@@ -722,8 +693,9 @@ import_auth_mnesia(Auths, _) ->
     case ets:info(emqx_user) of
         undefined -> ok;
         _ -> 
-            [ mnesia:dirty_write({emqx_user, Login, Password, CreatedAt})
+            [ mnesia:dirty_write({emqx_user, {any_to_atom(Type), Login}, Password, CreatedAt})
               || #{<<"login">> := Login,
+                   <<"type">> := Type,
                    <<"password">> := Password,
                    <<"created_at">> := CreatedAt } <- Auths ]
     end.
@@ -738,11 +710,18 @@ import_acl_mnesia(Acls, _) ->
     case ets:info(emqx_acl) of
         undefined -> ok;
         _ -> 
-            [ mnesia:dirty_write({emqx_acl ,Filter, Action, Access, CreatedAt})
-              || #{<<"filter">> := Filter,
-                   <<"action">> := Action,
-                   <<"access">> := Access,
-                   <<"created_at">> := CreatedAt} <- Acls ]
+            [ begin
+              Filter = case maps:get(<<"type_value">>, Map, undefined) of
+                  undefined ->
+                      {any_to_atom(maps:get(<<"type">>, Map)), maps:get(<<"topic">>, Map)};
+                  Value ->
+                      {{any_to_atom(maps:get(<<"type">>, Map)), Value}, maps:get(<<"topic">>, Map)}
+              end,
+              mnesia:dirty_write({emqx_acl ,Filter, any_to_atom(Action), any_to_atom(Access), CreatedAt})
+              end
+              || Map = #{<<"action">> := Action,
+                         <<"access">> := Access,
+                         <<"created_at">> := CreatedAt} <- Acls ]
     end.
 
 import_schemas(Schemas) -> 
