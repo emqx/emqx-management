@@ -111,6 +111,7 @@
         , export_auth_mnesia/0
         , export_acl_mnesia/0
         , export_schemas/0
+        , export_confs/0
         , import_modules/1
         , import_rules/1
         , import_resources/1
@@ -122,6 +123,7 @@
         , import_auth_mnesia/2
         , import_acl_mnesia/2
         , import_schemas/1
+        , import_confs/2
         , to_version/1
         ]).
 
@@ -576,6 +578,34 @@ export_schemas() ->
             [emqx_schema_api:format_schema(Schema) || Schema <- emqx_schema_registry:get_all_schemas()]
     end.
 
+export_confs() ->
+    case ets:info(emqx_conf_info) of
+        undefined -> {[], []};
+        _ ->
+            {lists:map(fun({_, Key, Confs}) ->
+                case Key of
+                    {_Zone, Name} ->
+                        [{zone, list_to_binary(Name)},
+                         {confs, confs_to_binary(Confs)}];
+                    {_Listener, Type, Name} ->
+                        [{type, list_to_binary(Type)},
+                         {name, list_to_binary(Name)},
+                         {confs, confs_to_binary(Confs)}];
+                    Name ->
+                        [{name, list_to_binary(Name)},
+                         {confs, confs_to_binary(Confs)}]
+                end
+            end, ets:tab2list(emqx_conf_b)),
+            lists:map(fun({_, {_Listener, Type, Name}, Status}) ->
+                [{type, list_to_binary(Type)},
+                 {name, list_to_binary(Name)},
+                 {status, Status}]
+            end, ets:tab2list(emqx_listeners_state))}
+    end.
+
+confs_to_binary(Confs) ->
+    [{list_to_binary(Key), list_to_binary(Val)} || {Key, Val} <-Confs].
+
 import_modules(Modules) ->
     case ets:info(emqx_modules) of
         undefined -> [];
@@ -728,6 +758,13 @@ import_schemas(Schemas) ->
     case ets:info(emqx_schema) of
         undefined -> ok;
         _ -> [emqx_schema_registry:add_schema(emqx_schema_api:make_schema_params(Schema)) || Schema <- Schemas]
+    end.
+
+import_confs(Configs, ListenersState) ->
+    case ets:info(emqx_conf_info) of
+        undefined -> ok;
+        _ ->
+            emqx_conf:import_confs(Configs, ListenersState)
     end.
 
 any_to_atom(L) when is_list(L) -> list_to_atom(L);
