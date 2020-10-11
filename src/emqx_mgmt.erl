@@ -36,15 +36,6 @@
 %% Metrics and Stats
 -export([ get_metrics/0
         , get_metrics/1
-        , get_all_topic_metrics/0
-        , get_topic_metrics/1
-        , get_topic_metrics/2
-        , register_topic_metrics/1
-        , register_topic_metrics/2
-        , unregister_topic_metrics/1
-        , unregister_topic_metrics/2
-        , unregister_all_topic_metrics/0
-        , unregister_all_topic_metrics/1
         , get_stats/0
         , get_stats/1
         ]).
@@ -92,14 +83,6 @@
         , reload_plugin/2
         ]).
 
-%% Modules
--export([ list_modules/0
-        , list_modules/1
-        , load_module/2
-        , unload_module/2
-        , reload_module/2
-        ]).
-
 %% Listeners
 -export([ list_listeners/0
         , list_listeners/1
@@ -119,16 +102,17 @@
         ]).
 
 %% Export/Import
--export([ export_rules/0
+-export([ export_modules/0
+        , export_rules/0
         , export_resources/0
         , export_blacklist/0
         , export_applications/0
         , export_users/0
-        , export_auth_clientid/0
-        , export_auth_username/0
         , export_auth_mnesia/0
         , export_acl_mnesia/0
         , export_schemas/0
+        , export_confs/0
+        , import_modules/1
         , import_rules/1
         , import_resources/1
         , import_blacklist/1
@@ -136,9 +120,10 @@
         , import_users/1
         , import_auth_clientid/1
         , import_auth_username/1
-        , import_auth_mnesia/1
-        , import_acl_mnesia/1
+        , import_auth_mnesia/2
+        , import_acl_mnesia/2
         , import_schemas/1
+        , import_confs/2
         , to_version/1
         ]).
 
@@ -219,73 +204,6 @@ get_metrics(Node) when Node =:= node() ->
     emqx_metrics:all();
 get_metrics(Node) ->
     rpc_call(Node, get_metrics, [Node]).
-
-get_all_topic_metrics() ->
-    lists:foldl(fun(Topic, Acc) ->
-                    case get_topic_metrics(Topic) of
-                        {error, _Reason} ->
-                            Acc;
-                        Metrics ->
-                            [#{topic => Topic, metrics => Metrics} | Acc]
-                    end
-                end, [], emqx_mod_topic_metrics:all_registered_topics()).
-
-get_topic_metrics(Topic) ->
-    lists:foldl(fun(Node, Acc) ->
-                    case get_topic_metrics(Node, Topic) of
-                        {error, _Reason} ->
-                            Acc;
-                        Metrics ->
-                            case Acc of
-                                [] -> Metrics;
-                                _ ->
-                                    lists:foldl(fun({K, V}, Acc0) ->
-                                                    [{K, V + proplists:get_value(K, Metrics, 0)} | Acc0]
-                                                end, [], Acc)
-                            end
-                    end
-                end, [], ekka_mnesia:running_nodes()).
-
-get_topic_metrics(Node, Topic) when Node =:= node() ->
-    emqx_mod_topic_metrics:metrics(Topic);
-get_topic_metrics(Node, Topic) ->
-    rpc_call(Node, get_topic_metrics, [Node, Topic]).
-
-register_topic_metrics(Topic) ->
-    Results = [register_topic_metrics(Node, Topic) || Node <- ekka_mnesia:running_nodes()],
-    case lists:any(fun(Item) -> Item =:= ok end, Results) of
-        true  -> ok;
-        false -> lists:last(Results)
-    end.
-
-register_topic_metrics(Node, Topic) when Node =:= node() ->
-    emqx_mod_topic_metrics:register(Topic);
-register_topic_metrics(Node, Topic) ->
-    rpc_call(Node, register_topic_metrics, [Node, Topic]).
-
-unregister_topic_metrics(Topic) ->
-    Results = [unregister_topic_metrics(Node, Topic) || Node <- ekka_mnesia:running_nodes()],
-    case lists:any(fun(Item) -> Item =:= ok end, Results) of
-        true  -> ok;
-        false -> lists:last(Results)
-    end.
-
-unregister_topic_metrics(Node, Topic) when Node =:= node() ->
-    emqx_mod_topic_metrics:unregister(Topic);
-unregister_topic_metrics(Node, Topic) ->
-    rpc_call(Node, unregister_topic_metrics, [Node, Topic]).
-
-unregister_all_topic_metrics() ->
-    Results = [unregister_all_topic_metrics(Node) || Node <- ekka_mnesia:running_nodes()],
-    case lists:any(fun(Item) -> Item =:= ok end, Results) of
-        true  -> ok;
-        false -> lists:last(Results)
-    end.
-
-unregister_all_topic_metrics(Node) when Node =:= node() ->
-    emqx_mod_topic_metrics:unregister_all();
-unregister_all_topic_metrics(Node) ->
-    rpc_call(Node, unregister_topic_metrics, [Node]).
 
 get_stats() ->
     [{Node, get_stats(Node)} || Node <- ekka_mnesia:running_nodes()].
@@ -505,33 +423,6 @@ reload_plugin(Node, Plugin) when Node =:= node() ->
 reload_plugin(Node, Plugin) ->
     rpc_call(Node, reload_plugin, [Node, Plugin]).
 
-
-%%--------------------------------------------------------------------
-%% Modules
-%%--------------------------------------------------------------------
-
-list_modules() ->
-    [{Node, list_modules(Node)} || Node <- ekka_mnesia:running_nodes()].
-
-list_modules(Node) when Node =:= node() ->
-    emqx_modules:list();
-list_modules(Node) ->
-    rpc_call(Node, list_modules, [Node]).
-
-load_module(Node, Module) when Node =:= node() ->
-    emqx_modules:load(Module);
-load_module(Node, Module) ->
-    rpc_call(Node, load_module, [Node, Module]).
-
-unload_module(Node, Module) when Node =:= node() ->
-    emqx_modules:unload(Module);
-unload_module(Node, Module) ->
-    rpc_call(Node, unload_module, [Node, Module]).
-
-reload_module(Node, Module) when Node =:= node() ->
-    emqx_modules:reload(Module);
-reload_module(Node, Module) ->
-    rpc_call(Node, reload_module, [Node, Module]).
 %%--------------------------------------------------------------------
 %% Listeners
 %%--------------------------------------------------------------------
@@ -600,6 +491,21 @@ delete_banned(Who) ->
 %% Data Export and Import
 %%--------------------------------------------------------------------
 
+export_modules() ->
+    case ets:info(emqx_modules) of
+        undefined -> [];
+        _ ->
+           lists:map(fun({_, Id, Type, Config, Enabled, CreatedAt, Description}) ->
+                          [ {id, Id},
+                            {type, Type},
+                            {config, Config},
+                            {enabled, Enabled},
+                            {created_at, CreatedAt},
+                            {description, Description}
+                          ]
+                      end, ets:tab2list(emqx_modules))
+    end.
+
 export_rules() ->
     lists:map(fun({_, RuleId, _, RawSQL, _, _, _, _, _, _, Actions, Enabled, Desc}) ->
                     [{id, RuleId},
@@ -610,71 +516,59 @@ export_rules() ->
                end, emqx_rule_registry:get_rules()).
 
 export_resources() ->
-    lists:foldl(fun({_, Id, Type, Config, CreatedAt, Desc}, Acc) ->
+    lists:map(fun({_, Id, Type, Config, CreatedAt, Desc}) ->
                     NCreatedAt = case CreatedAt of
                                      undefined -> null;
                                      _ -> CreatedAt
                                  end,
-                    [[{id, Id},
-                      {type, Type},
-                      {config, maps:to_list(Config)},
-                      {created_at, NCreatedAt},
-                      {description, Desc}] | Acc]
-               end, [], emqx_rule_registry:get_resources()).
+                    [{id, Id},
+                     {type, Type},
+                     {config, maps:to_list(Config)},
+                     {created_at, NCreatedAt},
+                     {description, Desc}]
+               end, emqx_rule_registry:get_resources()).
 
 export_blacklist() ->
-    lists:foldl(fun(#banned{who = Who, by = By, reason = Reason, at = At, until = Until}, Acc) ->
+    lists:map(fun(#banned{who = Who, by = By, reason = Reason, at = At, until = Until}) ->
                     NWho = case Who of
                                {peerhost, Peerhost} -> {peerhost, inet:ntoa(Peerhost)};
                                _ -> Who
                            end,
-                    [[{who, [NWho]}, {by, By}, {reason, Reason}, {at, At}, {until, Until}] | Acc]
-                end, [], ets:tab2list(emqx_banned)).
+                    [{who, [NWho]}, {by, By}, {reason, Reason}, {at, At}, {until, Until}]
+                end, ets:tab2list(emqx_banned)).
 
 export_applications() ->
-    lists:foldl(fun({_, AppID, AppSecret, Name, Desc, Status, Expired}, Acc) ->
-                    [[{id, AppID}, {secret, AppSecret}, {name, Name}, {desc, Desc}, {status, Status}, {expired, Expired}] | Acc]
-                end, [], ets:tab2list(mqtt_app)).
+    lists:map(fun({_, AppID, AppSecret, Name, Desc, Status, Expired}) ->
+                    [{id, AppID}, {secret, AppSecret}, {name, Name}, {desc, Desc}, {status, Status}, {expired, Expired}]
+                end, ets:tab2list(mqtt_app)).
 
 export_users() ->
-    lists:foldl(fun({_, Username, Password, Tags}, Acc) ->
-                    [[{username, Username}, {password, base64:encode(Password)}, {tags, Tags}] | Acc]
-                end, [], ets:tab2list(mqtt_admin)).
-
-export_auth_clientid() ->
-    case ets:info(emqx_auth_clientid) of
-        undefined -> [];
-        _ ->
-            lists:foldl(fun({_, ClientId, Password}, Acc) ->
-                            [[{clientid, ClientId}, {password, Password}] | Acc]
-                        end, [], ets:tab2list(emqx_auth_clientid))
-    end.
-
-export_auth_username() ->
-    case ets:info(emqx_auth_username) of
-        undefined -> [];
-        _ ->
-            lists:foldl(fun({_, Username, Password}, Acc) ->
-                            [[{username, Username}, {password, Password}] | Acc]
-                        end, [], ets:tab2list(emqx_auth_username))
-    end.
+    lists:map(fun({_, Username, Password, Tags}) ->
+                    [{username, Username}, {password, base64:encode(Password)}, {tags, Tags}]
+                end, ets:tab2list(mqtt_admin)).
 
 export_auth_mnesia() ->
     case ets:info(emqx_user) of
         undefined -> [];
         _ -> 
-            lists:foldl(fun({_, Login, Password, IsSuperuser}, Acc) ->
-                            [[{login, Login}, {password, Password}, {is_superuser, IsSuperuser}] | Acc]
-                        end, [], ets:tab2list(emqx_user))
+            lists:map(fun({_, {Type, Login}, Password, CreatedAt}) ->
+                            [{login, Login}, {type, Type}, {password, Password}, {created_at, CreatedAt}]
+                        end, ets:tab2list(emqx_user))
     end.
 
 export_acl_mnesia() ->
     case ets:info(emqx_acl) of
         undefined -> [];
         _ ->
-            lists:foldl(fun({_, Login, Topic, Action, Allow}, Acc) ->
-                            [[{login, Login}, {topic, Topic}, {action, Action}, {allow, Allow}] | Acc]
-                        end, [], ets:tab2list(emqx_acl))
+            lists:map(fun({_, Filter, Action, Access, CreatedAt}) ->
+                            Filter1 = case Filter of
+                                {{Type, TypeValue}, Topic} ->
+                                    [{type, Type}, {type_value, TypeValue}, {topic, Topic}];
+                                {Type, Topic} ->
+                                    [{type, Type}, {topic, Topic}]
+                            end,
+                            Filter1 ++ [{action, Action}, {access, Access}, {created_at, CreatedAt}]
+                        end, ets:tab2list(emqx_acl))
     end.
 
 export_schemas() ->
@@ -683,6 +577,50 @@ export_schemas() ->
         _ ->
             [emqx_schema_api:format_schema(Schema) || Schema <- emqx_schema_registry:get_all_schemas()]
     end.
+
+export_confs() ->
+    case ets:info(emqx_conf_info) of
+        undefined -> {[], []};
+        _ ->
+            {lists:map(fun({_, Key, Confs}) ->
+                case Key of
+                    {_Zone, Name} ->
+                        [{zone, list_to_binary(Name)},
+                         {confs, confs_to_binary(Confs)}];
+                    {_Listener, Type, Name} ->
+                        [{type, list_to_binary(Type)},
+                         {name, list_to_binary(Name)},
+                         {confs, confs_to_binary(Confs)}];
+                    Name ->
+                        [{name, list_to_binary(Name)},
+                         {confs, confs_to_binary(Confs)}]
+                end
+            end, ets:tab2list(emqx_conf_b)),
+            lists:map(fun({_, {_Listener, Type, Name}, Status}) ->
+                [{type, list_to_binary(Type)},
+                 {name, list_to_binary(Name)},
+                 {status, Status}]
+            end, ets:tab2list(emqx_listeners_state))}
+    end.
+
+confs_to_binary(Confs) ->
+    [{list_to_binary(Key), list_to_binary(Val)} || {Key, Val} <-Confs].
+
+import_modules(Modules) ->
+    case ets:info(emqx_modules) of
+        undefined -> [];
+        _ ->
+           lists:foreach(fun(#{<<"id">> := Id,
+                               <<"type">> := Type,
+                               <<"config">> := Config,
+                               <<"enabled">> := Enabled,
+                               <<"created_at">> := CreatedAt,
+                               <<"description">> := Description}) ->
+                            emqx_modules:import_module({Id, any_to_atom(Type), Config, Enabled, CreatedAt, Description})
+                         end, Modules),
+           emqx_modules:refresh_modules()
+    end.
+
 
 import_rules(Rules) ->
     lists:foreach(fun(#{<<"id">> := RuleId,
@@ -759,44 +697,74 @@ import_users(Users) ->
                   end, Users).
 
 import_auth_clientid(Lists) ->
-    case ets:info(emqx_auth_clientid) of
+    case ets:info(emqx_user) of
         undefined -> ok;
         _ ->
-            [ mnesia:dirty_write({emqx_auth_clientid, ClientId, Password}) || #{<<"clientid">> := ClientId, 
-                                                                               <<"password">> := Password} <- Lists ]
+            [ mnesia:dirty_write({emqx_user, {clientid, Clientid}, Password, erlang:system_time(millisecond)})
+              || #{<<"clientid">> := Clientid, <<"password">> := Password} <- Lists ]
     end.
 
 import_auth_username(Lists) ->
-    case ets:info(emqx_auth_username) of
+    case ets:info(emqx_user) of
         undefined -> ok;
         _ ->
-            [ mnesia:dirty_write({emqx_auth_username, Username, Password}) || #{<<"username">> := Username, 
-                                                                               <<"password">> := Password} <- Lists ]
+            [ mnesia:dirty_write({emqx_user, {username, Username}, Password, erlang:system_time(millisecond)})
+              || #{<<"username">> := Username, <<"password">> := Password} <- Lists ]
     end.
 
-import_auth_mnesia(Auths) ->
+import_auth_mnesia(_Auths, FromVersion) when FromVersion =:= "4.0" orelse
+                                             FromVersion =:= "4.1" ->
+    case ets:info(emqx_user) of
+        undefined -> ok;
+        _ -> []
+    end;
+
+import_auth_mnesia(Auths, _) ->
     case ets:info(emqx_user) of
         undefined -> ok;
         _ -> 
-            [ mnesia:dirty_write({emqx_user, Login, Password, IsSuperuser}) || #{<<"login">> := Login,
-                                                                                 <<"password">> := Password,
-                                                                                 <<"is_superuser">> := IsSuperuser} <- Auths ]
+            [ mnesia:dirty_write({emqx_user, {any_to_atom(Type), Login}, Password, CreatedAt})
+              || #{<<"login">> := Login,
+                   <<"type">> := Type,
+                   <<"password">> := Password,
+                   <<"created_at">> := CreatedAt } <- Auths ]
     end.
 
-import_acl_mnesia(Acls) ->
+import_acl_mnesia(_Acls, FromVersion) when FromVersion =:= "4.0" orelse
+                                           FromVersion =:= "4.1" ->
+    case ets:info(emqx_acl) of
+        undefined -> ok;
+        _ -> []
+    end;
+import_acl_mnesia(Acls, _) ->
     case ets:info(emqx_acl) of
         undefined -> ok;
         _ -> 
-            [ mnesia:dirty_write({emqx_acl ,Login, Topic, Action, Allow}) || #{<<"login">> := Login, 
-                                                                               <<"topic">> := Topic,
-                                                                               <<"action">> := Action,
-                                                                               <<"allow">> := Allow} <- Acls ]
+            [ begin
+              Filter = case maps:get(<<"type_value">>, Map, undefined) of
+                  undefined ->
+                      {any_to_atom(maps:get(<<"type">>, Map)), maps:get(<<"topic">>, Map)};
+                  Value ->
+                      {{any_to_atom(maps:get(<<"type">>, Map)), Value}, maps:get(<<"topic">>, Map)}
+              end,
+              mnesia:dirty_write({emqx_acl ,Filter, any_to_atom(Action), any_to_atom(Access), CreatedAt})
+              end
+              || Map = #{<<"action">> := Action,
+                         <<"access">> := Access,
+                         <<"created_at">> := CreatedAt} <- Acls ]
     end.
 
 import_schemas(Schemas) -> 
     case ets:info(emqx_schema) of
         undefined -> ok;
         _ -> [emqx_schema_registry:add_schema(emqx_schema_api:make_schema_params(Schema)) || Schema <- Schemas]
+    end.
+
+import_confs(Configs, ListenersState) ->
+    case ets:info(emqx_conf_info) of
+        undefined -> ok;
+        _ ->
+            emqx_conf:import_confs(Configs, ListenersState)
     end.
 
 any_to_atom(L) when is_list(L) -> list_to_atom(L);
