@@ -552,7 +552,7 @@ export_auth_mnesia() ->
         undefined -> [];
         _ -> 
             lists:map(fun({_, {Type, Login}, Password, CreatedAt}) ->
-                            [{login, Login}, {type, Type}, {password, Password}, {created_at, CreatedAt}]
+                            [{login, Login}, {type, Type}, {password, base64:encode(Password)}, {created_at, CreatedAt}]
                         end, ets:tab2list(emqx_user))
     end.
 
@@ -700,7 +700,7 @@ import_auth_clientid(Lists) ->
     case ets:info(emqx_user) of
         undefined -> ok;
         _ ->
-            [ mnesia:dirty_write({emqx_user, {clientid, Clientid}, Password, erlang:system_time(millisecond)})
+            [ mnesia:dirty_write({emqx_user, {clientid, Clientid}, base64:decode(Password), erlang:system_time(millisecond)})
               || #{<<"clientid">> := Clientid, <<"password">> := Password} <- Lists ]
     end.
 
@@ -708,7 +708,7 @@ import_auth_username(Lists) ->
     case ets:info(emqx_user) of
         undefined -> ok;
         _ ->
-            [ mnesia:dirty_write({emqx_user, {username, Username}, Password, erlang:system_time(millisecond)})
+            [ mnesia:dirty_write({emqx_user, {username, Username}, base64:decode(Password), erlang:system_time(millisecond)})
               || #{<<"username">> := Username, <<"password">> := Password} <- Lists ]
     end.
 
@@ -723,7 +723,7 @@ import_auth_mnesia(Auths, _) ->
     case ets:info(emqx_user) of
         undefined -> ok;
         _ -> 
-            [ mnesia:dirty_write({emqx_user, {any_to_atom(Type), Login}, Password, CreatedAt})
+            [ mnesia:dirty_write({emqx_user, {any_to_atom(Type), Login}, base64:decode(Password), CreatedAt})
               || #{<<"login">> := Login,
                    <<"type">> := Type,
                    <<"password">> := Password,
