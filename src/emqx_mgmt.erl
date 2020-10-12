@@ -617,8 +617,7 @@ import_modules(Modules) ->
                                <<"created_at">> := CreatedAt,
                                <<"description">> := Description}) ->
                             emqx_modules:import_module({Id, any_to_atom(Type), Config, Enabled, CreatedAt, Description})
-                         end, Modules),
-           emqx_modules:refresh_modules()
+                         end, Modules)
     end.
 
 
