@@ -41,7 +41,6 @@
         , log/1
         , mgmt/1
         , data/1
-        , modules/1
         ]).
 
 -define(PROC_INFOKEYS, [status,
@@ -320,44 +319,6 @@ plugins(_) ->
                     {"plugins load <Plugin>",   "Load plugin"},
                     {"plugins unload <Plugin>", "Unload plugin"},
                     {"plugins reload <Plugin>", "Reload plugin"}
-                   ]).
-
-%%--------------------------------------------------------------------
-%% @doc Modules Command
-modules(["list"]) ->
-    foreach(fun(Module) -> print({module, Module}) end, emqx_modules:list());
-
-modules(["load", Name]) ->
-    case emqx_modules:load(list_to_atom(Name)) of
-        ok ->
-            emqx_ctl:print("Module ~s loaded successfully.~n", [Name]);
-        {error, Reason}   ->
-            emqx_ctl:print("Load module ~s error: ~p.~n", [Name, Reason])
-    end;
-
-modules(["unload", Name]) ->
-    case emqx_modules:unload(list_to_atom(Name)) of
-        ok ->
-            emqx_ctl:print("Module ~s unloaded successfully.~n", [Name]);
-        {error, Reason} ->
-            emqx_ctl:print("Unload module ~s error: ~p.~n", [Name, Reason])
-    end;
-
-modules(["reload", "emqx_mod_acl_internal" = Name]) ->
-    case emqx_modules:reload(list_to_atom(Name)) of
-        ok ->
-            emqx_ctl:print("Module ~s reloaded successfully.~n", [Name]);
-        {error, Reason} ->
-            emqx_ctl:print("Reload module ~s error: ~p.~n", [Name, Reason])
-    end;
-modules(["reload", Name]) ->
-    emqx_ctl:print("Module: ~p does not need to be reloaded.~n", [Name]);
-
-modules(_) ->
-    emqx_ctl:usage([{"modules list",            "Show loaded modules"},
-                    {"modules load <Module>",   "Load module"},
-                    {"modules unload <Module>", "Unload module"},
-                    {"modules reload <Module>", "Reload module"}
                    ]).
 
 %%--------------------------------------------------------------------
