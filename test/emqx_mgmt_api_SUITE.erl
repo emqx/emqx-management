@@ -432,6 +432,10 @@ acl_cache(_) ->
     ok = emqtt:disconnect(C1).
 
 pubsub(_) ->
+    Qos1Received = emqx_metrics:val('messages.qos1.received'),
+    Qos2Received = emqx_metrics:val('messages.qos2.received'),
+    Received = emqx_metrics:val('messages.received'),
+
     ClientId = <<"client1">>,
     Options = #{clientid => ClientId,
                 proto_ver => 5},
@@ -532,7 +536,11 @@ pubsub(_) ->
     {ok, Data3} = request_api(post, api_path(["mqtt/unsubscribe_batch"]), [], auth_header_(), Body3),
     loop(maps:get(<<"data">>, jiffy:decode(list_to_binary(Data3), [return_maps]))),
 
-    ok = emqtt:disconnect(C1).
+    ok = emqtt:disconnect(C1),
+
+    ?assertEqual(2, emqx_metrics:val('messages.qos1.received') - Qos1Received),
+    ?assertEqual(2, emqx_metrics:val('messages.qos2.received') - Qos2Received),
+    ?assertEqual(4, emqx_metrics:val('messages.received') - Received).
 
 loop([]) -> [];
 
