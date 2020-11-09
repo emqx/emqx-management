@@ -64,6 +64,16 @@ end_per_suite(_Config) ->
     emqx_ct_helpers:stop_apps([emqx_reloader, emqx_management, emqx]),
     ekka_mnesia:ensure_stopped().
 
+init_per_testcase(pubsub, Config) ->
+    emqx_metrics:stop(),
+    Config;
+
+init_per_testcase(_, Config) ->
+    Config.
+
+end_per_testcase(_, Config) ->
+    Config.
+
 get(Key, ResponseBody) ->
    maps:get(Key, jiffy:decode(list_to_binary(ResponseBody), [return_maps])).
 
@@ -473,7 +483,14 @@ pubsub(_) ->
     {ok, Data3} = request_api(post, api_path(["mqtt/unsubscribe_batch"]), [], auth_header_(), Body3),
     loop(maps:get(<<"data">>, jiffy:decode(list_to_binary(Data3), [return_maps]))),
 
-    ok = emqtt:disconnect(C1).
+    ok = emqtt:disconnect(C1),
+
+    Metrics = emqx_metrics:all(),
+    ?assertEqual(2, proplists:get_value('messages.qos1.received', Metrics)),
+    ?assertEqual(2, proplists:get_value('messages.qos2.received', Metrics)),
+    ?assertEqual(4, proplists:get_value('packets.publish.received', Metrics)),
+    ?assertEqual(4, proplists:get_value('messages.publish', Metrics)),
+    ?assertEqual(4, proplists:get_value('messages.received', Metrics)).
 
 loop([]) -> [];
 
