@@ -64,16 +64,6 @@ end_per_suite(_Config) ->
     emqx_ct_helpers:stop_apps([emqx_reloader, emqx_management, emqx]),
     ekka_mnesia:ensure_stopped().
 
-init_per_testcase(pubsub, Config) ->
-    emqx_metrics:stop(),
-    Config;
-
-init_per_testcase(_, Config) ->
-    Config.
-
-end_per_testcase(_, Config) ->
-    Config.
-
 get(Key, ResponseBody) ->
    maps:get(Key, jiffy:decode(list_to_binary(ResponseBody), [return_maps])).
 
@@ -383,6 +373,10 @@ acl_cache(_) ->
     ok = emqtt:disconnect(C1).
 
 pubsub(_) ->
+    Qos1Received = emqx_metrics:val('messages.qos1.received'),
+    Qos2Received = emqx_metrics:val('messages.qos2.received'),
+    Received = emqx_metrics:val('messages.received'),
+
     ClientId = <<"client1">>,
     Options = #{clientid => ClientId,
                 proto_ver => 5},
@@ -485,12 +479,9 @@ pubsub(_) ->
 
     ok = emqtt:disconnect(C1),
 
-    Metrics = emqx_metrics:all(),
-    ?assertEqual(2, proplists:get_value('messages.qos1.received', Metrics)),
-    ?assertEqual(2, proplists:get_value('messages.qos2.received', Metrics)),
-    ?assertEqual(4, proplists:get_value('packets.publish.received', Metrics)),
-    ?assertEqual(4, proplists:get_value('messages.publish', Metrics)),
-    ?assertEqual(4, proplists:get_value('messages.received', Metrics)).
+    ?assertEqual(2, emqx_metrics:val('messages.qos1.received') - Qos1Received),
+    ?assertEqual(2, emqx_metrics:val('messages.qos2.received') - Qos2Received),
+    ?assertEqual(4, emqx_metrics:val('messages.received') - Received).
 
 loop([]) -> [];
 

@@ -376,7 +376,7 @@ do_subscribe(ClientId, TopicTables) ->
 
 %%TODO: ???
 publish(Msg) ->
-    emqx_metrics:inc_recv(emqx_message:to_packet(undefined, Msg)),
+    emqx_metrics:inc_msg(Msg),
     emqx:publish(Msg).
 
 unsubscribe(ClientId, Topic) ->
