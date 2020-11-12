@@ -7,13 +7,15 @@ jobs:
         runs-on: ubuntu-latest
       
         container:
-            image: erlang:22.1
+            image: erlang:22.3
             
         steps:
             - uses: actions/checkout@v1
             - name: run test cases
               run: |
-                make eunit  
+                echo "https://zhanghongtong%40foxmail.com:${{ secrets.AccessToken }}@github.com" > $HOME/.git-credentials
+                git config --global credential.helper store
+                make eunit
                 make ct
                 make cover
             - uses: actions/upload-artifact@v1
