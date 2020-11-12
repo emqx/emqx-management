@@ -51,4 +51,17 @@ NewDeps = [EMQX_DEP, EMQX_RELOADER_DEP | DEPS],
 
 CONFIG1 = lists:keystore(deps, 1, CONFIG, {deps, NewDeps}),
 
-CONFIG1.
+{_,Profiles} = lists:keyfind(profiles, 1, CONFIG1),
+{_, Test} = lists:keyfind(test, 1, Profiles),
+
+TestDeps = [{emqx_ct_helpers, {git, "https://github.com/emqx/emqx-ct-helpers", {tag, "1.3.0"}}},
+            {emqtt, {git, "https://github.com/emqx/emqtt", {tag, "1.1.1"}}},
+            {emqx_dashboard, {git, UrlPrefix ++ "emqx-dashboard", GitDescribe}},
+            {emqx_rule_engine, {git, UrlPrefix ++ "emqx-rule-engine", GitDescribe}}
+           ],
+
+NewTest = lists:keystore(deps, 1, Test, {deps, TestDeps}),
+NewProfiles = lists:keystore(test, 1, Profiles, {test, NewTest}),
+CONFIG2 = lists:keystore(profiles, 1, CONFIG1, {profiles, NewProfiles}),
+
+CONFIG2.
