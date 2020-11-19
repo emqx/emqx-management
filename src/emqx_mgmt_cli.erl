@@ -528,6 +528,7 @@ data(["export"]) ->
     AuthMnesia = emqx_mgmt:export_auth_mnesia(),
     AclMnesia = emqx_mgmt:export_acl_mnesia(),
     Schemas = emqx_mgmt:export_schemas(),
+    {Configs, State} = emqx_mgmt:export_confs(),
     Seconds = erlang:system_time(second),
     {{Y, M, D}, {H, MM, S}} = emqx_mgmt_util:datetime(Seconds),
     Filename = io_lib:format("emqx-export-~p-~p-~p-~p-~p-~p.json", [Y, M, D, H, MM, S]),
@@ -543,7 +544,9 @@ data(["export"]) ->
             {users, Users},
             {auth_mnesia, AuthMnesia},
             {acl_mnesia, AclMnesia},
-            {schemas, Schemas}],
+            {schemas, Schemas},
+            {configs, Configs},
+            {listeners_state, State}],
     ok = filelib:ensure_dir(NFilename),
     case file:write_file(NFilename, emqx_json:encode(Data)) of
         ok ->
@@ -560,12 +563,13 @@ data(["import", Filename]) ->
             case lists:member(Version, ?VERSIONS) of
                 true  ->
                     try
-                        emqx_mgmt:import_modules(maps:get(<<"modules">>, Data, [])),
+                        emqx_mgmt:import_confs(maps:get(<<"configs">>, Data, []), maps:get(<<"listeners_state">>, Data, [])),
                         emqx_mgmt:import_resources(maps:get(<<"resources">>, Data, [])),
                         emqx_mgmt:import_rules(maps:get(<<"rules">>, Data, [])),
                         emqx_mgmt:import_blacklist(maps:get(<<"blacklist">>, Data, [])),
                         emqx_mgmt:import_applications(maps:get(<<"apps">>, Data, [])),
                         emqx_mgmt:import_users(maps:get(<<"users">>, Data, [])),
+                        emqx_mgmt:import_modules(maps:get(<<"modules">>, Data, [])),
                         emqx_mgmt:import_auth_clientid(maps:get(<<"auth_clientid">>, Data, [])),
                         emqx_mgmt:import_auth_username(maps:get(<<"auth_username">>, Data, [])),
                         emqx_mgmt:import_auth_mnesia(maps:get(<<"auth_mnesia">>, Data, []), Version),
