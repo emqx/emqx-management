@@ -1,18 +1,24 @@
 {VSN,
   [
-    {"4.2.1", []},
+    {"4.2.1", [
+      {load_module, emqx_mgmt_api_apps, brutal_purge, soft_purge, []}
+    ]},
     {"4.2.0", [
       {load_module, emqx_mgmt, brutal_purge, soft_purge, []},
       {load_module, emqx_mgmt_cli, brutal_purge, soft_purge, []},
-      {load_module, emqx_mgmt_api_data, brutal_purge, soft_purge, []}
+      {load_module, emqx_mgmt_api_data, brutal_purge, soft_purge, []},
+      {load_module, emqx_mgmt_api_apps, brutal_purge, soft_purge, []}
     ]}
   ],
   [
-    {"4.2.1", []},
+    {"4.2.1", [
+      {load_module, emqx_mgmt_api_apps, brutal_purge, soft_purge, []}
+    ]},
     {"4.2.0", [
       {load_module, emqx_mgmt, brutal_purge, soft_purge, []},
       {load_module, emqx_mgmt_cli, brutal_purge, soft_purge, []},
-      {load_module, emqx_mgmt_api_data, brutal_purge, soft_purge, []}
+      {load_module, emqx_mgmt_api_data, brutal_purge, soft_purge, []},
+      {load_module, emqx_mgmt_api_apps, brutal_purge, soft_purge, []}
     ]}
   ]
 }.
