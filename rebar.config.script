@@ -45,9 +45,8 @@ GitDescribe = case re:run(Branch, "master|^dev/|^hotfix/", [{capture, none}]) of
 UrlPrefix = "https://github.com/emqx/",
 
 EMQX_DEP = {emqx, {git, UrlPrefix ++ "emqx", GitDescribe}},
-EMQX_RELOADER_DEP = {emqx_reloader, {git, UrlPrefix ++ "emqx-reloader", GitDescribe}},
 
-NewDeps = [EMQX_DEP, EMQX_RELOADER_DEP | DEPS],
+NewDeps = [EMQX_DEP | DEPS],
 
 CONFIG1 = lists:keystore(deps, 1, CONFIG, {deps, NewDeps}),
 
