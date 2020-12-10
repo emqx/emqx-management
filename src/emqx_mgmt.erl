@@ -476,7 +476,7 @@ delete_all_deactivated_alarms() ->
 
 delete_all_deactivated_alarms(Node) when Node =:= node() ->
     emqx_alarm:delete_all_deactivated_alarms();
-delete_all_deactivated_alarms(Node) -> 
+delete_all_deactivated_alarms(Node) ->
     rpc_call(Node, delete_deactivated_alarms, [Node]).
 
 %%--------------------------------------------------------------------
@@ -552,7 +552,7 @@ export_users() ->
 export_auth_mnesia() ->
     case ets:info(emqx_user) of
         undefined -> [];
-        _ -> 
+        _ ->
             lists:map(fun({_, {Type, Login}, Password, CreatedAt}) ->
                             [{login, Login}, {type, Type}, {password, base64:encode(Password)}, {created_at, CreatedAt}]
                         end, ets:tab2list(emqx_user))
@@ -713,17 +713,24 @@ import_auth_username(Lists) ->
               || #{<<"username">> := Username, <<"password">> := Password} <- Lists ]
     end.
 
-import_auth_mnesia(_Auths, FromVersion) when FromVersion =:= "4.0" orelse
-                                             FromVersion =:= "4.1" ->
+import_auth_mnesia(Auths, FromVersion) when FromVersion =:= "4.0" orelse
+                                            FromVersion =:= "4.1" ->
     case ets:info(emqx_user) of
         undefined -> ok;
-        _ -> []
+        _ ->
+            CreatedAt = erlang:system_time(millisecond),
+            [ begin
+                mnesia:dirty_write({emqx_user, {username, Login}, base64:decode(Password), CreatedAt})
+              end
+              || #{<<"login">> := Login,
+                   <<"password">> := Password} <- Auths ]
+
     end;
 
 import_auth_mnesia(Auths, _) ->
     case ets:info(emqx_user) of
         undefined -> ok;
-        _ -> 
+        _ ->
             [ mnesia:dirty_write({emqx_user, {any_to_atom(Type), Login}, base64:decode(Password), CreatedAt})
               || #{<<"login">> := Login,
                    <<"type">> := Type,
@@ -731,16 +738,24 @@ import_auth_mnesia(Auths, _) ->
                    <<"created_at">> := CreatedAt } <- Auths ]
     end.
 
-import_acl_mnesia(_Acls, FromVersion) when FromVersion =:= "4.0" orelse
-                                           FromVersion =:= "4.1" ->
+import_acl_mnesia(Acls, FromVersion) when FromVersion =:= "4.0" orelse
+                                          FromVersion =:= "4.1" ->
     case ets:info(emqx_acl) of
         undefined -> ok;
-        _ -> []
+        _ ->
+            CreatedAt = erlang:system_time(millisecond),
+            [begin
+                 mnesia:dirty_write({emqx_acl, {Login, Topic}, any_to_atom(Action), any_to_atom(Allow), CreatedAt})
+             end || #{<<"login">> := Login,
+                      <<"topic">> := Topic,
+                      <<"allow">> := Allow,
+                      <<"action">> := Action} <- Acls]
     end;
+
 import_acl_mnesia(Acls, _) ->
     case ets:info(emqx_acl) of
         undefined -> ok;
-        _ -> 
+        _ ->
             [ begin
               Filter = case maps:get(<<"type_value">>, Map, undefined) of
                   undefined ->
@@ -755,7 +770,7 @@ import_acl_mnesia(Acls, _) ->
                          <<"created_at">> := CreatedAt} <- Acls ]
     end.
 
-import_schemas(Schemas) -> 
+import_schemas(Schemas) ->
     case ets:info(emqx_schema) of
         undefined -> ok;
         _ -> [emqx_schema_registry:add_schema(emqx_schema_api:make_schema_params(Schema)) || Schema <- Schemas]
