@@ -745,7 +745,11 @@ import_acl_mnesia(Acls, FromVersion) when FromVersion =:= "4.0" orelse
         _ ->
             CreatedAt = erlang:system_time(millisecond),
             [begin
-                 mnesia:dirty_write({emqx_acl, {Login, Topic}, any_to_atom(Action), any_to_atom(Allow), CreatedAt})
+                 Allow1 = case any_to_atom(Allow) of
+                              true -> allow;
+                              false -> deny
+                          end,
+                 mnesia:dirty_write({emqx_acl, {{username, Login}, Topic}, any_to_atom(Action), Allow1, CreatedAt})
              end || #{<<"login">> := Login,
                       <<"topic">> := Topic,
                       <<"allow">> := Allow,
