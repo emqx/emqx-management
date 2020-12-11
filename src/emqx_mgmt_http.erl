@@ -73,7 +73,8 @@ ranch_opts(Port, Options0) ->
             socket_opts => [{port, Port} | Options]},
     Res.
 
-stop_listener({Proto, _Port, _}) ->
+stop_listener({Proto, Port, _}) ->
+    io:format("Stop http:management listener on ~s successfully.~n",[format(Port)]),
     minirest:stop_http(listener_name(Proto)).
 
 listeners() ->
@@ -116,3 +117,10 @@ authorize_appid(Req) ->
         {basic, AppId, AppSecret} -> emqx_mgmt_auth:is_authorized(AppId, AppSecret);
          _  -> false
     end.
+
+format(Port) when is_integer(Port) ->
+    io_lib:format("0.0.0.0:~w", [Port]);
+format({Addr, Port}) when is_list(Addr) ->
+    io_lib:format("~s:~w", [Addr, Port]);
+format({Addr, Port}) when is_tuple(Addr) ->
+    io_lib:format("~s:~w", [inet:ntoa(Addr), Port]).

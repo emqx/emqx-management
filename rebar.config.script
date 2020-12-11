@@ -48,22 +48,23 @@ EMQX_DEP = {emqx, {git, UrlPrefix ++ "emqx", GitDescribe}},
 
 NewDeps = [EMQX_DEP | DEPS],
 
+
 CONFIG1 = lists:keystore(deps, 1, CONFIG, {deps, NewDeps}),
 
 {_,Profiles} = lists:keyfind(profiles, 1, CONFIG1),
 {_, Test} = lists:keyfind(test, 1, Profiles),
+{_, TestDeps} = lists:keyfind(deps, 1, Test),
 
-TestDeps = [{emqx_ct_helpers, {git, "https://github.com/emqx/emqx-ct-helpers", {tag, "1.3.0"}}},
-            {emqtt, {git, "https://github.com/emqx/emqtt", {tag, "1.1.1"}}},
-            {emqx_enterprise_dashboard, {git, UrlPrefix ++ "emqx-enterprise-dashboard", GitDescribe}},
-            {emqx_conf, {git, UrlPrefix ++ "emqx-conf", GitDescribe}},
-            {emqx_modules_spec, {git, UrlPrefix ++ "emqx-modules-spec", GitDescribe}},
-            {emqx_modules, {git, UrlPrefix ++ "emqx-modules", GitDescribe}},
-            {emqx_rule_engine, {git, UrlPrefix ++ "emqx-rule-engine", GitDescribe}},
-            {emqx_schema_registry, {git, UrlPrefix ++ "emqx-schema-registry", GitDescribe}}
-           ],
+NewTestDeps = [{emqx_enterprise_dashboard, {git, UrlPrefix ++ "emqx-enterprise-dashboard", GitDescribe}},
+               {emqx_conf, {git, UrlPrefix ++ "emqx-conf", GitDescribe}},
+               {emqx_modules_spec, {git, UrlPrefix ++ "emqx-modules-spec", GitDescribe}},
+               {emqx_modules, {git, UrlPrefix ++ "emqx-modules", GitDescribe}},
+               {emqx_reloader, {git, UrlPrefix ++ "emqx-reloader", GitDescribe}},
+               {emqx_rule_engine, {git, UrlPrefix ++ "emqx-rule-engine", GitDescribe}},
+               {emqx_schema_registry, {git, UrlPrefix ++ "emqx-schema-registry", GitDescribe}}
+              ],
 
-NewTest = lists:keystore(deps, 1, Test, {deps, TestDeps}),
+NewTest = lists:keystore(deps, 1, Test, {deps, lists:append(NewTestDeps, TestDeps)}),
 NewProfiles = lists:keystore(test, 1, Profiles, {test, NewTest}),
 CONFIG2 = lists:keystore(profiles, 1, CONFIG1, {profiles, NewProfiles}),
 

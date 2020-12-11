@@ -159,11 +159,11 @@ apps(_) ->
                                auth_header_(), #{<<"app_id">> => AppId,
                                                  <<"name">> => <<"test">>,
                                                  <<"status">> => true}),
-    ?assertEqual(?ERROR2, get(<<"code">>, Error1)),
+    ?assertMatch(<<"undefined">>, get(<<"message">>, Error1)),
 
     meck:expect(emqx_mgmt_auth, del_app, 1, fun(_) -> {error, undefined} end),
     {ok, Error2} = request_api(delete, api_path(["apps", binary_to_list(AppId)]), auth_header_()),
-    ?assertEqual(?ERROR2, get(<<"code">>, Error2)),
+    ?assertMatch(<<"undefined">>, get(<<"message">>, Error2)),
     meck:unload(emqx_mgmt_auth),
 
     {ok, NoApp} = request_api(get, api_path(["apps", binary_to_list(AppId)]), auth_header_()),
