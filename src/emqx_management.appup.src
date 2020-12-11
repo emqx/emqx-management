@@ -1,5 +1,7 @@
-{"4.2.3",
+%% -*-: erlang -*-
+{VSN,
   [
+    {<<".*">>, []},
     {"4.2.2", [
       {load_module, emqx_mgmt, brutal_purge, soft_purge, []},
       {load_module, emqx_mgmt_api_data, brutal_purge, soft_purge, []}
@@ -14,6 +16,7 @@
     ]}
   ],
   [
+    {<<".*">>, []},
     {"4.2.2", [
       {load_module, emqx_mgmt, brutal_purge, soft_purge, []},
       {load_module, emqx_mgmt_api_data, brutal_purge, soft_purge, []}
