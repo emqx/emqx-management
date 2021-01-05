@@ -53,6 +53,7 @@ groups() ->
        pubsub,
        routes_and_subscriptions,
        stats,
+       log,
        data]}].
 
 init_per_suite(Config) ->
@@ -582,6 +583,51 @@ stats(_) ->
     ?assertEqual(<<"undefined">>, get(<<"message">>, Return)),
     meck:unload(emqx_mgmt).
 
+log(_) ->
+    {ok, _} = request_api(put, api_path(["log"]), [], auth_header_(), #{<<"primary_level">> => <<"debug">>}),
+    {ok, Return1} = request_api(get, api_path(["log"]), auth_header_()),
+    ?assertEqual(#{<<"primary_level">> => <<"debug">>}, get(<<"data">>, Return1)),
+
+    {ok, Return2} = request_api(get, api_path(["log", "trace"]), auth_header_()),
+    ?assertEqual([], get(<<"data">>, Return2)),
+    
+    Data1 = #{<<"type">> => <<"clientid">>,
+              <<"name">> => <<"test_clientid">>,
+              <<"level">> => <<"debug">>
+             },
+    {ok, _} = request_api(post, api_path(["log", "trace"]), [], auth_header_(), Data1),
+    {ok, Return3} = request_api(get, api_path(["log", "trace", "clientid", "test_clientid"]), auth_header_()),
+    ?assertMatch(0, get(<<"code">>, Return3)),
+    {ok, Return4} = request_api(get, api_path(["log", "trace", view, "clientid", "test_clientid"]), auth_header_()),
+    ?assertEqual(0, get(<<"code">>, Return4)),
+
+    File1 = "test_clientid.log",
+    {ok, saved_to_file} = request_stream(get, api_path(["log", "trace", "download", "clientid", "test_clientid"]), auth_header_(), File1),
+    ?assertEqual(true, filelib:is_file(File1)),
+
+    Data2 = #{<<"type">> => <<"topic">>,
+              <<"name">> => <<"test/topic">>,
+              <<"level">> => <<"debug">>
+             },
+    {ok, _} = request_api(post, api_path(["log", "trace"]), [], auth_header_(), Data2),
+    {ok, Return5} = request_api(get, api_path(["log", "trace", "topic", http_uri:encode("test/topic")]), auth_header_()),
+    ?assertMatch(0, get(<<"code">>, Return5)),
+    {ok, Return6} = request_api(get, api_path(["log", "trace", view, "topic", http_uri:encode("test/topic")]), auth_header_()),
+    ?assertEqual(0, get(<<"code">>, Return6)),
+
+    File2 = "test_topic.log",
+    {ok, saved_to_file} = request_stream(get, api_path(["log", "trace", "download", "topic", http_uri:encode("test/topic")]), auth_header_(), File2),
+    ?assertEqual(true, filelib:is_file(File2)),
+
+    {ok, Return7} = request_api(get, api_path(["log", "trace"]), auth_header_()),
+    ?assertEqual(2, length(get(<<"data">>, Return7))),
+
+    {ok, _} = request_api(delete, api_path(["log", "trace", "clientid", "test_clientid"]), auth_header_()),
+    {ok, _} = request_api(delete, api_path(["log", "trace", "topic", http_uri:encode("test/topic")]), auth_header_()),
+    {ok, Return8} = request_api(get, api_path(["log", "trace"]), auth_header_()),
+    ?assertEqual([], get(<<"data">>, Return8)),
+    {ok, _} = request_api(put, api_path(["log"]), [], auth_header_(), #{<<"primary_level">> => <<"notice">>}),
+    ok.
 data(_) ->
     {ok, Data} = request_api(post, api_path(["data","export"]), [], auth_header_(), [#{}]),
     #{<<"filename">> := Filename, <<"node">> := Node} = emqx_ct_http:get_http_data(Data),
@@ -590,7 +636,6 @@ data(_) ->
 
     ?assertMatch({ok, _}, request_api(post, api_path(["data","import"]), [], auth_header_(), #{<<"filename">> => Filename, <<"node">> => Node})),
     ?assertMatch({ok, _}, request_api(post, api_path(["data","import"]), [], auth_header_(), #{<<"filename">> => Filename})),
-
     ok.
 
 request_api(Method, Url, Auth) ->
@@ -623,6 +668,9 @@ do_request_api(Method, Request)->
         {ok, {Reason, _, _}} ->
             {error, Reason}
     end.
+
+request_stream(Method, Url, Auth, File) ->
+    httpc:request(Method, {Url, [Auth]}, [], [{stream, File}]).
 
 auth_header_() ->
     AppId = <<"admin">>,
