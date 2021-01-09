@@ -23,6 +23,7 @@
 -include_lib("emqx/include/emqx_mqtt.hrl").
 
 -import(proplists, [get_value/2]).
+-import(lists, [foldl/3]).
 
 %% Nodes and Brokers API
 -export([ list_nodes/0
@@ -103,6 +104,8 @@
 %% Listeners
 -export([ list_listeners/0
         , list_listeners/1
+        , restart_listener/2
+        , restart_listener/3
         ]).
 
 %% Alarms
@@ -562,6 +565,44 @@ list_listeners(Node) when Node =:= node() ->
 
 list_listeners(Node) ->
     rpc_call(Node, list_listeners, [Node]).
+
+restart_listener(Proto, ListenOn) ->
+    ListenOn1 = case string:tokens(ListenOn, ":") of
+        [Port]     -> list_to_integer(Port);
+        [IP, Port] -> {IP, list_to_integer(Port)}
+    end,
+    case find_listener_opts(Proto, ListenOn1) of
+        {ok, Listener} ->
+            emqx_listeners:restart_listener(Listener);
+        {error, Error} ->
+            {error, Error}
+    end.
+
+restart_listener(Node, Proto, ListenOn) when Node =:= node() ->
+    ListenOn1 = case string:tokens(ListenOn, ":") of
+        [Port]     -> list_to_integer(Port);
+        [IP, Port] -> {IP, list_to_integer(Port)}
+    end,
+    case find_listener_opts(Proto, ListenOn1) of
+        {ok, Listener} ->
+            emqx_listeners:restart_listener(Listener);
+        {error, Error} ->
+            {error, Error}
+    end;
+
+restart_listener(Node, Proto, ListenOn) ->
+    rpc_call(Node, restart_listener, [Node, Proto, ListenOn]).
+
+find_listener_opts(Proto, ListenOn) ->
+    ProtoAtom = list_to_atom(Proto),
+    foldl(fun({LisProtocol, LisListenOn, LisOpts}, Acc) ->
+        if
+        LisProtocol == ProtoAtom andalso LisListenOn == ListenOn ->
+            {ok, {LisProtocol, LisListenOn, LisOpts}};
+        true ->
+            Acc
+        end
+    end, {error, "Listener/options not found"}, emqx:get_env(listeners, [])).
 
 %%--------------------------------------------------------------------
 %% Get Alarms
