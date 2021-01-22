@@ -550,8 +550,17 @@ listeners(["stop", Proto, ListenOn]) ->
             emqx_ctl:print("Failed to stop ~s listener on ~s, error:~p~n", [Proto, ListenOn, Error])
     end;
 
+listeners(["restart"]) ->
+    case emqx_listeners:restart() of
+        ok ->
+            emqx_ctl:print("Restarted all listeners on successfully.~n");
+        {error, Error} ->
+            emqx_ctl:print("Failed to restart all listener, error:~p~n", [Error])
+    end;
+
 listeners(_) ->
     emqx_ctl:usage([{"listeners",                        "List listeners"},
+                    {"listeners restart",         "Restart all listeners"},
                     {"listeners stop    <Proto> <Port>", "Stop a listener"}]).
 
 %%--------------------------------------------------------------------
