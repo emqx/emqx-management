@@ -242,7 +242,8 @@ t_subscriptions_cmd(_) ->
 t_listeners_cmd(_) ->
     print_mock(),
     ?assertEqual(emqx_mgmt_cli:listeners([]), ok),
-    ?assertEqual(emqx_mgmt_cli:listeners(["stop", "wss", "8084"]), "Stop wss listener on 8084 successfully.\n").
+    ?assertEqual(emqx_mgmt_cli:listeners(["stop", "wss", "8084"]), "Stop wss listener on 8084 successfully.\n"),
+    ?assertEqual(emqx_mgmt_cli:listeners(["restart", "wss", "8084"]), "Restarted wss listener on 8084 successfully.\n").
 
 t_plugins_cmd(_) ->
     print_mock(),

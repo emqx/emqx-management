@@ -567,11 +567,7 @@ list_listeners(Node) ->
     rpc_call(Node, list_listeners, [Node]).
 
 restart_listener(Proto, ListenOn) ->
-    ListenOn1 = case string:tokens(ListenOn, ":") of
-        [Port]     -> list_to_integer(Port);
-        [IP, Port] -> {IP, list_to_integer(Port)}
-    end,
-    case find_listener_opts(Proto, ListenOn1) of
+    case find_listener_opts(Proto, ListenOn) of
         {ok, Listener} ->
             emqx_listeners:restart_listener(Listener);
         {error, Error} ->
@@ -579,11 +575,7 @@ restart_listener(Proto, ListenOn) ->
     end.
 
 restart_listener(Node, Proto, ListenOn) when Node =:= node() ->
-    ListenOn1 = case string:tokens(ListenOn, ":") of
-        [Port]     -> list_to_integer(Port);
-        [IP, Port] -> {IP, list_to_integer(Port)}
-    end,
-    case find_listener_opts(Proto, ListenOn1) of
+    case find_listener_opts(Proto, ListenOn) of
         {ok, Listener} ->
             emqx_listeners:restart_listener(Listener);
         {error, Error} ->
@@ -595,14 +587,32 @@ restart_listener(Node, Proto, ListenOn) ->
 
 find_listener_opts(Proto, ListenOn) ->
     ProtoAtom = list_to_atom(Proto),
-    foldl(fun({LisProtocol, LisListenOn, LisOpts}, Acc) ->
-        if
-        LisProtocol == ProtoAtom andalso LisListenOn == ListenOn ->
-            {ok, {LisProtocol, LisListenOn, LisOpts}};
-        true ->
-            Acc
-        end
-    end, {error, "Listener/options not found"}, emqx:get_env(listeners, [])).
+    case parse_listenon(ListenOn) of
+        {ok, ListenOnParsed} ->
+            foldl(fun({LisProtocol, LisListenOn, LisOpts}, Acc) ->
+                if
+                LisProtocol == ProtoAtom andalso LisListenOn == ListenOnParsed ->
+                    {ok, {LisProtocol, LisListenOn, LisOpts}};
+                true ->
+                    Acc
+                end
+            end, {error, "Listener/options not found"}, emqx:get_env(listeners, []));
+        {error, Error} ->
+            {error, Error}
+    end.
+
+parse_listenon(ListenOn) ->
+    case string:tokens(ListenOn, ":") of
+        [] ->
+            {error, "missing port"};
+        [Port] ->
+            {ok, list_to_integer(Port)};
+        [IP, Port] ->
+            case inet:parse_address(IP) of
+                {ok, IP1}      -> {ok, {IP1, list_to_integer(Port)}};
+                {error, Error} -> {error, Error}
+            end
+    end.
 
 %%--------------------------------------------------------------------
 %% Get Alarms
@@ -973,3 +983,19 @@ action_to_prop_list({action_instance, ActionInstId, Name, FallbackActions, Args}
      {name, Name},
      {fallbacks, actions_to_prop_list(FallbackActions)},
      {args, Args}].
+
+%%--------------------------------------------------------------------
+%% EUnits
+%%--------------------------------------------------------------------
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+parse_listenon_test() ->
+    ?assertEqual({ok, 8883}, parse_listenon("8883")),
+    ?assertEqual({ok, 8883}, parse_listenon(":8883")),
+    ?assertEqual({ok, {{127,0,0,1},8883}}, parse_listenon("127.0.0.1:8883")),
+    ?assertEqual({error, "missing port"}, parse_listenon("")),
+    ?assertEqual({error, einval}, parse_listenon("localhost:8883")).
+
+-endif.

@@ -552,7 +552,7 @@ listeners(["stop", Proto, ListenOn]) ->
 
 listeners(["restart", Proto, ListenOn]) ->
     case emqx_mgmt:restart_listener(Proto, ListenOn) of
-        ok ->
+        {ok, _} ->
             emqx_ctl:print("Restarted ~s listener on ~s successfully.~n", [Proto, ListenOn]);
         {error, Error} ->
             emqx_ctl:print("Failed to restart ~s listener on ~s, error:~p~n", [Proto, ListenOn, Error])
@@ -560,8 +560,6 @@ listeners(["restart", Proto, ListenOn]) ->
 
 listeners(_) ->
     emqx_ctl:usage([{"listeners",                        "List listeners"},
-                    {"listeners stop    <Proto> <Port>", "Stop a listener"},
-                    {"listeners start   <Proto> <Port>", "Start a listener"},
                     {"listeners restart <Proto> <Port>", "Restart a listener"}]).
 
 %%--------------------------------------------------------------------
