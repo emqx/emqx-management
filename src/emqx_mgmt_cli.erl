@@ -630,6 +630,9 @@ data(_) ->
 %%--------------------------------------------------------------------
 %% @doc acl Command
 
+acl(["cache-clean", "node", SNode]) ->
+  emqx_mgmt:clean_acl_cache_all(ekka_node:parse_name(SNode));
+
 acl(["cache-clean", "all"]) ->
   emqx_mgmt:clean_acl_cache();
 
@@ -637,8 +640,9 @@ acl(["cache-clean", ClientId]) ->
   emqx_mgmt:clean_acl_cache(ClientId);
 
 acl(_) ->
-  emqx_ctl:usage([{"cache-clean all", "Clears acl cache on all nodes"},
-    {"cache-clean <ClientId>",    "Clears acl cache for given client"}]).
+  emqx_ctl:usage([{"cache-clean all",           "Clears acl cache on all nodes"},
+                  {"cache-clean node <Node>",   "Clears acl cache on given node"},
+                  {"cache-clean <ClientId>",    "Clears acl cache for given client"}]).
 
 %%--------------------------------------------------------------------
 %% Dump ETS
