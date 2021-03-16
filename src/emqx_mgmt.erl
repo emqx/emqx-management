@@ -337,7 +337,11 @@ list_acl_cache(ClientId) ->
     call_client(ClientId, list_acl_cache).
 
 clean_acl_cache() ->
-  ok.
+  Results = [clean_acl_cache_all(Node) || Node <- ekka_mnesia:running_nodes()],
+  case lists:any(fun(Item) -> Item =:= ok end, Results) of
+    true  -> ok;
+    false -> lists:last(Results)
+  end.
 
 clean_acl_cache(ClientId) ->
     Results = [clean_acl_cache(Node, ClientId) || Node <- ekka_mnesia:running_nodes()],
