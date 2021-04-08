@@ -589,7 +589,7 @@ export_auth_clientid() ->
         undefined -> [];
         _ ->
             lists:foldl(fun({_, ClientId, Password}, Acc) ->
-                            [[{clientid, ClientId}, {password, Password}] | Acc]
+                            [[{clientid, ClientId}, {password, base64:encode(Password)}] | Acc]
                         end, [], ets:tab2list(emqx_auth_clientid))
     end.
 
@@ -605,7 +605,7 @@ export_auth_username() ->
 export_auth_mnesia() ->
     case ets:info(emqx_user) of
         undefined -> [];
-        _ -> 
+        _ ->
             lists:foldl(fun({_, Login, Password, IsSuperuser}, Acc) ->
                             [[{login, Login}, {password, Password}, {is_superuser, IsSuperuser}] | Acc]
                         end, [], ets:tab2list(emqx_user))
@@ -705,7 +705,7 @@ import_auth_clientid(Lists) ->
     case ets:info(emqx_auth_clientid) of
         undefined -> ok;
         _ ->
-            [ mnesia:dirty_write({emqx_auth_clientid, ClientId, Password}) || #{<<"clientid">> := ClientId, 
+            [ mnesia:dirty_write({emqx_auth_clientid, ClientId, Password}) || #{<<"clientid">> := ClientId,
                                                                                <<"password">> := Password} <- Lists ]
     end.
 
@@ -713,14 +713,14 @@ import_auth_username(Lists) ->
     case ets:info(emqx_auth_username) of
         undefined -> ok;
         _ ->
-            [ mnesia:dirty_write({emqx_auth_username, Username, Password}) || #{<<"username">> := Username, 
+            [ mnesia:dirty_write({emqx_auth_username, Username, Password}) || #{<<"username">> := Username,
                                                                                <<"password">> := Password} <- Lists ]
     end.
 
 import_auth_mnesia(Auths) ->
     case ets:info(emqx_acl) of
         undefined -> ok;
-        _ -> 
+        _ ->
             [ mnesia:dirty_write({emqx_user, Login, Password, IsSuperuser}) || #{<<"login">> := Login,
                                                                                  <<"password">> := Password,
                                                                                  <<"is_superuser">> := IsSuperuser} <- Auths ]
@@ -729,14 +729,14 @@ import_auth_mnesia(Auths) ->
 import_acl_mnesia(Acls) ->
     case ets:info(emqx_acl) of
         undefined -> ok;
-        _ -> 
-            [ mnesia:dirty_write({emqx_acl ,Login, Topic, Action, Allow}) || #{<<"login">> := Login, 
+        _ ->
+            [ mnesia:dirty_write({emqx_acl ,Login, Topic, Action, Allow}) || #{<<"login">> := Login,
                                                                                <<"topic">> := Topic,
                                                                                <<"action">> := Action,
                                                                                <<"allow">> := Allow} <- Acls ]
     end.
 
-import_schemas(Schemas) -> 
+import_schemas(Schemas) ->
     case ets:info(emqx_schema) of
         undefined -> ok;
         _ -> [emqx_schema_registry:add_schema(emqx_schema_api:make_schema_params(Schema)) || Schema <- Schemas]
