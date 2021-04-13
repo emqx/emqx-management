@@ -559,7 +559,10 @@ data(["import", Filename]) ->
     case file:read_file(Filename) of
         {ok, Json} ->
             Data = emqx_json:decode(Json, [return_maps]),
-            Version = emqx_mgmt:to_version(maps:get(<<"version">>, Data)),
+            Version = case emqx_mgmt:to_version(maps:get(<<"version">>, Data)) of
+                          "e4." -> "4.1";
+                          V -> V
+                      end,
             case lists:member(Version, ?VERSIONS) of
                 true  ->
                     try
