@@ -572,7 +572,7 @@ data(["export"]) ->
     {{Y, M, D}, {H, MM, S}} = emqx_mgmt_util:datetime(Seconds),
     Filename = io_lib:format("emqx-export-~p-~p-~p-~p-~p-~p.json", [Y, M, D, H, MM, S]),
     NFilename = filename:join([emqx:get_env(data_dir), Filename]),
-    Version = string:sub_string(emqx_sys:version(), 1, 3),
+    Version = emqx_sys:version(),
     Data = [{version, erlang:list_to_binary(Version)},
             {date, erlang:list_to_binary(emqx_mgmt_util:strftime(Seconds))},
             {rules, Rules},
