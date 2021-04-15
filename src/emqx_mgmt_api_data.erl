@@ -84,7 +84,7 @@ export(_Bindings, _Params) ->
     {ok, Dir} = file:get_cwd(),
     Filename = io_lib:format("emqx-export-~p-~p-~p-~p-~p-~p.json", [Y, M, D, H, MM, S]),
     NFilename = filename:join([Dir, "data", Filename]),
-    Version = string:sub_string(emqx_sys:version(), 1, 3),
+    Version = emqx_sys:version(),
     Data = [{version, erlang:list_to_binary(Version)},
             {date, erlang:list_to_binary(emqx_mgmt_util:strftime(Seconds))},
             {rules, Rules},
@@ -213,5 +213,3 @@ delete(#{filename := Filename}, _Params) ->
         {error, Reason} ->
             return({error, Reason})
     end.
-
-    
