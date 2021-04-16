@@ -573,7 +573,7 @@ data(["export", Directory]) ->
                     end;
                 _ ->
                     emqx_ctl:print("Please enter a directory using an absolute path.~n")
-            end            
+            end
     end;
 
 data(["import", Filename]) ->
@@ -581,7 +581,7 @@ data(["import", Filename]) ->
         {ok, Json} ->
             Data = emqx_json:decode(Json, [return_maps]),
             Version = emqx_mgmt:to_version(maps:get(<<"version">>, Data)),
-            case lists:member(Version, ?VERSIONS) of
+            case is_version_supported(Data, Version) of
                 true  ->
                     try
                         emqx_mgmt:import_resources(maps:get(<<"resources">>, Data, [])),
@@ -608,6 +608,22 @@ data(["import", Filename]) ->
 data(_) ->
     emqx_ctl:usage([{"data import <File>",   "Import data from the specified file"},
                     {"data export [<Path>]", "Export data to the specified path"}]).
+
+is_version_supported(Data, Version) ->
+    case {maps:get(<<"auth_clientid">>, Data, []), maps:get(<<"auth_username">>, Data, [])} of
+        {[], []} -> lists:member(Version, ?VERSIONS);
+        _ ->
+            case re:run(Version, "^4.0.\\d+$", [{capture, none}]) of
+                match ->
+                    try lists:map(fun erlang:list_to_integer/1, string:tokens(Version, ".")) of
+                        [4, 0, N] -> N >= 13;
+                        _ -> false
+                    catch
+                        _ : _ -> false
+                    end;
+                _ -> false
+            end
+    end.
 
 %%--------------------------------------------------------------------
 %% Dump ETS

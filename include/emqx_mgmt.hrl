@@ -33,4 +33,4 @@
 -define(ERROR15, 115). %% bad topic
 
 
--define(VERSIONS, ["1", "3.2", "3.4", "4.0", "4.0.13"]).
+-define(VERSIONS, ["4.0"]).
