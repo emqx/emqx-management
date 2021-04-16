@@ -581,7 +581,7 @@ data(["import", Filename]) ->
         {ok, Json} ->
             Data = emqx_json:decode(Json, [return_maps]),
             Version = emqx_mgmt:to_version(maps:get(<<"version">>, Data)),
-            case lists:member(Version, ?VERSIONS) of
+            case emqx_mgmt:is_version_supported(Data, Version) of
                 true  ->
                     try
                         emqx_mgmt:import_resources(maps:get(<<"resources">>, Data, [])),

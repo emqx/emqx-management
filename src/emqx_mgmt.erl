@@ -114,6 +114,7 @@
         , import_acl_mnesia/1
         , import_schemas/1
         , to_version/1
+        , is_version_supported/2
         ]).
 
 %% Common Table API
@@ -652,6 +653,22 @@ to_version(Version) when is_binary(Version) ->
     binary_to_list(Version);
 to_version(Version) when is_list(Version) ->
     Version.
+
+is_version_supported(Data, Version) ->
+    case {maps:get(<<"auth_clientid">>, Data, []), maps:get(<<"auth_username">>, Data, [])} of
+        {[], []} -> lists:member(Version, ?VERSIONS);
+        _ ->
+            case re:run(Version, "^4.0.\\d+$", [{capture, none}]) of
+                match ->
+                    try lists:map(fun erlang:list_to_integer/1, string:tokens(Version, ".")) of
+                        [4, 0, N] -> N >= 13;
+                        _ -> false
+                    catch
+                        _ : _ -> false
+                    end;
+                _ -> false
+            end
+    end.
 
 %%--------------------------------------------------------------------
 %% Common Table API
