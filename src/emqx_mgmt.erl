@@ -832,14 +832,13 @@ is_version_supported(Data, Version) ->
         _ -> is_version_supported2(Version)
     end.
 
-is_version_supported2("4.1") ->
-    true;
 is_version_supported2(Version) ->
-    case re:run(Version, "^4.[02].\\d+$", [{capture, none}]) of
+    case re:run(Version, "^(\\d+\\.){1,2}\\d+$", [{capture, none}]) of
         match ->
             try lists:map(fun erlang:list_to_integer/1, string:tokens(Version, ".")) of
-                [4, 2, N] -> N >= 11;
                 [4, 0, N] -> N >= 13;
+                [4, 1] -> true
+                [4, 2, N] -> N >= 11;
                 _ -> false
             catch
                 _ : _ -> false
