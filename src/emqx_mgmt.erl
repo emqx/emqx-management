@@ -678,7 +678,7 @@ export_auth_mnesia() ->
         undefined -> [];
         _ ->
             lists:foldl(fun({_, Login, Password, IsSuperuser}, Acc) ->
-                            [[{login, Login}, {password, base64:encode(password)}, {is_superuser, IsSuperuser}] | Acc]
+                            [[{login, Login}, {password, base64:encode(Password)}, {is_superuser, IsSuperuser}] | Acc]
                         end, [], ets:tab2list(emqx_user))
     end.
 
@@ -776,7 +776,7 @@ import_auth_clientid(Lists) ->
     case ets:info(emqx_auth_clientid) of
         undefined -> ok;
         _ ->
-            [ mnesia:dirty_write({emqx_auth_clientid, ClientId, base64:decode(Passworad)}) || #{<<"clientid">> := ClientId,
+            [ mnesia:dirty_write({emqx_auth_clientid, ClientId, base64:decode(Password)}) || #{<<"clientid">> := ClientId,
                                                                                <<"password">> := Password} <- Lists ]
     end.
 
@@ -784,7 +784,7 @@ import_auth_username(Lists) ->
     case ets:info(emqx_auth_username) of
         undefined -> ok;
         _ ->
-            [ mnesia:dirty_write({emqx_auth_username, Username, base64:decode(Passworad)}) || #{<<"username">> := Username,
+            [ mnesia:dirty_write({emqx_auth_username, Username, base64:decode(Password)}) || #{<<"username">> := Username,
                                                                                <<"password">> := Password} <- Lists ]
     end.
 
@@ -792,7 +792,7 @@ import_auth_mnesia(Auths) ->
     case ets:info(emqx_user) of
         undefined -> ok;
         _ ->
-            [ mnesia:dirty_write({emqx_user, Login, base64:decode(Passworad), IsSuperuser}) || #{<<"login">> := Login,
+            [ mnesia:dirty_write({emqx_user, Login, base64:decode(Password), IsSuperuser}) || #{<<"login">> := Login,
                                                                                  <<"password">> := Password,
                                                                                  <<"is_superuser">> := IsSuperuser} <- Auths ]
     end.
@@ -837,7 +837,7 @@ is_version_supported2(Version) ->
         match ->
             try lists:map(fun erlang:list_to_integer/1, string:tokens(Version, ".")) of
                 [4, 0, N] -> N >= 13;
-                [4, 1] -> true
+                [4, 1] -> true;
                 [4, 2, N] -> N >= 11;
                 _ -> false
             catch
