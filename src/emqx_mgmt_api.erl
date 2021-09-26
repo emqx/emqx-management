@@ -271,6 +271,14 @@ is_fuzzy_key(_) ->
 %%--------------------------------------------------------------------
 %% Types
 
+to_type(V, TargetType) ->
+    try
+        to_type_(V, TargetType)
+    catch
+        _ : _ ->
+            throw(bad_value_type)
+    end.
+
 to_type_(V, atom) -> to_atom(V);
 to_type_(V, integer) -> to_integer(V);
 to_type_(V, timestamp) -> to_timestamp(V);
