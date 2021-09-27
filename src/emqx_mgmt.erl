@@ -161,7 +161,7 @@ node_info(Node) when Node =:= node() ->
     Info#{node              => node(),
           otp_release       => iolist_to_binary(otp_rel()),
           memory_total      => get_value(allocated, Memory),
-          memory_used       => get_value(used, Memory),
+          memory_used       => get_value(total, Memory),
           process_available => erlang:system_info(process_limit),
           process_used      => erlang:system_info(process_count),
           max_fds           => get_value(max_fds, lists:usort(lists:flatten(erlang:system_info(check_io)))),
