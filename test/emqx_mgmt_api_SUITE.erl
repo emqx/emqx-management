@@ -270,8 +270,8 @@ clients(_) ->
     {ok, Ok} = request_api(delete, api_path(["clients", binary_to_list(ClientId1)]), auth_header_()),
     ?assertEqual(?SUCCESS, get(<<"code">>, Ok)),
 
-    {ok, NotFound0} = request_api(delete, api_path(["clients", binary_to_list(ClientId1)]), auth_header_()),
-    ?assertEqual(?ERROR12, get(<<"code">>, NotFound0)),
+    {ok, Ok1} = request_api(delete, api_path(["clients", binary_to_list(ClientId1)]), auth_header_()),
+    ?assertEqual(?SUCCESS, get(<<"code">>, Ok1)),
 
     {ok, Clients6} = request_api(get, api_path(["clients"]), "_limit=100&_page=1", auth_header_()),
     ?assertEqual(1, maps:get(<<"count">>, get(<<"meta">>, Clients6))),
