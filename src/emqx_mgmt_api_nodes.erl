@@ -38,11 +38,10 @@ list(_Bindings, _Params) ->
     return({ok, [format(Node, Info) || {Node, Info} <- emqx_mgmt:list_nodes()]}).
 
 get(#{node := Node}, _Params) ->
-    return({ok, emqx_mgmt:lookup_node(Node)}).
+    return({ok, format(Node, emqx_mgmt:lookup_node(Node))}).
 
 format(Node, {error, Reason}) -> #{node => Node, error => Reason};
 
 format(_Node, Info = #{memory_total := Total, memory_used := Used}) ->
     Info#{memory_total := emqx_mgmt_util:kmg(Total),
           memory_used  := emqx_mgmt_util:kmg(Used)}.
-
