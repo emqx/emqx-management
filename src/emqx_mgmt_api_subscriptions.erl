@@ -87,10 +87,10 @@ list(#{node := Node} = Bindings, Params) ->
     end.
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
-    return({ok, format(emqx_mgmt:lookup_subscriptions(Node, emqx_mgmt_util:urldecode(ClientId)))});
+    return({ok, emqx_mgmt:lookup_subscriptions(Node, emqx_mgmt_util:urldecode(ClientId), ?format_fun)});
 
 lookup(#{clientid := ClientId}, _Params) ->
-    return({ok, format(emqx_mgmt:lookup_subscriptions(emqx_mgmt_util:urldecode(ClientId)))}).
+    return({ok, emqx_mgmt:lookup_subscriptions(emqx_mgmt_util:urldecode(ClientId), ?format_fun)}).
 
 format(Items) when is_list(Items) ->
     [format(Item) || Item <- Items];
