@@ -62,6 +62,7 @@ NewTestDeps = [{emqx_enterprise_dashboard, {git, UrlPrefix ++ "emqx-enterprise-d
               ],
 
 NewTest = lists:keystore(deps, 1, Test, {deps, lists:append(NewTestDeps, TestDeps)}),
+
 NewProfiles = lists:keystore(test, 1, Profiles, {test, NewTest}),
 CONFIG2 = lists:keystore(profiles, 1, CONFIG1, {profiles, NewProfiles}),
 

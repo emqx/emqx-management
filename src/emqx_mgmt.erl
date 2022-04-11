@@ -125,6 +125,7 @@
         , import_schemas/1
         , import_confs/2
         , to_version/1
+        , is_version_supported/2
         ]).
 
 -export([ enable_telemetry/0
@@ -809,6 +810,29 @@ to_version(Version) when is_binary(Version) ->
     binary_to_list(Version);
 to_version(Version) when is_list(Version) ->
     Version.
+
+is_version_supported(Data, Version) ->
+    case { maps:get(<<"auth_clientid">>, Data, [])
+         , maps:get(<<"auth_username">>, Data, [])
+         , maps:get(<<"auth_mnesia">>, Data, [])} of
+        {[], [], []} -> lists:member(Version, ?VERSIONS);
+        _ -> is_version_supported2(Version)
+    end.
+
+is_version_supported2(Version) ->
+    case re:run(Version, "^(\\d+\\.){1,2}\\d+$", [{capture, none}]) of
+        match ->
+            try lists:map(fun erlang:list_to_integer/1, string:tokens(Version, ".")) of
+                [4, 0, N] -> N >= 13;
+                [4, 1] -> true;
+                [4, 2, N] -> N >= 11;
+                _ -> false
+            catch
+                _ : _ -> false
+            end;
+        nomatch ->
+            false
+    end.
 
 %%--------------------------------------------------------------------
 %% Telemtry API

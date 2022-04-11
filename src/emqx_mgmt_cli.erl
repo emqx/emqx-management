@@ -531,7 +531,7 @@ data(["export"]) ->
     {{Y, M, D}, {H, MM, S}} = emqx_mgmt_util:datetime(Seconds),
     Filename = io_lib:format("emqx-export-~p-~p-~p-~p-~p-~p.json", [Y, M, D, H, MM, S]),
     NFilename = filename:join([emqx:get_env(data_dir), Filename]),
-    Version = string:sub_string(emqx_sys:version(), 1, 3),
+    Version = emqx_sys:version(),
     Data = [{version, erlang:list_to_binary(Version)},
             {date, erlang:list_to_binary(emqx_mgmt_util:strftime(Seconds))},
             {modules, Modules},
@@ -558,7 +558,7 @@ data(["import", Filename]) ->
         {ok, Json} ->
             Data = emqx_json:decode(Json, [return_maps]),
             Version = emqx_mgmt:to_version(maps:get(<<"version">>, Data)),
-            case lists:member(Version, ?VERSIONS) of
+            case emqx_mgmt:is_version_supported(Data, Version) of
                 true  ->
                     try
                         emqx_mgmt:import_confs(maps:get(<<"configs">>, Data, []), maps:get(<<"listeners_state">>, Data, [])),
