@@ -66,8 +66,10 @@ list(Bindings, Params) when map_size(Bindings) == 0 ->
     case proplists:get_value(<<"topic">>, Params) of
         undefined ->
             return({ok, emqx_mgmt_api:cluster_query(Params, ?SUBS_QS_SCHEMA, ?query_fun)});
-        Topic ->
-            return({ok, emqx_mgmt:list_subscriptions_via_topic(emqx_mgmt_util:urldecode(Topic), ?format_fun)})
+        Topic0 ->
+            Topic = emqx_mgmt_util:urldecode(Topic0),
+            Data = emqx_mgmt:list_subscriptions_via_topic(Topic, ?format_fun),
+            return({ok, add_meta(Params, Data)})
     end;
 
 list(#{node := Node} = Bindings, Params) ->
@@ -82,9 +84,27 @@ list(#{node := Node} = Bindings, Params) ->
                         Res -> Res
                     end
             end;
-        Topic ->
-            return({ok, emqx_mgmt:list_subscriptions_via_topic(Node, emqx_mgmt_util:urldecode(Topic), ?format_fun)})
+        Topic0 ->
+            Topic = emqx_mgmt_util:urldecode(Topic0),
+            Data = emqx_mgmt:list_subscriptions_via_topic(Node, Topic, ?format_fun),
+            return({ok, add_meta(Params, Data)})            
     end.
+
+add_meta(Params, List) ->
+    Page = emqx_mgmt_api:page(Params),
+    Limit = emqx_mgmt_api:limit(Params),
+    Count = erlang:length(List),
+    Start = (Page - 1) * Limit + 1,
+    Data = lists:sublist(List, Start, Limit),
+    #{meta => #{
+        page => Page,
+        limit => Limit,
+        hasnext => Start + Limit - 1 < Count,
+        count => Count
+    },
+        data => Data,
+        code => 0
+    }.    
 
 lookup(#{node := Node, clientid := ClientId}, _Params) ->
     return({ok, emqx_mgmt:lookup_subscriptions(Node, emqx_mgmt_util:urldecode(ClientId), ?format_fun)});
