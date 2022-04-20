@@ -69,7 +69,8 @@ list(Bindings, Params) when map_size(Bindings) == 0 ->
         Topic0 ->
             Topic = emqx_mgmt_util:urldecode(Topic0),
             Data = emqx_mgmt:list_subscriptions_via_topic(Topic, ?format_fun),
-            return({ok, add_meta(Params, Data)})
+            FilterData = filter_subscriptions(Data, Params),
+            return({ok, add_meta(Params, FilterData)})
     end;
 
 list(#{node := Node} = Bindings, Params) ->
@@ -87,7 +88,8 @@ list(#{node := Node} = Bindings, Params) ->
         Topic0 ->
             Topic = emqx_mgmt_util:urldecode(Topic0),
             Data = emqx_mgmt:list_subscriptions_via_topic(Node, Topic, ?format_fun),
-            return({ok, add_meta(Params, Data)})            
+            FilterData = filter_subscriptions(Data, Params),
+            return({ok, add_meta(Params, FilterData)})
     end.
 
 add_meta(Params, List) ->
@@ -172,3 +174,23 @@ update_ms(share, X, {{Pid, Topic}, Opts}) ->
     {{Pid, Topic}, Opts#{share => X}};
 update_ms(qos, X, {{Pid, Topic}, Opts}) ->
     {{Pid, Topic}, Opts#{qos => X}}.
+
+filter_subscriptions(Data0, Params) ->
+  Data1 = filter_by_key(qos, proplists:get_value(<<"qos">>, Params), Data0),
+  Data2 = filter_by_key(clientid, proplists:get_value(<<"clientid">>, Params), Data1),
+  case proplists:get_value(<<"share">>, Params) of
+    undefined -> Data2;
+    Share ->
+      Prefix = filename:join([<<"$share">>, Share]),
+      Size = byte_size(Prefix),
+      lists:filter(fun(#{topic := Topic}) ->
+        case Topic of
+          <<Prefix:Size, _/binary>> -> true;
+          _ -> false
+        end
+                   end,
+        Data2)
+  end.
+
+filter_by_key(_Key, undefined, List) -> List;
+filter_by_key(Key, Value, List) -> lists:filter(fun(E) -> Value =:= maps:get(Key, E) end, List).
