@@ -176,7 +176,7 @@ update_ms(qos, X, {{Pid, Topic}, Opts}) ->
     {{Pid, Topic}, Opts#{qos => X}}.
 
 filter_subscriptions(Data0, Params) ->
-  Data1 = filter_by_key(qos, proplists:get_value(<<"qos">>, Params), Data0),
+  Data1 = filter_by_key(qos, qos(Params), Data0),
   Data2 = filter_by_key(clientid, proplists:get_value(<<"clientid">>, Params), Data1),
   case proplists:get_value(<<"share">>, Params) of
     undefined -> Data2;
@@ -185,11 +185,18 @@ filter_subscriptions(Data0, Params) ->
       Size = byte_size(Prefix),
       lists:filter(fun(#{topic := Topic}) ->
         case Topic of
-          <<Prefix:Size, _/binary>> -> true;
+          <<Prefix:Size/binary, _/binary>> -> true;
           _ -> false
         end
                    end,
         Data2)
+  end.
+
+qos(Params) ->
+  case proplists:get_value(<<"qos">>, Params) of
+    undefined -> undefined;
+    Qos when is_integer(Qos) -> Qos;
+    Qos when is_binary(Qos) -> binary_to_integer(Qos)
   end.
 
 filter_by_key(_Key, undefined, List) -> List;
